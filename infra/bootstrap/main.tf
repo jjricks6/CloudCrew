@@ -30,10 +30,10 @@ provider "aws" {
 
 # --- S3 bucket for Terraform state ---
 
-#checkov:skip=CKV2_AWS_62:Event notifications unnecessary for state bucket
-#checkov:skip=CKV_AWS_144:Cross-region replication unnecessary for single-region dev project
-#checkov:skip=CKV_AWS_18:Access logging adds cost; state bucket access audited via CloudTrail
 resource "aws_s3_bucket" "terraform_state" {
+  #checkov:skip=CKV2_AWS_62:Event notifications unnecessary for state bucket
+  #checkov:skip=CKV_AWS_144:Cross-region replication unnecessary for single-region dev project
+  #checkov:skip=CKV_AWS_18:Access logging adds cost; state bucket access audited via CloudTrail
   bucket = var.state_bucket_name
 
   lifecycle {
@@ -77,6 +77,10 @@ resource "aws_s3_bucket_lifecycle_configuration" "terraform_state" {
 
     filter {}
 
+    abort_incomplete_multipart_upload {
+      days_after_initiation = 7
+    }
+
     noncurrent_version_expiration {
       noncurrent_days = 90
     }
@@ -85,9 +89,9 @@ resource "aws_s3_bucket_lifecycle_configuration" "terraform_state" {
 
 # --- DynamoDB table for state locking ---
 
-#checkov:skip=CKV_AWS_28:PITR unnecessary for lock table — ephemeral lock data only
-#checkov:skip=CKV_AWS_119:CMK encryption unnecessary — default encryption sufficient for lock table
 resource "aws_dynamodb_table" "terraform_locks" {
+  #checkov:skip=CKV_AWS_28:PITR unnecessary for lock table — ephemeral lock data only
+  #checkov:skip=CKV_AWS_119:CMK encryption unnecessary — default encryption sufficient for lock table
   name         = var.lock_table_name
   billing_mode = "PAY_PER_REQUEST"
   hash_key     = "LockID"
