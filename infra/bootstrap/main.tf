@@ -30,6 +30,9 @@ provider "aws" {
 
 # --- S3 bucket for Terraform state ---
 
+#checkov:skip=CKV2_AWS_62:Event notifications unnecessary for state bucket
+#checkov:skip=CKV_AWS_144:Cross-region replication unnecessary for single-region dev project
+#checkov:skip=CKV_AWS_18:Access logging adds cost; state bucket access audited via CloudTrail
 resource "aws_s3_bucket" "terraform_state" {
   bucket = var.state_bucket_name
 
@@ -65,8 +68,25 @@ resource "aws_s3_bucket_public_access_block" "terraform_state" {
   restrict_public_buckets = true
 }
 
+resource "aws_s3_bucket_lifecycle_configuration" "terraform_state" {
+  bucket = aws_s3_bucket.terraform_state.id
+
+  rule {
+    id     = "expire-old-versions"
+    status = "Enabled"
+
+    filter {}
+
+    noncurrent_version_expiration {
+      noncurrent_days = 90
+    }
+  }
+}
+
 # --- DynamoDB table for state locking ---
 
+#checkov:skip=CKV_AWS_28:PITR unnecessary for lock table — ephemeral lock data only
+#checkov:skip=CKV_AWS_119:CMK encryption unnecessary — default encryption sufficient for lock table
 resource "aws_dynamodb_table" "terraform_locks" {
   name         = var.lock_table_name
   billing_mode = "PAY_PER_REQUEST"
