@@ -22,7 +22,15 @@ make check
 
 This runs format + lint + typecheck + test. Do NOT skip this. Do NOT commit code that fails `make check`.
 
-If `make check` fails, fix the issue and re-run. If a test doesn't pass after 3 attempts, stop and ask for help.
+Before pushing ANY branch to GitHub, you MUST run:
+
+```bash
+make pre-push
+```
+
+This mirrors every CI check locally: `make check` + security scan + file size check + Terraform validate + Checkov scan. Do NOT push code that fails `make pre-push`. Fix failures locally — do not rely on CI to catch them.
+
+If any check fails, fix the issue and re-run. If a check doesn't pass after 3 attempts, stop and ask for help.
 
 ## Infrastructure & Deployment
 
@@ -123,7 +131,7 @@ Do NOT create new top-level directories in `src/` without architectural justific
 - NEVER use `Any` type without a comment explaining why
 - NEVER create workaround code for upstream issues — fix the root cause or file an issue
 - NEVER use `git commit --no-verify`
-- NEVER skip `make check` before committing
+- NEVER skip `make check` before committing or `make pre-push` before pushing
 - NEVER create a new module that duplicates functionality of an existing one — enhance the existing module
 - NEVER put business logic in hooks — hooks are for cross-cutting concerns (logging, memory, auth)
 - NEVER modify generated files directly — modify the source and regenerate
@@ -214,10 +222,11 @@ Rules:
 
 1. Create a feature branch from `main`.
 2. Make focused commits. Run `make check` before each commit.
-3. Push the branch and open a PR against `main`.
-4. PR must pass CI (lint, typecheck, test, security, architecture tests).
-5. PR gets reviewed, then merged (squash merge preferred for feature branches).
-6. Delete the branch after merge.
+3. Run `make pre-push` before pushing. Fix any failures locally.
+4. Push the branch and open a PR against `main`.
+5. PR must pass CI (lint, typecheck, test, security, file size, Terraform validate, Checkov).
+6. PR gets reviewed, then merged (squash merge preferred for feature branches).
+7. Delete the branch after merge.
 
 PR title follows the same conventional commit format as the commit message subject.
 

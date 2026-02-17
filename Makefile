@@ -1,9 +1,13 @@
-.PHONY: check test lint format typecheck security arch-test install install-hooks clean \
+.PHONY: check pre-push test lint format typecheck security arch-test file-size-check \
+       install install-hooks clean checkov-scan \
        bootstrap-init bootstrap-apply tf-init tf-plan tf-apply tf-destroy tf-validate \
        docker-build docker-push
 
-# Run ALL quality checks — the single command agents must run after changes
+# Run ALL quality checks — the single command agents must run after code changes
 check: format lint typecheck test
+
+# Run EVERY CI check locally — agents MUST run this before pushing
+pre-push: check security file-size-check tf-validate checkov-scan
 
 # Install dependencies
 install:
@@ -45,6 +49,16 @@ test-integration:
 security:
 	bandit -r src/ -c pyproject.toml
 
+# Check for oversized Python files (>500 lines)
+file-size-check:
+	@oversized=$$(find src/ -name "*.py" -exec awk 'END{if(NR>500)print FILENAME": "NR" lines"}' {} \;); \
+	if [ -n "$$oversized" ]; then \
+		echo "Files exceeding 500 line limit:"; \
+		echo "$$oversized"; \
+		exit 1; \
+	fi; \
+	echo "All files within size limits"
+
 # Clean build artifacts
 clean:
 	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
@@ -84,6 +98,10 @@ tf-validate:
 	terraform -chdir=infra/bootstrap validate
 	terraform -chdir=infra/terraform init -backend=false
 	terraform -chdir=infra/terraform validate
+
+# Checkov security scan on Terraform code
+checkov-scan:
+	checkov -d infra/ --framework terraform --quiet --compact
 
 # --- Docker: ECS phase runner image ---
 
