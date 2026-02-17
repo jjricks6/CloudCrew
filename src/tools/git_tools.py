@@ -60,7 +60,7 @@ def _resolve_path(repo: git.Repo, file_path: str) -> Path:
     return resolved
 
 
-@tool(context=True)  # type: ignore[misc]
+@tool(context=True)
 def git_read(file_path: str, tool_context: ToolContext) -> str:
     """Read a file from the project repository.
 
@@ -79,7 +79,7 @@ def git_read(file_path: str, tool_context: ToolContext) -> str:
     return resolved.read_text()
 
 
-@tool(context=True)  # type: ignore[misc]
+@tool(context=True)
 def git_list(directory: str, tool_context: ToolContext) -> str:
     """List files in a directory in the project repository.
 
@@ -102,7 +102,7 @@ def git_list(directory: str, tool_context: ToolContext) -> str:
     return "\n".join(files)
 
 
-@tool(context=True)  # type: ignore[misc]
+@tool(context=True)
 def git_write_architecture(
     file_path: str,
     content: str,

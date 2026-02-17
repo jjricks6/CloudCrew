@@ -76,7 +76,7 @@ def _get_repo(invocation_state: dict[str, Any]) -> git.Repo:
     return git.Repo(str(repo_path))
 
 
-@tool(context=True)  # type: ignore[misc]
+@tool(context=True)
 def write_adr(
     title: str,
     status: str,
