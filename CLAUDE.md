@@ -97,6 +97,7 @@ Do NOT create new top-level directories in `src/` without architectural justific
 - Use `pytest` markers: `@pytest.mark.unit`, `@pytest.mark.integration`, `@pytest.mark.e2e`
 - Mock external services (Bedrock, DynamoDB, Git) in unit tests
 - Architecture tests in `tests/architecture/` enforce module boundaries — don't break them
+- **Coverage ratchet**: `fail_under` in pyproject.toml starts at 0 (no code yet). When the first module lands, raise it to match actual coverage. It must never decrease — only stay the same or go up. If your PR drops coverage below the threshold, add tests until it passes.
 
 ## Documentation Lockstep
 
