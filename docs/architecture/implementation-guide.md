@@ -7,7 +7,7 @@
 
 ## Build Order
 
-The implementation is organized into 5 milestones. Each builds on the previous and produces a testable system.
+The implementation is organized into 6 milestones. Each builds on the previous and produces a testable system.
 
 ---
 
@@ -588,6 +588,86 @@ Cognito user pool + hosted UI for customer login
 
 ---
 
+### Milestone 6: Self-Improvement System
+
+**Goal:** CloudCrew gets better with every engagement through cross-engagement learning.
+
+**Build:**
+
+#### 6.1 Metrics Hook + DynamoDB Table
+
+Create the `cloudcrew-metrics` DynamoDB table (PAY_PER_REQUEST). Implement the `metrics_hook` as a Strands HookProvider that tracks token usage, agent turns, and handoff events per invocation. The hook writes to working memory during the Swarm. Update the PM Review Lambda to aggregate phase-level metrics.
+
+**Schema:**
+- `ENGAGEMENT#{project_id}` / `SUMMARY` — per-engagement totals
+- `ENGAGEMENT#{project_id}` / `PHASE#{name}` — per-phase breakdowns with per-agent cost
+- `TIMELINE` / `#{timestamp}#{project_id}` — cross-engagement timeline
+- `ENGAGEMENT#{project_id}` / `SURVEY` — post-engagement survey
+
+**Test:**
+- Unit test the metrics hook with mock Bedrock calls
+- Verify token counts accumulate correctly in working memory
+- Verify PM Review Lambda writes phase-level metrics
+
+#### 6.2 Structured Customer Feedback + Survey
+
+Update the approval gate API to accept structured ratings (quality, relevance, completeness: 1-5) alongside the approve/revise decision. Update the task ledger `customer_feedback` field to include ratings. Add a post-engagement survey endpoint and dashboard page.
+
+**Test:**
+- Approval API accepts and stores structured feedback
+- Survey API stores results in metrics table
+- Dashboard renders rating inputs at approval gates
+
+#### 6.3 Pattern Library (S3 + KB + Tools)
+
+Create the `cloudcrew-patterns` S3 bucket. Create a dedicated Bedrock KB data source pointing to it. Implement pattern library tools:
+- `search_patterns(query, category?, tags?)` — searches pattern KB
+- `use_pattern(pattern_id)` — copies pattern into project, increments `times_used` in metadata.json
+- `contribute_pattern(artifact_path, category, tags)` — creates draft pattern from engagement artifact
+- `promote_pattern(pattern_id)` — QA-only, promotes candidate → proven if 3+ uses and >80% success rate
+
+Add pattern library search instructions to all agent system prompts.
+
+**Test:**
+- Seed the pattern library with 2-3 sample patterns
+- Verify `search_patterns` returns relevant results
+- Verify `use_pattern` copies files and updates metadata
+- Verify `contribute_pattern` creates draft with correct metadata
+- Verify `promote_pattern` enforces tier criteria
+
+#### 6.4 Retrospective Phase (Step Functions + Swarm)
+
+Add the Retrospective phase to the Step Functions state machine after Handoff:
+- Retrospective Swarm (PM, QA) — no customer approval gate
+- Finalize Metrics Lambda — aggregates metrics, writes timeline item, triggers KB re-sync
+- Post-engagement survey trigger
+
+PM responsibilities: compare outcomes vs. SOW, write lessons to cross-engagement LTM, identify artifacts for pattern library. QA responsibilities: score deliverable quality, evaluate and promote pattern candidates.
+
+**Test:**
+- Verify Retrospective runs automatically after Handoff approval
+- Verify PM writes lessons to LTM and contributes patterns
+- Verify QA promotes qualifying patterns
+- Verify Finalize Metrics Lambda writes SUMMARY and TIMELINE items
+- Verify KB re-syncs with newly contributed patterns
+
+#### 6.5 Cross-Engagement Analytics
+
+Build tools/queries for analyzing trends across engagements:
+- Cost trends over time (are engagements getting cheaper?)
+- Satisfaction trends (are customers happier?)
+- Pattern library growth and usage statistics
+- Agent cost optimization recommendations
+
+This is primarily a reporting/query layer on top of the metrics table — no new infrastructure.
+
+**Test:**
+- Query TIMELINE items and verify trend calculations
+- Verify pattern library statistics (total patterns by tier, usage counts)
+- Run 2+ test engagements and verify cross-engagement queries return meaningful data
+
+---
+
 ## Testing Strategy
 
 ### Unit Tests
@@ -610,9 +690,11 @@ Cognito user pool + hosted UI for customer login
 ### End-to-End Tests
 
 - Full project lifecycle with a sample SOW
-- Run through all 5 phases with mock approvals
+- Run through all 5 delivery phases + retrospective with mock approvals
 - Verify all deliverables are produced
 - Verify task ledger is complete and accurate
+- Verify engagement metrics are written and cross-engagement queries work
+- Verify pattern library contributions and promotions after multiple engagements
 
 ### Performance Benchmarks
 
@@ -636,6 +718,7 @@ BEDROCK_REGION=us-east-1
 
 # DynamoDB
 TASK_LEDGER_TABLE=cloudcrew-projects
+METRICS_TABLE=cloudcrew-metrics
 
 # AgentCore Memory
 STM_MEMORY_ID=mem-xxx
@@ -643,6 +726,10 @@ LTM_MEMORY_ID=mem-yyy
 
 # Knowledge Base
 KNOWLEDGE_BASE_ID=kb-zzz
+PATTERNS_KNOWLEDGE_BASE_ID=kb-patterns
+
+# Pattern Library
+PATTERNS_BUCKET=cloudcrew-patterns
 
 # Git
 PROJECT_REPO_URL=https://github.com/org/cloudcrew-project-{customer}
@@ -757,6 +844,7 @@ make tf-destroy
 | 3 (Task Ledger + Memory) | + DynamoDB config | ~$1/month |
 | 4 (Step Functions + ECS) | + VPC, ECS, Step Functions, Lambda, API GW, Cognito | ~$5-15/month |
 | 5 (Dashboard) | + CloudFront, S3 hosting | ~$5-15/month |
+| 6 (Self-Improvement) | + DynamoDB metrics table, S3 patterns bucket, Bedrock KB data source | ~$5-15/month |
 
 All costs assume resources are destroyed after testing. Bedrock token costs are separate.
 

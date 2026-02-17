@@ -91,6 +91,28 @@ Two-tier orchestration:
 │    runbooks, knowledge transfer      │
 └──────┬──────────────────────────────┘
        ▼
+┌─────────────────────────────────────┐
+│  PM Review → Approval Gate           │
+└──────┬──────────────────────────────┘
+       ▼
+┌─────────────────────────────────────┐
+│  Retrospective Phase (ECS)           │
+│  Swarm: PM, QA                       │
+│  Internal: metrics, lessons learned, │
+│    pattern library contributions     │
+│  (No customer approval gate)         │
+└──────┬──────────────────────────────┘
+       ▼
+┌─────────────────────────────────────┐
+│  Finalize Metrics (Lambda)           │
+│  Aggregate metrics, sync patterns KB │
+└──────┬──────────────────────────────┘
+       ▼
+┌─────────────────────────────────────┐
+│  Post-Engagement Survey              │
+│  Customer rates overall experience   │
+└──────┬──────────────────────────────┘
+       ▼
 ┌─────────────┐
 │  Complete    │
 └─────────────┘
@@ -202,8 +224,9 @@ Within a Swarm:
 | POC | Dev | Dev, Infra, Data, Security, SA | Post-Swarm step | Working POC, findings doc, updated architecture, security-reviewed IaC |
 | Production | Dev | Dev, Infra, Data, Security, QA | Post-Swarm step | Production code, IaC, CI/CD, tests, security scans |
 | Handoff | PM | PM, SA | Implicit (PM is in Swarm) | Documentation, runbooks, knowledge transfer |
+| Retrospective | PM | PM, QA | N/A (internal) | Engagement analysis, lessons learned, pattern contributions, quality scores |
 
-Note: Security was added to POC because Infra produces IaC during POC that must be reviewed. SA remains in POC to validate POC aligns with architecture. PM reviews every phase's output in a dedicated post-Swarm step (except Discovery and Handoff where PM is already the entry agent).
+Note: Security was added to POC because Infra produces IaC during POC that must be reviewed. SA remains in POC to validate POC aligns with architecture. PM reviews every phase's output in a dedicated post-Swarm step (except Discovery and Handoff where PM is already the entry agent). Retrospective is internal — no customer approval gate.
 
 ---
 
@@ -219,6 +242,9 @@ Note: Security was added to POC because Infra produces IaC during POC that must 
 | **Task Ledger** | DynamoDB | Entire project | Structured record: decisions, assumptions, progress, blockers, customer feedback |
 | **Project Artifacts** | Git repository | Entire project lifetime | Code, IaC, ADRs, docs — the canonical deliverables |
 | **Semantic Search** | Bedrock Knowledge Base (S3 synced from Git) | Entire project lifetime | Any agent can search all artifacts semantically |
+| **Cross-Engagement Metrics** | DynamoDB (`cloudcrew-metrics` table) | All projects | Engagement metrics, phase breakdowns, cost tracking, satisfaction trends |
+| **Pattern Library** | S3 (`cloudcrew-patterns`) + Bedrock KB | All projects | Reusable IaC modules, code scaffolds, architecture patterns, security baselines |
+| **Cross-Engagement LTM** | AgentCore Memory (shared namespace) | All projects | Lessons learned, best practices, engagement retrospective insights |
 
 ### Task Ledger Schema (DynamoDB)
 
@@ -240,7 +266,7 @@ Attributes:
   assumptions: list[{description, confidence, timestamp}]  # Unverified, needs validation
   decisions: list[{description, rationale, made_by, timestamp, adr_path}]
   blockers: list[{description, assigned_to, status, timestamp}]
-  customer_feedback: list[{phase, feedback, timestamp}]
+  customer_feedback: list[{phase, decision, ratings: {quality, relevance, completeness}, feedback_text, timestamp}]
 
   deliverables: map{phase -> list[{name, git_path, status}]}
 
@@ -413,7 +439,9 @@ React SPA with three views:
 | LLM (execution agents) | Amazon Bedrock — Claude Sonnet | Efficient generation for Dev, Infra, Data, QA |
 | Agent Memory (STM) | AgentCore Memory | Per-agent session memory within phases |
 | Agent Memory (LTM) | AgentCore Memory (semantic + preference strategies) | Cross-phase decisions, customer preferences |
-| Task Ledger | DynamoDB | Structured project state, queryable by all agents |
+| Task Ledger | DynamoDB (`cloudcrew-projects`) | Structured project state, queryable by all agents |
+| Engagement Metrics | DynamoDB (`cloudcrew-metrics`) | Cross-engagement performance tracking, cost analysis, satisfaction trends |
+| Pattern Library | S3 (`cloudcrew-patterns`) + Bedrock KB | Reusable cross-engagement artifacts with tiered promotion |
 | Project Artifacts | Git repository (GitHub) | Canonical deliverables, stigmergic coordination |
 | Semantic Search | Bedrock Knowledge Bases (S3 data source) | Semantic search across all project artifacts |
 | Phase Execution | ECS Fargate (AgentCore Runtime when mature) | Swarm invocations per phase; ECS required for >15min execution and interrupt blocking |
@@ -429,7 +457,66 @@ React SPA with three views:
 
 ---
 
-## 12. Design Principles
+## 12. Self-Improvement System
+
+CloudCrew gets better with every engagement through a cross-engagement intelligence layer. Five mechanisms feed improvement:
+
+### Pattern Library
+
+A tiered repository of reusable artifacts stored in S3 (`cloudcrew-patterns`) and indexed by a dedicated Bedrock KB data source.
+
+| Tier | Criteria | Who promotes |
+|------|----------|-------------|
+| **Draft** | Auto-captured from engagement artifacts at retrospective | System (automatic) |
+| **Candidate** | Used once and worked well | Any agent contributes |
+| **Proven** | Used in 3+ engagements with >80% success rate | QA agent promotes |
+
+Pattern categories: `iac/`, `architecture/`, `security/`, `code/`. Each pattern is a directory containing the artifact files plus a `metadata.json` with tier, usage count, success rate, tags, and contributing agent.
+
+Agent tools for the pattern library:
+- `search_patterns(query, category?, tags?)` — semantic search via Bedrock KB
+- `use_pattern(pattern_id)` — copies pattern into project repo, increments usage count
+- `contribute_pattern(artifact_path, category, tags)` — creates draft pattern from engagement artifact
+- `promote_pattern(pattern_id)` — QA agent only, promotes candidate → proven
+
+Agents search the pattern library **before building from scratch** in every phase.
+
+### Engagement Metrics
+
+A dedicated DynamoDB table (`cloudcrew-metrics`, PAY_PER_REQUEST) tracks quantitative data per engagement:
+
+- **Per-engagement summary**: total token cost, duration, revision cycles, handoffs, satisfaction score, patterns used/contributed
+- **Per-phase breakdown**: token cost, duration, revision cycles, handoffs, per-agent cost breakdown
+- **Cross-engagement timeline**: all engagements sorted by date for trend analysis
+- **Post-engagement survey**: overall satisfaction, would-reuse, improvement areas
+
+A Strands hook (`metrics_hook`) runs on every agent invocation to track token usage, turn count, and handoff events. Data flows from working memory → phase aggregation (PM Review Lambda) → engagement aggregation (Finalize Metrics Lambda at retrospective).
+
+### Structured Customer Feedback
+
+At each approval gate, the dashboard collects structured ratings alongside the approve/revise decision:
+
+- Quality (1-5), Relevance (1-5), Completeness (1-5)
+- Optional freeform notes
+
+After Handoff, a post-engagement survey captures overall satisfaction, reuse intent, and improvement suggestions. All feedback is stored in the metrics table and factored into pattern success rates and engagement trend analysis.
+
+### Retrospective Phase
+
+After Handoff approval, a Retrospective phase runs automatically (no customer approval gate):
+
+- **PM agent**: Compares outcomes vs. SOW, summarizes lessons learned, identifies artifacts for pattern library, writes insights to cross-engagement LTM
+- **QA agent**: Scores deliverable quality, evaluates pattern candidates for promotion, promotes qualifying patterns
+
+Followed by a **Finalize Metrics Lambda** that aggregates all phase metrics, writes the cross-engagement timeline item, and triggers KB re-sync for newly contributed patterns.
+
+### Cost Tracking
+
+Token costs are attributed by agent, phase, and deliverable. The metrics hook records `{model_id, input_tokens, output_tokens}` per call. A utility maps model → price-per-token. The retrospective generates a cost report identifying expensive agents, high-cost phases, and optimization opportunities (e.g., "consider Sonnet instead of Opus for routine SA documentation").
+
+---
+
+## 13. Design Principles
 
 1. **Orchestration for structure, choreography for creativity** — Step Functions handles the predictable (phase ordering, approvals). Swarm handles the creative (agent collaboration within phases).
 
@@ -449,7 +536,7 @@ React SPA with three views:
 
 ---
 
-## 13. Decisions Log
+## 14. Decisions Log
 
 | Decision | Choice | Rationale |
 |----------|--------|-----------|
@@ -468,3 +555,8 @@ React SPA with three views:
 | Security in POC | Security added to POC Swarm | Infra produces IaC during POC that must be security-reviewed |
 | Chat availability | Standalone PM Lambda for non-PM phases | Customer needs PM access at all times, not just during PM's active Swarms |
 | Customer UI | React SPA (chat + kanban + artifacts) | Familiar patterns; straightforward to build |
+| Metrics storage | Separate DynamoDB table (`cloudcrew-metrics`) | Clearer separation from task ledger; no GSIs needed; same cost |
+| Pattern storage | S3 + Bedrock KB | Files in S3 for storage, KB for semantic search; consistent with project artifact search |
+| Retrospective phase | Automated (no approval gate) | Internal analysis doesn't need customer input; runs PM + QA |
+| Metrics collection | Strands hook (in-process) | More accurate than external monitoring; writes to working memory during Swarm |
+| Self-improvement milestone | M6 (after Dashboard) | Core system must work before it can improve itself |

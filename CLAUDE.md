@@ -100,6 +100,8 @@ Import rules:
 | CloudCrew infrastructure | Terraform | `infra/terraform/` |
 | Customer dashboard | React app | `dashboard/` |
 | Architecture decisions | ADR | `docs/architecture/` |
+| Engagement metrics, cost tracking | State module | `src/state/` |
+| Pattern library tools | Tool module | `src/tools/` |
 
 Do NOT create new top-level directories in `src/` without architectural justification.
 

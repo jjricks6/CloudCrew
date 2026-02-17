@@ -19,9 +19,13 @@ CloudCrew uses 7 specialized agents that collaborate within Strands Swarms. Each
 
 All agents share:
 
-- Access to `invocation_state` containing: `project_id`, `session_id`, `phase`, `task_ledger_table`, `git_repo_url`, `knowledge_base_id`
+- Access to `invocation_state` containing: `project_id`, `session_id`, `phase`, `task_ledger_table`, `git_repo_url`, `knowledge_base_id`, `patterns_bucket`
 - A Knowledge Base search tool for semantic search across project artifacts
 - A task ledger reader tool (read-only access to the DynamoDB task ledger)
+- Pattern library tools: `search_patterns` (search reusable patterns), `use_pattern` (copy pattern into project), `contribute_pattern` (submit pattern from engagement artifact)
+- Metrics hook: automatic token usage, turn count, and handoff tracking (no agent action needed)
+
+All agents are instructed to **search the pattern library before building from scratch**.
 
 ---
 
@@ -44,6 +48,7 @@ Rationale: Needs to decompose complex SOWs, synthesize across all domains, manag
 | POC | Advisory |
 | Production | Advisory |
 | Handoff | Primary, entry agent |
+| Retrospective | Primary, entry agent — engagement analysis and lessons learned |
 
 ### Tools
 
@@ -535,6 +540,7 @@ Rationale: Test generation follows patterns from the architecture and code; exec
 | Phase | Role |
 |-------|------|
 | Production | Primary — test all application code |
+| Retrospective | Primary — quality scoring, pattern promotion |
 
 ### Tools
 
@@ -545,6 +551,7 @@ Rationale: Test generation follows patterns from the architecture and code; exec
 | `integration_test_runner` | Runs integration tests against deployed services. |
 | `load_test` | Runs basic load tests (k6, locust) and reports results. |
 | `test_report_generator` | Generates structured test reports. |
+| `promote_pattern` | Promotes pattern library candidates to proven tier (QA-only tool). |
 | `git_read` | Read any file in the project repo. |
 | `git_write_tests` | Write/update files in `app/tests/`. |
 | `knowledge_base_search` | Semantic search across all project artifacts. |
@@ -635,4 +642,10 @@ These guidelines are appended to every agent's system prompt when participating 
 - Use `git_read` for artifacts written **during the current phase** (the KB only re-syncs at phase transitions)
 - Read the task ledger to understand current project state, decisions, and open items
 - Check if another agent has already done related work in this phase
+
+### Pattern Library
+- Before building anything from scratch, search the pattern library with `search_patterns`
+- If a relevant pattern exists, use `use_pattern` to copy it into the project and adapt it
+- Prefer Proven patterns over Candidate patterns over Draft patterns
+- After producing a reusable artifact, contribute it with `contribute_pattern`
 ```
