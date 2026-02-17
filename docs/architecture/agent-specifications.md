@@ -19,9 +19,16 @@ CloudCrew uses 7 specialized agents that collaborate within Strands Swarms. Each
 
 All agents share:
 
-- Access to `invocation_state` containing: `project_id`, `session_id`, `phase`, `task_ledger_table`, `git_repo_url`, `knowledge_base_id`
-- A Knowledge Base search tool for semantic search across project artifacts
-- A task ledger reader tool (read-only access to the DynamoDB task ledger)
+- Access to `invocation_state` containing: `project_id`, `session_id`, `phase`, `task_ledger_table`, `git_repo_url`, `knowledge_base_id`, `patterns_bucket`
+- `git_read` — read any file from the project repo
+- `git_list` — list files in a directory in the project repo (essential for discovering artifacts written by other agents in the same phase, since the KB only re-syncs at phase transitions)
+- `knowledge_base_search` — semantic search across project artifacts (via Bedrock KB)
+- `read_task_ledger` — read-only access to the DynamoDB task ledger
+- Pattern library tools: `search_patterns` (search reusable patterns), `use_pattern` (copy pattern into project), `contribute_pattern` (submit pattern from engagement artifact)
+- `retrieve_cross_engagement_lessons` — search cross-engagement LTM (AgentCore Memory shared namespace) for lessons learned and best practices from prior engagements
+- Metrics hook: automatic token usage, turn count, and handoff tracking (no agent action needed)
+
+All agents are instructed to **search the pattern library before building from scratch**.
 
 ---
 
@@ -44,6 +51,7 @@ Rationale: Needs to decompose complex SOWs, synthesize across all domains, manag
 | POC | Advisory |
 | Production | Advisory |
 | Handoff | Primary, entry agent |
+| Retrospective | Primary, entry agent — engagement analysis and lessons learned |
 
 ### Tools
 
@@ -53,6 +61,7 @@ Rationale: Needs to decompose complex SOWs, synthesize across all domains, manag
 | `update_task_ledger` | Writes to DynamoDB task ledger (facts, assumptions, decisions, blockers, deliverable status). PM-only tool. |
 | `format_customer_update` | Formats phase summaries and deliverable lists for customer presentation. |
 | `git_read` | Read any file in the project repo. |
+| `git_list` | List files in a directory in the project repo. |
 | `git_write_project_plan` | Write/update files in `docs/project-plan/`. |
 | `knowledge_base_search` | Semantic search across all project artifacts. |
 | `read_task_ledger` | Read the current task ledger state. |
@@ -138,6 +147,7 @@ Rationale: Architecture trade-off analysis, cross-cutting design concerns, cost 
 | `aws_service_lookup` | Searches AWS documentation for service capabilities, limits, pricing. |
 | `estimate_cost` | Estimates AWS costs based on architecture components and expected usage patterns. |
 | `git_read` | Read any file in the project repo. |
+| `git_list` | List files in a directory in the project repo. |
 | `git_write_architecture` | Write/update files in `docs/architecture/`. |
 | `knowledge_base_search` | Semantic search across all project artifacts. |
 | `read_task_ledger` | Read the current task ledger state. |
@@ -229,6 +239,7 @@ Rationale: Terraform generation follows established patterns from SA's architect
 | `checkov_scan` | Runs Checkov security scan on Terraform code. |
 | `aws_provider_docs` | Searches Terraform AWS provider documentation. |
 | `git_read` | Read any file in the project repo. |
+| `git_list` | List files in a directory in the project repo. |
 | `git_write_infra` | Write/update files in `infra/`. |
 | `knowledge_base_search` | Semantic search across all project artifacts. |
 | `read_task_ledger` | Read the current task ledger state. |
@@ -313,6 +324,7 @@ Rationale: Code generation follows established patterns and frameworks; SA provi
 | `run_tests` | Executes test suites (pytest, jest, etc.) and returns results. |
 | `lint_code` | Runs linter/formatter (eslint, black, etc.). |
 | `git_read` | Read any file in the project repo. |
+| `git_list` | List files in a directory in the project repo. |
 | `git_write_app` | Write/update files in `app/`. |
 | `package_manager` | Install/manage dependencies (npm, pip, etc.). |
 | `knowledge_base_search` | Semantic search across all project artifacts. |
@@ -390,6 +402,7 @@ Rationale: Database design and pipeline creation follow established patterns.
 | `query_tool` | Generates and validates SQL/NoSQL queries. |
 | `pipeline_generator` | Generates data pipeline definitions (Glue, Step Functions, Lambda). |
 | `git_read` | Read any file in the project repo. |
+| `git_list` | List files in a directory in the project repo. |
 | `git_write_data` | Write/update files in `data/`. |
 | `knowledge_base_search` | Semantic search across all project artifacts. |
 | `read_task_ledger` | Read the current task ledger state. |
@@ -462,6 +475,7 @@ Rationale: Security review requires reasoning about attack surfaces, policy impl
 | `iam_analyzer` | Analyzes IAM policies for over-permissiveness. |
 | `security_review_template` | Generates structured security review reports. |
 | `git_read` | Read any file in the project repo. |
+| `git_list` | List files in a directory in the project repo. |
 | `git_write_security` | Write/update files in `security/`. |
 | `knowledge_base_search` | Semantic search across all project artifacts. |
 | `read_task_ledger` | Read the current task ledger state. |
@@ -535,6 +549,7 @@ Rationale: Test generation follows patterns from the architecture and code; exec
 | Phase | Role |
 |-------|------|
 | Production | Primary — test all application code |
+| Retrospective | Primary — quality scoring, pattern promotion |
 
 ### Tools
 
@@ -545,7 +560,9 @@ Rationale: Test generation follows patterns from the architecture and code; exec
 | `integration_test_runner` | Runs integration tests against deployed services. |
 | `load_test` | Runs basic load tests (k6, locust) and reports results. |
 | `test_report_generator` | Generates structured test reports. |
+| `promote_pattern` | Promotes pattern library candidates to proven tier (QA-only tool). |
 | `git_read` | Read any file in the project repo. |
+| `git_list` | List files in a directory in the project repo. |
 | `git_write_tests` | Write/update files in `app/tests/`. |
 | `knowledge_base_search` | Semantic search across all project artifacts. |
 | `read_task_ledger` | Read the current task ledger state. |
@@ -632,7 +649,16 @@ These guidelines are appended to every agent's system prompt when participating 
 
 ### Context Retrieval
 - Before starting work, search the Knowledge Base for relevant **prior phase** artifacts
-- Use `git_read` for artifacts written **during the current phase** (the KB only re-syncs at phase transitions)
+- For artifacts written **during the current phase** (the KB only re-syncs at phase transitions):
+  - Use `git_list` to discover what files exist in relevant directories
+  - Use `git_read` to read specific files
 - Read the task ledger to understand current project state, decisions, and open items
 - Check if another agent has already done related work in this phase
+- Use `retrieve_cross_engagement_lessons` to check for relevant insights from prior engagements
+
+### Pattern Library
+- Before building anything from scratch, search the pattern library with `search_patterns`
+- If a relevant pattern exists, use `use_pattern` to copy it into the project and adapt it
+- Prefer Proven patterns over Candidate patterns over Draft patterns
+- After producing a reusable artifact, contribute it with `contribute_pattern`
 ```

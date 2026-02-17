@@ -12,6 +12,16 @@ AI-powered ProServe team: 7 specialized agents (PM, SA, Infra, Dev, Data, Securi
 
 See `docs/architecture/` for full architecture, agent specs, and implementation guide.
 
+## Virtual Environment
+
+This project uses a Python venv at `.venv/`. **Always activate it before running any command** — `make`, `pytest`, `ruff`, `mypy`, `bandit`, `terraform`, `checkov`, and anything else in the toolchain are installed there.
+
+```bash
+source .venv/bin/activate
+```
+
+If a command fails with "No such file or directory" or "command not found", you almost certainly forgot to activate the venv. Activate it and retry.
+
 ## Mandatory Commands
 
 After making ANY changes, you MUST run:
@@ -100,6 +110,8 @@ Import rules:
 | CloudCrew infrastructure | Terraform | `infra/terraform/` |
 | Customer dashboard | React app | `dashboard/` |
 | Architecture decisions | ADR | `docs/architecture/` |
+| Engagement metrics, cost tracking | State module | `src/state/` |
+| Pattern library tools | Tool module | `src/tools/` |
 
 Do NOT create new top-level directories in `src/` without architectural justification.
 
