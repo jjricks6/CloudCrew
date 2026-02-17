@@ -1,13 +1,10 @@
-.PHONY: check pre-push test lint format typecheck security arch-test file-size-check \
+.PHONY: check test lint format typecheck security arch-test file-size-check \
        install install-hooks clean checkov-scan \
        bootstrap-init bootstrap-apply tf-init tf-plan tf-apply tf-destroy tf-validate \
        docker-build docker-push
 
-# Run ALL quality checks — the single command agents must run after code changes
-check: format lint typecheck test
-
-# Run EVERY CI check locally — agents MUST run this before pushing
-pre-push: check security file-size-check tf-validate checkov-scan
+# Run ALL CI checks locally — agents MUST run this before committing and pushing
+check: format lint typecheck test security file-size-check tf-validate checkov-scan
 
 # Install dependencies
 install:
