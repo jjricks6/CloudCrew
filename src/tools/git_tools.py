@@ -132,3 +132,67 @@ def git_write_architecture(
     repo.index.commit(commit_message)
     logger.info("git_write_architecture: committed %s", file_path)
     return f"Committed: {file_path}"
+
+
+@tool(context=True)
+def git_write_infra(
+    file_path: str,
+    content: str,
+    commit_message: str,
+    tool_context: ToolContext,
+) -> str:
+    """Write a file to infra/ in the project repo and commit it.
+
+    Only the Infra agent should use this tool. Files must be under infra/.
+
+    Args:
+        file_path: Relative path within the repo (must start with infra/).
+        content: File content to write.
+        commit_message: Git commit message describing the change.
+        tool_context: Strands tool context (injected by framework).
+
+    Returns:
+        Success message with the committed file path, or an error message.
+    """
+    if not file_path.startswith("infra/"):
+        return "Error: Infra agent can only write to infra/"
+    repo = _get_repo(tool_context.invocation_state)
+    resolved = _resolve_path(repo, file_path)
+    resolved.parent.mkdir(parents=True, exist_ok=True)
+    resolved.write_text(content)
+    repo.index.add([file_path])
+    repo.index.commit(commit_message)
+    logger.info("git_write_infra: committed %s", file_path)
+    return f"Committed: {file_path}"
+
+
+@tool(context=True)
+def git_write_security(
+    file_path: str,
+    content: str,
+    commit_message: str,
+    tool_context: ToolContext,
+) -> str:
+    """Write a file to security/ in the project repo and commit it.
+
+    Only the Security agent should use this tool. Files must be under security/.
+
+    Args:
+        file_path: Relative path within the repo (must start with security/).
+        content: File content to write.
+        commit_message: Git commit message describing the change.
+        tool_context: Strands tool context (injected by framework).
+
+    Returns:
+        Success message with the committed file path, or an error message.
+    """
+    if not file_path.startswith("security/"):
+        return "Error: Security agent can only write to security/"
+    repo = _get_repo(tool_context.invocation_state)
+    resolved = _resolve_path(repo, file_path)
+    resolved.parent.mkdir(parents=True, exist_ok=True)
+    resolved.write_text(content)
+    repo.index.add([file_path])
+    repo.index.commit(commit_message)
+    logger.info("git_write_security: committed %s", file_path)
+    return f"Committed: {file_path}"

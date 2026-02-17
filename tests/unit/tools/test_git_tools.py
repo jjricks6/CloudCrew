@@ -4,7 +4,15 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
-from src.tools.git_tools import _get_repo, _resolve_path, git_list, git_read, git_write_architecture
+from src.tools.git_tools import (
+    _get_repo,
+    _resolve_path,
+    git_list,
+    git_read,
+    git_write_architecture,
+    git_write_infra,
+    git_write_security,
+)
 
 
 @pytest.mark.unit
@@ -148,3 +156,100 @@ class TestGitWriteArchitecture:
         assert written_file.read_text() == "# Design Doc"
         mock_repo.index.add.assert_called_once()
         mock_repo.index.commit.assert_called_once_with("docs: add design doc")
+
+
+@pytest.mark.unit
+class TestGitWriteInfra:
+    """Verify git_write_infra tool."""
+
+    def test_rejects_non_infra_path(self, tmp_path: Path) -> None:
+        mock_context = MagicMock()
+        mock_context.invocation_state = {"git_repo_url": str(tmp_path)}
+
+        result = git_write_infra("docs/readme.md", "content", "msg", mock_context)
+        assert "Error" in result
+
+    def test_writes_and_commits(self, tmp_path: Path) -> None:
+        mock_repo = MagicMock()
+        mock_repo.working_dir = str(tmp_path)
+        mock_context = MagicMock()
+        mock_context.invocation_state = {"git_repo_url": str(tmp_path)}
+
+        with patch("src.tools.git_tools.git.Repo", return_value=mock_repo):
+            result = git_write_infra(
+                "infra/modules/vpc/main.tf",
+                'resource "aws_vpc" "main" {}',
+                "infra: add vpc module",
+                mock_context,
+            )
+
+        assert "Committed" in result
+        written_file = tmp_path / "infra" / "modules" / "vpc" / "main.tf"
+        assert written_file.exists()
+        mock_repo.index.add.assert_called_once()
+        mock_repo.index.commit.assert_called_once_with("infra: add vpc module")
+
+    def test_accepts_nested_infra_path(self, tmp_path: Path) -> None:
+        mock_repo = MagicMock()
+        mock_repo.working_dir = str(tmp_path)
+        mock_context = MagicMock()
+        mock_context.invocation_state = {"git_repo_url": str(tmp_path)}
+
+        with patch("src.tools.git_tools.git.Repo", return_value=mock_repo):
+            result = git_write_infra(
+                "infra/modules/rds/variables.tf",
+                'variable "db_name" {}',
+                "infra: add rds variables",
+                mock_context,
+            )
+
+        assert "Committed" in result
+
+
+@pytest.mark.unit
+class TestGitWriteSecurity:
+    """Verify git_write_security tool."""
+
+    def test_rejects_non_security_path(self, tmp_path: Path) -> None:
+        mock_context = MagicMock()
+        mock_context.invocation_state = {"git_repo_url": str(tmp_path)}
+
+        result = git_write_security("infra/main.tf", "content", "msg", mock_context)
+        assert "Error" in result
+
+    def test_writes_and_commits(self, tmp_path: Path) -> None:
+        mock_repo = MagicMock()
+        mock_repo.working_dir = str(tmp_path)
+        mock_context = MagicMock()
+        mock_context.invocation_state = {"git_repo_url": str(tmp_path)}
+
+        with patch("src.tools.git_tools.git.Repo", return_value=mock_repo):
+            result = git_write_security(
+                "security/reviews/report.md",
+                "# Security Report",
+                "security: add review",
+                mock_context,
+            )
+
+        assert "Committed" in result
+        written_file = tmp_path / "security" / "reviews" / "report.md"
+        assert written_file.exists()
+        assert written_file.read_text() == "# Security Report"
+        mock_repo.index.add.assert_called_once()
+        mock_repo.index.commit.assert_called_once_with("security: add review")
+
+    def test_accepts_nested_security_path(self, tmp_path: Path) -> None:
+        mock_repo = MagicMock()
+        mock_repo.working_dir = str(tmp_path)
+        mock_context = MagicMock()
+        mock_context.invocation_state = {"git_repo_url": str(tmp_path)}
+
+        with patch("src.tools.git_tools.git.Repo", return_value=mock_repo):
+            result = git_write_security(
+                "security/policies/iam-review.md",
+                "# IAM Review",
+                "security: add iam review",
+                mock_context,
+            )
+
+        assert "Committed" in result
