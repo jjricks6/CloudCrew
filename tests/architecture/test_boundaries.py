@@ -233,7 +233,16 @@ class TestAgentConventions:
 class TestNoNewTopLevelModules:
     """Verify no unauthorized top-level modules in src/."""
 
-    ALLOWED_MODULES: ClassVar[set[str]] = {"agents", "tools", "hooks", "templates", "state", "phases", "__pycache__"}
+    ALLOWED_MODULES: ClassVar[set[str]] = {
+        "agents",
+        "tools",
+        "hooks",
+        "templates",
+        "state",
+        "phases",
+        "__pycache__",
+        "cloudcrew.egg-info",  # created by pip install -e, not real source code
+    }
     ALLOWED_FILES: ClassVar[set[str]] = {"__init__.py", "config.py"}
 
     def test_no_unauthorized_modules(self) -> None:
