@@ -8,6 +8,7 @@ dependencies = [
     "strands-agents-tools>=0.1.0",
     "boto3>=1.35.0",
     "pydantic>=2.0.0",
+    "gitpython>=3.1.0",
 ]
 
 [project.optional-dependencies]
@@ -55,7 +56,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**/*.py" = ["S101", "ARG001", "T20"]
+"tests/**/*.py" = ["S101", "ARG001", "T20", "S108"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["cloudcrew"]
@@ -77,6 +78,7 @@ warn_unused_ignores = true
 module = [
     "strands.*",
     "strands_tools.*",
+    "git.*",
 ]
 ignore_missing_imports = true
 
@@ -102,7 +104,7 @@ source = ["src"]
 branch = true
 
 [tool.coverage.report]
-fail_under = 0
+fail_under = 90
 show_missing = true
 exclude_lines = [
     "pragma: no cover",
