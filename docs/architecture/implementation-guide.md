@@ -692,11 +692,90 @@ class TokenBudgetHook(HookProvider):
 
 ---
 
+## Deployment
+
+### Prerequisites
+
+1. **AWS CLI** configured with credentials for your AWS account
+2. **Terraform** >= 1.7.0 installed
+3. **Docker** installed (for building phase runner image)
+
+### One-Time Bootstrap
+
+Creates the S3 bucket and DynamoDB table for Terraform remote state. These cost pennies per month and stay running permanently.
+
+```bash
+make bootstrap-init
+make bootstrap-apply
+```
+
+After bootstrap completes, the output values match what's hardcoded in `infra/terraform/backend.tf`. If you used custom variable overrides (different bucket name), update `backend.tf` to match.
+
+### Terraform Variables
+
+Create `infra/terraform/terraform.tfvars` (gitignored — never committed):
+
+```hcl
+aws_region            = "us-east-1"
+environment           = "dev"
+budget_alert_email    = "your-email@example.com"
+monthly_budget_amount = 50
+```
+
+See `infra/terraform/example.tfvars` for the template.
+
+### Per-Milestone Deploy/Test/Destroy Cycle
+
+```bash
+# 1. Initialize (first time, or after destroy)
+make tf-init
+
+# 2. Review what will be created
+make tf-plan
+
+# 3. Deploy (interactive confirmation)
+make tf-apply
+
+# 4. If milestone requires Docker image:
+make docker-build
+make docker-push
+
+# 5. Run your tests against the live infrastructure
+
+# 6. Tear down when done testing
+make tf-destroy
+```
+
+**Always destroy after testing.** The only resources that persist between sessions are the bootstrap resources (state bucket + lock table).
+
+### Cost per Milestone
+
+| Milestone | Resources | Estimated Cost While Running |
+|-----------|-----------|------------------------------|
+| 1 (Single Agent) | DynamoDB, S3 | ~$1/month |
+| 2 (Two-Agent Swarm) | + ECR | ~$1/month |
+| 3 (Task Ledger + Memory) | + DynamoDB config | ~$1/month |
+| 4 (Step Functions + ECS) | + VPC, ECS, Step Functions, Lambda, API GW, Cognito | ~$5-15/month |
+| 5 (Dashboard) | + CloudFront, S3 hosting | ~$5-15/month |
+
+All costs assume resources are destroyed after testing. Bedrock token costs are separate.
+
+### CI Validation
+
+The `quality.yml` CI pipeline validates Terraform on every PR:
+- `terraform fmt -check` — formatting
+- `terraform validate` — HCL syntax and references
+- Checkov scan — security and best practices
+
+CI never runs `plan` or `apply`. All deployment is manual via Makefile targets.
+
+---
+
 ## Development Workflow
 
-1. **Branch strategy:** `main` (stable) → `develop` (integration) → `feature/*` (individual features)
-2. **PR review:** All PRs require passing tests
-3. **Testing cadence:** Run unit tests on every push. Run integration tests before merge to develop. Run e2e tests before release.
+1. **Branch strategy:** Trunk-based. `main` is the production branch. All changes go through short-lived feature branches and pull requests.
+2. **PR review:** All PRs require passing CI (lint, typecheck, test, security, terraform-validate).
+3. **Testing cadence:** Run unit tests on every push. Run integration tests before merge. Run e2e tests before release.
 4. **Agent prompt iteration:** System prompts live in version-controlled files (`src/agents/prompts/`). Changes to prompts are PRs with test results showing improvement.
 
 ---

@@ -24,6 +24,46 @@ This runs format + lint + typecheck + test. Do NOT skip this. Do NOT commit code
 
 If `make check` fails, fix the issue and re-run. If a test doesn't pass after 3 attempts, stop and ask for help.
 
+## Infrastructure & Deployment
+
+### Manual-Only Deployment
+
+CloudCrew deploys to a personal AWS account. All deployment is manual — CI never applies infrastructure.
+
+```bash
+# Validate Terraform (no AWS credentials needed)
+make tf-validate
+
+# Deploy infrastructure (interactive confirmation)
+make tf-init
+make tf-plan
+make tf-apply
+
+# Build and push Docker image for ECS phase runner
+make docker-build
+make docker-push
+
+# Tear down after testing (do this after every milestone test)
+make tf-destroy
+```
+
+### Infrastructure Layout
+
+```
+infra/
+├── bootstrap/         # One-time: S3 state bucket + DynamoDB lock table (local state)
+├── terraform/         # Main stack: all CloudCrew resources (remote state)
+└── docker/            # ECS phase runner image
+```
+
+### Cost Rules
+
+- **Destroy after testing**: Run `make tf-destroy` after each milestone. Only bootstrap resources persist (~$0.02/month).
+- **No NAT Gateways**: Dev uses public subnets (~$32/month savings per gateway).
+- **No ECS Services**: Step Functions launches individual Fargate Tasks on demand.
+- **DynamoDB on-demand**: Never provisioned capacity in dev.
+- **Budget alarm**: Configured in `budget.tf` — alerts at 50% forecast and 80% actual.
+
 ## Module Boundaries
 
 ```
@@ -89,6 +129,8 @@ Do NOT create new top-level directories in `src/` without architectural justific
 - NEVER modify generated files directly — modify the source and regenerate
 - NEVER use bare `except:` — always catch specific exceptions
 - NEVER use mutable default arguments
+- NEVER run `terraform apply -auto-approve` — always use interactive confirmation via `make tf-apply`
+- NEVER create NAT Gateways, ECS Services, or provisioned DynamoDB in dev — see Cost Rules
 
 ## Testing
 
@@ -107,6 +149,7 @@ Do NOT create new top-level directories in `src/` without architectural justific
 | Phase composition or Swarm config | `docs/architecture/final-architecture.md` |
 | Build steps, project structure, or config | `docs/architecture/implementation-guide.md` |
 | A significant technical decision | Add an ADR in the project repo |
+| Infrastructure or deployment config | `docs/architecture/implementation-guide.md` Deployment section |
 
 ## Git Workflow
 
