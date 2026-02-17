@@ -1,0 +1,118 @@
+[project]
+name = "cloudcrew"
+version = "0.1.0"
+description = "AI-powered ProServe team using 7 specialized agents"
+requires-python = ">=3.12"
+dependencies = [
+    "strands-agents>=0.1.0",
+    "strands-agents-tools>=0.1.0",
+    "boto3>=1.35.0",
+    "pydantic>=2.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-cov>=5.0.0",
+    "pytest-asyncio>=0.24.0",
+    "mypy>=1.13.0",
+    "ruff>=0.8.0",
+    "bandit>=1.8.0",
+    "pre-commit>=4.0.0",
+    "boto3-stubs[dynamodb,s3,stepfunctions,ecs]>=1.35.0",
+]
+
+# --- Ruff (linter + formatter) ---
+[tool.ruff]
+target-version = "py312"
+line-length = 120
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E",     # pycodestyle errors
+    "W",     # pycodestyle warnings
+    "F",     # pyflakes
+    "I",     # isort (import sorting)
+    "N",     # pep8-naming
+    "UP",    # pyupgrade
+    "B",     # flake8-bugbear
+    "S",     # flake8-bandit (security)
+    "A",     # flake8-builtins
+    "C4",    # flake8-comprehensions
+    "DTZ",   # flake8-datetimez
+    "T20",   # flake8-print (no print statements)
+    "RET",   # flake8-return
+    "SIM",   # flake8-simplify
+    "ARG",   # flake8-unused-arguments
+    "PTH",   # flake8-use-pathlib
+    "ERA",   # eradicate (commented-out code)
+    "RUF",   # ruff-specific rules
+]
+ignore = [
+    "S101",  # allow assert in tests
+    "ARG001", # unused function arguments (common in tool signatures)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["S101", "ARG001", "T20"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["cloudcrew"]
+
+# --- Mypy (type checker) ---
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+
+[[tool.mypy.overrides]]
+module = [
+    "strands.*",
+    "strands_tools.*",
+]
+ignore_missing_imports = true
+
+# --- Pytest ---
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+addopts = [
+    "--strict-markers",
+    "--strict-config",
+    "-ra",
+]
+markers = [
+    "unit: Unit tests (no external calls)",
+    "integration: Integration tests (requires AWS)",
+    "e2e: End-to-end tests (full system)",
+    "architecture: Architecture boundary tests",
+]
+
+[tool.coverage.run]
+source = ["src"]
+branch = true
+
+[tool.coverage.report]
+fail_under = 0
+show_missing = true
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "if __name__ == .__main__.",
+    "@overload",
+    "\\.\\.\\.",
+]
+
+# --- Bandit (security) ---
+[tool.bandit]
+exclude_dirs = ["tests"]
+skips = ["B101"]
