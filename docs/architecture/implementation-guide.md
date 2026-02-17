@@ -119,6 +119,7 @@ def build_invocation_state(project_id: str, phase: str, session_id: str = None) 
         "task_ledger_table": os.environ["TASK_LEDGER_TABLE"],
         "git_repo_url": os.environ["PROJECT_REPO_URL"],
         "knowledge_base_id": os.environ["KNOWLEDGE_BASE_ID"],
+        "patterns_bucket": os.environ["PATTERNS_BUCKET"],
     }
 ```
 
@@ -147,6 +148,12 @@ def git_write_infra(file_path: str, content: str) -> str:
 @tool
 def git_read(file_path: str) -> str:
     """Read any file from the project repo."""
+    ...
+
+@tool
+def git_list(directory: str) -> list[str]:
+    """List files in a directory in the project repo."""
+    # Returns relative file paths within the directory
     ...
 ```
 
@@ -323,6 +330,10 @@ ltm = memory_client.create_memory_and_wait(
         {"summaryMemoryStrategy": {
             "name": "summaries",
             "namespaces": ["/summaries/{actorId}/{sessionId}"]
+        }},
+        {"semanticMemoryStrategy": {
+            "name": "cross_engagement_lessons",
+            "namespaces": ["/cross-engagement/lessons/"]
         }}
     ],
     event_expiry_days=90
@@ -398,8 +409,10 @@ Discovery Swarm (ECS) → PM Review (Lambda) → ApprovalGate (waitForTaskToken)
   → Architecture Swarm (ECS) → PM Review → ApprovalGate
   → POC Swarm (ECS) → PM Review → ApprovalGate
   → Production Swarm (ECS) → PM Review → ApprovalGate
-  → Handoff Swarm (ECS) → Complete
+  → Handoff Swarm (ECS) → PM Review → ApprovalGate → Complete
 ```
+
+Note: The Retrospective phase (added in M6.4) extends this to: `→ Handoff → PM Review → ApprovalGate → Retrospective Swarm → Finalize Metrics → Complete`. Build the 5-phase machine here; M6 adds the Retrospective states.
 
 Each phase state:
 - Invokes an **ECS Fargate task** that runs the appropriate Swarm (not Lambda — Swarm timeouts exceed Lambda's 15-min limit, and interrupt blocking requires a long-lived process)
@@ -519,7 +532,7 @@ Wire up all 5 phase Swarms with the correct agent subsets:
 | Production | Dev | Dev, Infra, Data, Security, QA | 5-agent (max_handoffs=15) |
 | Handoff | PM | PM, SA | 2-agent (max_handoffs=10) |
 
-Each Swarm invocation is followed by a PM Review step (Lambda) before the approval gate.
+Each Swarm invocation is followed by a PM Review step (Lambda) before the approval gate. The Retrospective phase Swarm (PM, QA) is added in M6.4.
 
 **Test:**
 
@@ -527,7 +540,7 @@ Each Swarm invocation is followed by a PM Review step (Lambda) before the approv
 - Verify Discovery phase runs, produces deliverables, enters approval gate
 - Approve via API, verify Architecture phase starts
 - Request revision, verify Discovery re-runs with feedback
-- Run through all 5 phases with approvals
+- Run through all 5 delivery phases with approvals
 - Verify task ledger tracks the full project lifecycle
 
 ---
@@ -579,6 +592,8 @@ Cognito user pool + hosted UI for customer login
 - Pending approval notifications
 - Phase completion notifications
 - Agent question notifications (Strands interrupts)
+
+Note: The dashboard will be extended in M6.2 to include structured ratings (quality, relevance, completeness) at approval gates and a post-engagement survey page.
 
 **Test:**
 
@@ -639,8 +654,8 @@ Add pattern library search instructions to all agent system prompts.
 
 Add the Retrospective phase to the Step Functions state machine after Handoff:
 - Retrospective Swarm (PM, QA) — no customer approval gate
-- Finalize Metrics Lambda — aggregates metrics, writes timeline item, triggers KB re-sync
-- Post-engagement survey trigger
+- Finalize Metrics Lambda — aggregates metrics, writes timeline item, triggers KB re-sync, sends async survey invite (email + dashboard notification)
+- State machine completes after Finalize Metrics — survey is filled out asynchronously via dashboard API
 
 PM responsibilities: compare outcomes vs. SOW, write lessons to cross-engagement LTM, identify artifacts for pattern library. QA responsibilities: score deliverable quality, evaluate and promote pattern candidates.
 
@@ -880,7 +895,9 @@ CI never runs `plan` or `apply`. All deployment is manual via Makefile targets.
 | Agents disagree on approach | SA has architectural authority; PM is tiebreaker; hierarchy resolves conflicts |
 | Swarm scale limits unknown | Start conservative (max_handoffs=15 for 3+ agents, 10 for 2 agents); measure and tune per phase |
 | Within-phase interrupt unanswered | ECS task blocks indefinitely; sends reminder after 30 min; no auto-cancel |
-| Knowledge Base stale within phase | Agents use `git_read` for same-phase artifacts; KB only re-syncs at phase transitions |
+| Knowledge Base stale within phase | Agents use `git_list` + `git_read` for same-phase artifacts; KB only re-syncs at phase transitions |
 | ECS task crash | Step Functions retries 1x automatically; task ledger + Git preserve partial progress |
 | DynamoDB item size limit (400KB) | Task ledger stores metadata only (not artifact content). Unlikely to exceed limit for structured fields. Monitor. |
 | Git merge conflicts between agents | Swarm agents execute sequentially (one at a time). Scoped write tools enforce directory boundaries. Pull-before-write in git tools prevents conflicts. |
+| Metrics TIMELINE hot partition | All timeline items share one DynamoDB partition key (`TIMELINE`). Fine for current scale (dozens of engagements). If scaling to thousands, shard the key (e.g., `TIMELINE#YYYY-MM`). |
+| Pattern metadata S3 race condition | `use_pattern` does read-modify-write on `metadata.json` in S3. Concurrent engagements could lose an increment. Acceptable for sequential engagements. For concurrent usage, move pattern metadata to DynamoDB. |

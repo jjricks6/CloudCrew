@@ -105,12 +105,8 @@ Two-tier orchestration:
        ▼
 ┌─────────────────────────────────────┐
 │  Finalize Metrics (Lambda)           │
-│  Aggregate metrics, sync patterns KB │
-└──────┬──────────────────────────────┘
-       ▼
-┌─────────────────────────────────────┐
-│  Post-Engagement Survey              │
-│  Customer rates overall experience   │
+│  Aggregate metrics, sync patterns KB,│
+│  send post-engagement survey invite  │
 └──────┬──────────────────────────────┘
        ▼
 ┌─────────────┐
@@ -210,6 +206,8 @@ Within a Swarm:
 | **Security** | Opus 4.6 | Architecture (advisory), POC, Production | Checkov/tfsec, OWASP scanner, IAM analyzer, Git (security/) | ALL IaC and IAM policies |
 | **QA** | Sonnet | Production | Test frameworks, integration runner, load testing, Git (app/tests/) | ALL application code for testability |
 
+All agents also share: `git_list` (list files in a directory), `git_read`, `knowledge_base_search`, `read_task_ledger`, pattern library tools, and `retrieve_cross_engagement_lessons` (see [Agent Specifications](agent-specifications.md)).
+
 **Model rationale:**
 
 - **Opus 4.6** for agents requiring deep reasoning: PM (SOW decomposition, cross-domain synthesis), SA (architecture trade-offs), Security (attack surface analysis)
@@ -226,7 +224,7 @@ Within a Swarm:
 | Handoff | PM | PM, SA | Implicit (PM is in Swarm) | Documentation, runbooks, knowledge transfer |
 | Retrospective | PM | PM, QA | N/A (internal) | Engagement analysis, lessons learned, pattern contributions, quality scores |
 
-Note: Security was added to POC because Infra produces IaC during POC that must be reviewed. SA remains in POC to validate POC aligns with architecture. PM reviews every phase's output in a dedicated post-Swarm step (except Discovery and Handoff where PM is already the entry agent). Retrospective is internal — no customer approval gate.
+Note: Security was added to POC because Infra produces IaC during POC that must be reviewed. SA remains in POC to validate POC aligns with architecture. PM reviews every phase's output in a dedicated post-Swarm step (except Discovery and Handoff where PM is already the entry agent). Retrospective is internal — no customer approval gate. QA is intentionally absent from POC — POC code is exploratory and the customer reviews the concept, not code quality. Full quality gates (testing, coverage, code review) are enforced in the Production phase.
 
 ---
 
@@ -244,7 +242,7 @@ Note: Security was added to POC because Infra produces IaC during POC that must 
 | **Semantic Search** | Bedrock Knowledge Base (S3 synced from Git) | Entire project lifetime | Any agent can search all artifacts semantically |
 | **Cross-Engagement Metrics** | DynamoDB (`cloudcrew-metrics` table) | All projects | Engagement metrics, phase breakdowns, cost tracking, satisfaction trends |
 | **Pattern Library** | S3 (`cloudcrew-patterns`) + Bedrock KB | All projects | Reusable IaC modules, code scaffolds, architecture patterns, security baselines |
-| **Cross-Engagement LTM** | AgentCore Memory (shared namespace) | All projects | Lessons learned, best practices, engagement retrospective insights |
+| **Cross-Engagement LTM** | AgentCore Memory (namespace: `/cross-engagement/lessons/`) | All projects | Lessons learned, best practices, engagement retrospective insights |
 
 ### Task Ledger Schema (DynamoDB)
 
@@ -259,7 +257,7 @@ SK: LEDGER
 Attributes:
   project_name: string
   customer: string
-  current_phase: string (DISCOVERY | ARCHITECTURE | POC | PRODUCTION | HANDOFF)
+  current_phase: string (DISCOVERY | ARCHITECTURE | POC | PRODUCTION | HANDOFF | RETROSPECTIVE)
   phase_status: string (IN_PROGRESS | AWAITING_APPROVAL | APPROVED | REVISION_REQUESTED)
 
   facts: list[{description, source, timestamp}]           # Verified information
@@ -343,6 +341,7 @@ Error handling rules:
 - **Swarm timeout**: Retry once with extended timeout. If still fails, mark phase as FAILED, notify customer, allow manual restart
 - **Agent error loops**: Swarm's `repetitive_handoff_detection` catches these; Swarm terminates and returns partial result. PM Review step flags incomplete deliverables.
 - **Interrupt timeout**: If a within-phase interrupt goes unanswered for >30 minutes, the ECS task saves Swarm state, sends a reminder notification, and continues waiting. No automatic cancellation.
+- **Finalize Metrics failure**: If the Finalize Metrics Lambda fails (metrics aggregation error, KB re-sync failure), the state machine still completes — metrics are best-effort, not a gate. The error is logged to CloudWatch and can be manually reconciled.
 
 ### Partial Phase Recovery
 
@@ -473,6 +472,8 @@ A tiered repository of reusable artifacts stored in S3 (`cloudcrew-patterns`) an
 
 Pattern categories: `iac/`, `architecture/`, `security/`, `code/`. Each pattern is a directory containing the artifact files plus a `metadata.json` with tier, usage count, success rate, tags, and contributing agent.
 
+**Success rate calculation:** A pattern usage counts as "successful" if the phase where the pattern was used completed with customer approval (no revision requested). Success rate = successful uses / total uses. This is updated during retrospective by the QA agent, who cross-references patterns used per phase (from engagement metrics) against approval gate outcomes (from the task ledger).
+
 Agent tools for the pattern library:
 - `search_patterns(query, category?, tags?)` — semantic search via Bedrock KB
 - `use_pattern(pattern_id)` — copies pattern into project repo, increments usage count
@@ -499,7 +500,7 @@ At each approval gate, the dashboard collects structured ratings alongside the a
 - Quality (1-5), Relevance (1-5), Completeness (1-5)
 - Optional freeform notes
 
-After Handoff, a post-engagement survey captures overall satisfaction, reuse intent, and improvement suggestions. All feedback is stored in the metrics table and factored into pattern success rates and engagement trend analysis.
+After Handoff, a post-engagement survey captures overall satisfaction, reuse intent, and improvement suggestions. The survey is delivered asynchronously (email + dashboard notification from Finalize Metrics Lambda) and does not block state machine completion. All feedback is stored in the metrics table and factored into pattern success rates and engagement trend analysis.
 
 ### Retrospective Phase
 
@@ -508,7 +509,7 @@ After Handoff approval, a Retrospective phase runs automatically (no customer ap
 - **PM agent**: Compares outcomes vs. SOW, summarizes lessons learned, identifies artifacts for pattern library, writes insights to cross-engagement LTM
 - **QA agent**: Scores deliverable quality, evaluates pattern candidates for promotion, promotes qualifying patterns
 
-Followed by a **Finalize Metrics Lambda** that aggregates all phase metrics, writes the cross-engagement timeline item, and triggers KB re-sync for newly contributed patterns.
+Followed by a **Finalize Metrics Lambda** that aggregates all phase metrics, writes the cross-engagement timeline item, triggers KB re-sync for newly contributed patterns, and sends a post-engagement survey invitation to the customer (email + dashboard notification). The survey is **asynchronous** — the state machine completes immediately after Finalize Metrics. When the customer fills out the survey via the dashboard, the API writes the SURVEY item directly to the metrics table. If the customer never responds, the SURVEY item won't exist for that engagement.
 
 ### Cost Tracking
 
