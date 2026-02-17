@@ -74,3 +74,29 @@ jobs:
             exit 1
           fi
           echo "All files within size limits"
+
+  terraform-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.5.7"
+      - name: Format check (bootstrap)
+        run: terraform -chdir=infra/bootstrap fmt -check
+      - name: Format check (main)
+        run: terraform -chdir=infra/terraform fmt -check
+      - name: Validate bootstrap
+        run: |
+          terraform -chdir=infra/bootstrap init -backend=false
+          terraform -chdir=infra/bootstrap validate
+      - name: Validate main
+        run: |
+          terraform -chdir=infra/terraform init -backend=false
+          terraform -chdir=infra/terraform validate
+      - name: Checkov scan
+        uses: bridgecrewio/checkov-action@v12
+        with:
+          directory: infra/
+          framework: terraform
+          quiet: true

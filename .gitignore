@@ -44,6 +44,8 @@ dashboard/.vite/
 *.tfstate.*
 *.tfplan
 .terraform.lock.hcl
+*.tfvars
+!example.tfvars
 
 # Environment
 .env
