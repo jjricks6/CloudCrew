@@ -187,9 +187,7 @@ PHASE_TASKS: dict[str, str] = {
         "3. Write an architecture design document in docs/architecture/\n"
         "4. Create ADRs for key technology decisions in docs/architecture/adr/\n"
         "5. Hand off to Infra for Terraform module planning\n"
-        "6. Hand off to Security for initial security review\n\n"
-        "IMPORTANT: Limit Terraform validate/fix iterations to 3 cycles per module. "
-        "If issues remain after 3 cycles, document them and move on."
+        "6. Hand off to Security for initial security review"
     ),
     "POC": (
         "Continue the Acme Corp engagement. Architecture design is complete — "
