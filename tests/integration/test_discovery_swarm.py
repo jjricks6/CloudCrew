@@ -44,7 +44,7 @@ from pathlib import Path
 # Strands SDK uses recursive event_loop_cycle — each tool call adds ~7 stack
 # frames.  Agents making 40+ sequential calls (e.g. Infra validate/fix cycles)
 # can exceed Python's default 1000-frame limit.
-sys.setrecursionlimit(5000)
+sys.setrecursionlimit(50000)
 
 # Ensure project root is on sys.path for direct script execution
 _PROJECT_ROOT = str(Path(__file__).resolve().parent.parent.parent)
@@ -158,6 +158,10 @@ infrastructure costs by at least 30%.
 # ---------------------------------------------------------------------------
 
 PHASE_TASKS: dict[str, str] = {
+    # ------------------------------------------------------------------
+    # DISCOVERY: PM-only deliverables.  SA is available if PM needs to
+    # ask a quick architectural clarification, but SA produces nothing.
+    # ------------------------------------------------------------------
     "DISCOVERY": (
         "We have a new engagement for Acme Corp. The Statement of Work is at "
         "docs/sow.md in the project repository.\n\n"
@@ -173,6 +177,11 @@ PHASE_TASKS: dict[str, str] = {
         "later phases. Discovery output is strictly: parsed SOW data in the task "
         "ledger + a project plan document."
     ),
+    # ------------------------------------------------------------------
+    # ARCHITECTURE: SA writes design docs and ADRs.  Do NOT hand off to
+    # Infra or Security — there is no code to validate or scan yet.
+    # Infra and Security are in the swarm but should not be invoked.
+    # ------------------------------------------------------------------
     "ARCHITECTURE": (
         "Continue the Acme Corp engagement. Discovery is complete — the SOW has "
         "been parsed and a project plan exists in docs/project-plan/.\n\n"
@@ -181,46 +190,85 @@ PHASE_TASKS: dict[str, str] = {
         "- Use read_task_ledger to see recorded deliverables and decisions\n"
         "- If architecture docs or ADRs already exist from a prior attempt, "
         "READ them and build on them — do NOT recreate from scratch\n\n"
-        "Your tasks:\n"
+        "Your tasks (SA only — do NOT hand off to Infra or Security):\n"
         "1. Read the task ledger, SOW, and project plan to understand requirements\n"
         "2. Design a target AWS architecture that meets the requirements\n"
         "3. Write an architecture design document in docs/architecture/\n"
         "4. Create ADRs for key technology decisions in docs/architecture/adr/\n"
-        "5. Hand off to Infra for Terraform module planning\n"
-        "6. Hand off to Security for initial security review"
+        "5. Update the task ledger with architecture decisions and deliverables\n\n"
+        "IMPORTANT: This phase produces design documents ONLY. No Terraform code, "
+        "no security scans, no infrastructure implementation. Those happen in POC."
     ),
+    # ------------------------------------------------------------------
+    # POC: The heavy implementation phase.  Dev leads, Infra writes TF,
+    # Data writes schemas.  Key rule: Infra must hand off to Security
+    # AFTER EACH MODULE so the recursion stack resets between modules.
+    # ------------------------------------------------------------------
     "POC": (
         "Continue the Acme Corp engagement. Architecture design is complete — "
         "check docs/architecture/ for the design document and ADRs.\n\n"
+        "BEFORE creating any files, check what already exists:\n"
+        "- Use git_list to see existing files in infra/, app/, data/\n"
+        "- Use read_task_ledger to see recorded deliverables\n"
+        "- If modules or code exist from a prior attempt, build on them\n\n"
         "Your tasks:\n"
-        "1. Read the architecture design and task ledger\n"
-        "2. Implement core Terraform modules for the VPC at app/infra/vpc.tf\n"
-        "3. Implement a basic compute module at app/infra/compute.tf\n"
-        "4. Create a data layer module at data/schema/initial.sql\n"
-        "5. Have Security review the Terraform modules\n"
-        "6. Have SA validate alignment with the architecture design"
+        "1. Dev: Read the architecture design and task ledger, then create "
+        "application scaffolding under app/\n"
+        "2. Dev: Hand off to Infra for Terraform implementation\n"
+        "3. Infra: Implement ONE Terraform module (start with VPC under "
+        "infra/modules/vpc/), run terraform_validate, then hand off to "
+        "Security for review BEFORE starting the next module\n"
+        "4. Security: Review the module, hand back to Infra for the next one\n"
+        "5. Infra: Implement the next module (compute under "
+        "infra/modules/compute/), validate, hand off to Security again\n"
+        "6. Data: Create initial database schema under data/\n"
+        "7. SA: Validate alignment with the architecture design\n\n"
+        "CRITICAL: Infra must hand off to Security after EACH module — do NOT "
+        "write multiple modules in a single turn. This keeps each turn focused "
+        "and manageable."
     ),
+    # ------------------------------------------------------------------
+    # PRODUCTION: Harden existing POC code.  Same per-module handoff
+    # pattern.  QA validates acceptance criteria at the end.
+    # ------------------------------------------------------------------
     "PRODUCTION": (
         "Continue the Acme Corp engagement. The POC phase is complete — core "
-        "infrastructure modules exist in app/infra/ and data/.\n\n"
+        "infrastructure modules exist in infra/ and data/.\n\n"
+        "BEFORE creating any files, check what already exists:\n"
+        "- Use git_list to see existing files in infra/, app/, data/\n"
+        "- Use read_task_ledger to see recorded deliverables\n\n"
         "Your tasks:\n"
-        "1. Read existing infrastructure code and architecture docs\n"
-        "2. Harden Terraform modules for production (encryption, backup, monitoring)\n"
-        "3. Create a CI/CD pipeline configuration at app/ci/pipeline.yml\n"
-        "4. Have Security perform a comprehensive security review\n"
-        "5. Have QA create a test plan and validate acceptance criteria\n"
-        "6. Write a security review report at docs/security/review.md"
+        "1. Dev: Read existing code and architecture docs, then harden "
+        "application code and create a CI/CD pipeline config at app/ci/pipeline.yml\n"
+        "2. Dev: Hand off to Infra for infrastructure hardening\n"
+        "3. Infra: Harden existing Terraform modules ONE AT A TIME — add "
+        "encryption, backups, monitoring. After each module, run "
+        "terraform_validate and hand off to Security for review\n"
+        "4. Security: Perform security review of each module, hand back to Infra "
+        "or write the final security review report at docs/security/review.md\n"
+        "5. QA: Create a test plan, validate acceptance criteria from the SOW, "
+        "and write test suites under app/tests/\n\n"
+        "CRITICAL: Infra must hand off to Security after EACH module — do NOT "
+        "harden multiple modules in a single turn."
     ),
+    # ------------------------------------------------------------------
+    # HANDOFF: PM packages deliverables, SA signs off on architecture.
+    # ------------------------------------------------------------------
     "HANDOFF": (
         "Continue the Acme Corp engagement. Production hardening is complete — "
         "all infrastructure is production-ready with security review.\n\n"
+        "BEFORE creating any files, check what already exists:\n"
+        "- Use git_list to see all project deliverables\n"
+        "- Use read_task_ledger to see deliverable status\n\n"
         "Your tasks:\n"
-        "1. Read the task ledger and all project deliverables\n"
-        "2. Create an operations runbook at docs/handoff/runbook.md\n"
-        "3. Create a knowledge transfer document at docs/handoff/knowledge-transfer.md\n"
-        "4. Compile a final deliverables summary at docs/handoff/deliverables-summary.md\n"
-        "5. Update the task ledger with final deliverable status\n"
-        "6. Hand off to SA for a final architecture sign-off statement"
+        "1. PM: Read the task ledger and all project deliverables\n"
+        "2. PM: Create an operations runbook at docs/handoff/runbook.md\n"
+        "3. PM: Create a knowledge transfer document at "
+        "docs/handoff/knowledge-transfer.md\n"
+        "4. PM: Compile a final deliverables summary at "
+        "docs/handoff/deliverables-summary.md\n"
+        "5. PM: Update the task ledger with final deliverable status\n"
+        "6. PM: Hand off to SA for a final architecture sign-off statement"
     ),
 }
 

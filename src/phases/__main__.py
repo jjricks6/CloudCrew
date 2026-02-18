@@ -263,7 +263,7 @@ def main() -> None:
     # Strands SDK uses recursive event_loop_cycle — each tool call adds ~7 stack
     # frames.  Agents that make 40+ sequential tool calls (e.g. Infra doing
     # validate/fix cycles) can exceed Python's default 1000-frame limit.
-    sys.setrecursionlimit(5000)
+    sys.setrecursionlimit(50000)
 
     logging.basicConfig(
         level=logging.INFO,
