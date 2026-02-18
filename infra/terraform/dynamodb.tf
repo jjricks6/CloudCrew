@@ -3,11 +3,65 @@
 # Table: cloudcrew-projects
 # - Task ledger (project state, phase tracking, agent assignments)
 # - Approval tokens (waitForTaskToken storage)
-# PK: PROJECT#{project_id}, SK: LEDGER | TOKEN#{token_id}
+# - Interrupt records (mid-phase HITL questions/responses)
+# PK: PROJECT#{project_id}, SK: LEDGER | TOKEN#{phase} | INTERRUPT#{id}
 #
-# Table: cloudcrew-metrics
+# Table: cloudcrew-metrics (populated in M6)
 # - Engagement metrics (per-engagement summary, per-phase breakdowns)
 # - Cross-engagement timeline (trend queries)
-# - Post-engagement surveys
 # PK: ENGAGEMENT#{project_id}, SK: SUMMARY | PHASE#{name} | SURVEY
 # PK: TIMELINE, SK: #{timestamp}#{project_id}
+
+resource "aws_dynamodb_table" "projects" {
+  name         = "cloudcrew-projects"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "PK"
+  range_key    = "SK"
+
+  attribute {
+    name = "PK"
+    type = "S"
+  }
+
+  attribute {
+    name = "SK"
+    type = "S"
+  }
+
+  point_in_time_recovery {
+    enabled = true
+  }
+
+  server_side_encryption {
+    enabled = true
+  }
+
+  tags = { Name = "cloudcrew-projects" }
+}
+
+resource "aws_dynamodb_table" "metrics" {
+  name         = "cloudcrew-metrics"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "PK"
+  range_key    = "SK"
+
+  attribute {
+    name = "PK"
+    type = "S"
+  }
+
+  attribute {
+    name = "SK"
+    type = "S"
+  }
+
+  point_in_time_recovery {
+    enabled = true
+  }
+
+  server_side_encryption {
+    enabled = true
+  }
+
+  tags = { Name = "cloudcrew-metrics" }
+}

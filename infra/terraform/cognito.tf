@@ -1,2 +1,2 @@
-# Cognito user pool + app client for customer authentication.
-# Dashboard authenticates via Cognito hosted UI or custom login.
+# Cognito user pool for customer authentication.
+# Deferred to M5 (Dashboard). API Gateway uses NONE auth for M4 testing.

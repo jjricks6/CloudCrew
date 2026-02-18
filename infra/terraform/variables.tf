@@ -20,3 +20,39 @@ variable "monthly_budget_amount" {
   type        = number
   default     = 50
 }
+
+# --- Networking ---
+
+variable "vpc_cidr" {
+  description = "CIDR block for the VPC"
+  type        = string
+  default     = "10.0.0.0/16"
+}
+
+# --- ECS ---
+
+variable "ecs_cpu" {
+  description = "CPU units for the ECS phase runner task (1024 = 1 vCPU)"
+  type        = number
+  default     = 1024
+}
+
+variable "ecs_memory" {
+  description = "Memory (MiB) for the ECS phase runner task"
+  type        = number
+  default     = 2048
+}
+
+# --- Lambda ---
+
+variable "lambda_pm_review_memory" {
+  description = "Memory (MB) for the PM review Lambda"
+  type        = number
+  default     = 512
+}
+
+variable "lambda_pm_review_timeout" {
+  description = "Timeout (seconds) for the PM review Lambda"
+  type        = number
+  default     = 300
+}
