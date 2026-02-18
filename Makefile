@@ -96,9 +96,9 @@ tf-validate:
 	terraform -chdir=infra/terraform init -backend=false
 	terraform -chdir=infra/terraform validate
 
-# Checkov security scan on Terraform code
+# Checkov security scan on Terraform code (uses .checkov.yml for dev suppressions)
 checkov-scan:
-	checkov -d infra/ --framework terraform --quiet --compact
+	checkov -d infra/ --framework terraform --quiet --compact --config-file infra/terraform/.checkov.yml
 
 # --- Docker: ECS phase runner image ---
 
