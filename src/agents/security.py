@@ -11,6 +11,7 @@ from strands import Agent
 
 from src.agents.base import OPUS
 from src.tools.git_tools import git_list, git_read, git_write_security
+from src.tools.ledger_tools import read_task_ledger
 from src.tools.security_review import write_security_review
 from src.tools.security_tools import checkov_scan
 
@@ -89,7 +90,19 @@ A review PASSES when:
 - Zero Critical findings
 - Zero High findings
 - All Medium findings either fixed or documented with accepted risk rationale
-- Checkov scan shows no new failures versus the previous scan\
+- Checkov scan shows no new failures versus the previous scan
+
+## Recovery Awareness
+Before starting any work, ALWAYS check what already exists:
+1. Use read_task_ledger to see what decisions and deliverables are recorded
+2. Use git_list to check which files exist in docs/security/
+3. Use git_read to verify content of existing security review reports
+
+If work is partially complete from a prior run:
+- Do NOT duplicate security review reports that already exist
+- If a prior review exists, read it and verify its findings are still valid
+- Continue from where the prior work left off
+- Focus on completing any remaining review steps or re-scanning fixed code\
 """
 
 
@@ -103,5 +116,5 @@ def create_security_agent() -> Agent:
         model=OPUS,
         name="security",
         system_prompt=SECURITY_SYSTEM_PROMPT,
-        tools=[git_read, git_list, git_write_security, checkov_scan, write_security_review],
+        tools=[git_read, git_list, git_write_security, checkov_scan, write_security_review, read_task_ledger],
     )

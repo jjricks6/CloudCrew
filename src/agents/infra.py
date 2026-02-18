@@ -10,6 +10,7 @@ from strands import Agent
 
 from src.agents.base import SONNET
 from src.tools.git_tools import git_list, git_read, git_write_infra
+from src.tools.ledger_tools import read_task_ledger
 from src.tools.security_tools import checkov_scan
 from src.tools.terraform_tools import terraform_validate
 
@@ -71,7 +72,19 @@ When Security hands you findings:
 3. For Low issues, apply judgment — fix if simple, document if intentional
 4. Re-run terraform_validate and checkov_scan after every fix
 5. Hand back to Security with: "Fixed [N] issues. Remaining [M] Low items \
-are documented. Please re-review."\
+are documented. Please re-review."
+
+## Recovery Awareness
+Before starting any work, ALWAYS check what already exists:
+1. Use read_task_ledger to see what deliverables are recorded
+2. Use git_list to check which files exist in infra/modules/ and infra/
+3. Use git_read to verify content of existing Terraform modules
+
+If work is partially complete from a prior run:
+- Do NOT overwrite Terraform modules that already contain correct code
+- Continue from where the prior work left off — create only missing modules
+- Re-run terraform_validate and checkov_scan on existing code to verify it
+- Focus on completing the remaining infrastructure components\
 """
 
 
@@ -85,5 +98,5 @@ def create_infra_agent() -> Agent:
         model=SONNET,
         name="infra",
         system_prompt=INFRA_SYSTEM_PROMPT,
-        tools=[git_read, git_list, git_write_infra, terraform_validate, checkov_scan],
+        tools=[git_read, git_list, git_write_infra, terraform_validate, checkov_scan, read_task_ledger],
     )

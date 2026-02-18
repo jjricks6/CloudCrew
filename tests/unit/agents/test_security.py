@@ -26,7 +26,8 @@ class TestSecurityAgent:
         assert call_kwargs.kwargs["name"] == "security"
         assert call_kwargs.kwargs["model"] is mock_opus
         assert call_kwargs.kwargs["system_prompt"] == SECURITY_SYSTEM_PROMPT
-        assert len(call_kwargs.kwargs["tools"]) == 5
+        # 6 tools: git_read, git_list, git_write_security, checkov_scan, write_security_review, read_task_ledger
+        assert len(call_kwargs.kwargs["tools"]) == 6
         assert agent is mock_agent_cls.return_value
 
     def test_system_prompt_has_key_sections(self) -> None:
@@ -39,6 +40,7 @@ class TestSecurityAgent:
             "Review Process",
             "Handoff Guidance",
             "Approval Criteria",
+            "Recovery Awareness",
         ]
         for section in required_sections:
             assert section in SECURITY_SYSTEM_PROMPT, f"Missing section: {section}"

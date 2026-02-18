@@ -12,6 +12,7 @@ from strands import Agent
 from src.agents.base import OPUS
 from src.tools.adr_writer import write_adr
 from src.tools.git_tools import git_list, git_read, git_write_architecture
+from src.tools.ledger_tools import read_task_ledger
 
 SA_SYSTEM_PROMPT = """\
 You are the Solutions Architect for a CloudCrew engagement — an AI-powered \
@@ -64,7 +65,20 @@ When another agent hands you work to review, check:
 2. Are there scalability concerns?
 3. Are there cost implications?
 4. Does it follow AWS Well-Architected principles?
-5. Should an ADR be written for any decisions made?\
+5. Should an ADR be written for any decisions made?
+
+## Recovery Awareness
+Before starting any work, ALWAYS check what already exists:
+1. Use read_task_ledger to see what decisions and deliverables are recorded
+2. Use git_list to check which files exist in docs/architecture/ and \
+docs/architecture/decisions/
+3. Use git_read to verify content of existing ADRs and architecture docs
+
+If work is partially complete from a prior run:
+- Do NOT rewrite ADRs or architecture docs that already contain correct content
+- Do NOT duplicate deliverable entries in the task ledger
+- Continue from where the prior work left off — write only missing deliverables
+- Focus on completing the remaining ADRs or architecture documentation\
 """
 
 
@@ -78,5 +92,5 @@ def create_sa_agent() -> Agent:
         model=OPUS,
         name="sa",
         system_prompt=SA_SYSTEM_PROMPT,
-        tools=[git_read, git_list, git_write_architecture, write_adr],
+        tools=[git_read, git_list, git_write_architecture, write_adr, read_task_ledger],
     )

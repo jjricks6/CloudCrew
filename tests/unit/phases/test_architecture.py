@@ -3,6 +3,7 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
+from src.hooks.resilience_hook import ResilienceHook
 
 
 @pytest.mark.unit
@@ -40,14 +41,20 @@ class TestArchitectureSwarm:
         # Verify entry point
         assert call_kwargs.kwargs["entry_point"] is mock_sa
 
-        # Verify Swarm configuration
+        # Verify Swarm configuration (uses config defaults)
         assert call_kwargs.kwargs["max_handoffs"] == 15
         assert call_kwargs.kwargs["max_iterations"] == 15
-        assert call_kwargs.kwargs["execution_timeout"] == 1200.0
-        assert call_kwargs.kwargs["node_timeout"] == 300.0
+        assert call_kwargs.kwargs["execution_timeout"] == 2400.0
+        assert call_kwargs.kwargs["node_timeout"] == 600.0
         assert call_kwargs.kwargs["repetitive_handoff_detection_window"] == 8
         assert call_kwargs.kwargs["repetitive_handoff_min_unique_agents"] == 3
         assert call_kwargs.kwargs["id"] == "architecture-swarm"
+
+        # ResilienceHook always attached
+        hooks = call_kwargs.kwargs["hooks"]
+        assert hooks is not None
+        assert len(hooks) == 1
+        assert isinstance(hooks[0], ResilienceHook)
 
         assert swarm is mock_swarm_cls.return_value
 

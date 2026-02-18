@@ -27,7 +27,8 @@ class TestInfraAgent:
         assert call_kwargs.kwargs["name"] == "infra"
         assert call_kwargs.kwargs["model"] is mock_sonnet
         assert call_kwargs.kwargs["system_prompt"] == INFRA_SYSTEM_PROMPT
-        assert len(call_kwargs.kwargs["tools"]) == 5
+        # 6 tools: git_read, git_list, git_write_infra, terraform_validate, checkov_scan, read_task_ledger
+        assert len(call_kwargs.kwargs["tools"]) == 6
         assert agent is mock_agent_cls.return_value
 
     def test_system_prompt_has_key_sections(self) -> None:
@@ -40,6 +41,7 @@ class TestInfraAgent:
             "Self-Validation Workflow",
             "Handoff Guidance",
             "Review Triggers",
+            "Recovery Awareness",
         ]
         for section in required_sections:
             assert section in INFRA_SYSTEM_PROMPT, f"Missing section: {section}"

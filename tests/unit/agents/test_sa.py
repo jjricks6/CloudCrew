@@ -28,8 +28,8 @@ class TestSAAgent:
         assert call_kwargs.kwargs["name"] == "sa"
         assert call_kwargs.kwargs["model"] is mock_opus
         assert call_kwargs.kwargs["system_prompt"] == SA_SYSTEM_PROMPT
-        # Should have 4 tools: git_read, git_list, git_write_architecture, write_adr
-        assert len(call_kwargs.kwargs["tools"]) == 4
+        # Should have 5 tools: git_read, git_list, git_write_architecture, write_adr, read_task_ledger
+        assert len(call_kwargs.kwargs["tools"]) == 5
         assert agent is mock_agent_cls.return_value
 
     def test_system_prompt_has_key_sections(self) -> None:
@@ -42,6 +42,7 @@ class TestSAAgent:
             "Decision Framework",
             "Handoff Guidance",
             "Review Triggers",
+            "Recovery Awareness",
         ]
         for section in required_sections:
             assert section in SA_SYSTEM_PROMPT, f"Missing section: {section}"

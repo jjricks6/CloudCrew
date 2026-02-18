@@ -36,7 +36,15 @@ class TestLoadTemplate:
         assert "{findings}" in content
         assert "{recommendations}" in content
 
+    def test_load_project_plan_template(self) -> None:
+        content = load_template("project_plan.md")
+        assert "{title}" in content
+        assert "{project_name}" in content
+        assert "{objectives}" in content
+        assert "{requirements}" in content
+        assert "{deliverables}" in content
+
     def test_templates_are_nonempty(self) -> None:
-        for name in ("adr.md", "architecture_doc.md", "security_review.md"):
+        for name in ("adr.md", "architecture_doc.md", "security_review.md", "project_plan.md"):
             content = load_template(name)
             assert len(content.strip()) > 0, f"Template {name} is empty"

@@ -18,5 +18,22 @@ PATTERNS_KNOWLEDGE_BASE_ID: str = os.environ.get("PATTERNS_KNOWLEDGE_BASE_ID", "
 PATTERNS_BUCKET: str = os.environ.get("PATTERNS_BUCKET", "")
 AWS_REGION: str = os.environ.get("AWS_REGION", "us-east-1")
 
+# --- AgentCore Memory ---
+STM_MEMORY_ID: str = os.environ.get("STM_MEMORY_ID", "")
+LTM_MEMORY_ID: str = os.environ.get("LTM_MEMORY_ID", "")
+
 # --- Git ---
 PROJECT_REPO_PATH: str = os.environ.get("PROJECT_REPO_PATH", "")
+
+# --- Bedrock Client ---
+BEDROCK_READ_TIMEOUT: int = int(os.environ.get("BEDROCK_READ_TIMEOUT", "300"))
+BEDROCK_MAX_RETRIES: int = int(os.environ.get("BEDROCK_MAX_RETRIES", "3"))
+
+# --- Timeouts (seconds) ---
+NODE_TIMEOUT: float = float(os.environ.get("NODE_TIMEOUT", "600.0"))
+EXECUTION_TIMEOUT_DISCOVERY: float = float(os.environ.get("EXECUTION_TIMEOUT_DISCOVERY", "1800.0"))
+EXECUTION_TIMEOUT_ARCHITECTURE: float = float(os.environ.get("EXECUTION_TIMEOUT_ARCHITECTURE", "2400.0"))
+
+# --- Phase Retry ---
+PHASE_MAX_RETRIES: int = int(os.environ.get("PHASE_MAX_RETRIES", "2"))
+PHASE_RETRY_DELAY: float = float(os.environ.get("PHASE_RETRY_DELAY", "5.0"))

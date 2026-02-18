@@ -11,6 +11,7 @@ from src.tools.git_tools import (
     git_read,
     git_write_architecture,
     git_write_infra,
+    git_write_project_plan,
     git_write_security,
 )
 
@@ -249,6 +250,55 @@ class TestGitWriteSecurity:
                 "security/policies/iam-review.md",
                 "# IAM Review",
                 "security: add iam review",
+                mock_context,
+            )
+
+        assert "Committed" in result
+
+
+@pytest.mark.unit
+class TestGitWriteProjectPlan:
+    """Verify git_write_project_plan tool."""
+
+    def test_rejects_non_project_plan_path(self, tmp_path: Path) -> None:
+        mock_context = MagicMock()
+        mock_context.invocation_state = {"git_repo_url": str(tmp_path)}
+
+        result = git_write_project_plan("infra/main.tf", "content", "msg", mock_context)
+        assert "Error" in result
+
+    def test_writes_and_commits(self, tmp_path: Path) -> None:
+        mock_repo = MagicMock()
+        mock_repo.working_dir = str(tmp_path)
+        mock_context = MagicMock()
+        mock_context.invocation_state = {"git_repo_url": str(tmp_path)}
+
+        with patch("src.tools.git_tools.git.Repo", return_value=mock_repo):
+            result = git_write_project_plan(
+                "docs/project-plan/plan.md",
+                "# Project Plan",
+                "docs: add project plan",
+                mock_context,
+            )
+
+        assert "Committed" in result
+        written_file = tmp_path / "docs" / "project-plan" / "plan.md"
+        assert written_file.exists()
+        assert written_file.read_text() == "# Project Plan"
+        mock_repo.index.add.assert_called_once()
+        mock_repo.index.commit.assert_called_once_with("docs: add project plan")
+
+    def test_accepts_nested_project_plan_path(self, tmp_path: Path) -> None:
+        mock_repo = MagicMock()
+        mock_repo.working_dir = str(tmp_path)
+        mock_context = MagicMock()
+        mock_context.invocation_state = {"git_repo_url": str(tmp_path)}
+
+        with patch("src.tools.git_tools.git.Repo", return_value=mock_repo):
+            result = git_write_project_plan(
+                "docs/project-plan/phases/discovery.md",
+                "# Discovery Phase",
+                "docs: add discovery phase plan",
                 mock_context,
             )
 
