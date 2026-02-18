@@ -100,3 +100,4 @@ jobs:
           directory: infra/
           framework: terraform
           quiet: true
+          config_file: infra/terraform/.checkov.yml
