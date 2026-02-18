@@ -59,6 +59,9 @@ class TestConfigDefaults:
             assert src.config.NODE_TIMEOUT == 600.0
             assert src.config.EXECUTION_TIMEOUT_DISCOVERY == 1800.0
             assert src.config.EXECUTION_TIMEOUT_ARCHITECTURE == 2400.0
+            assert src.config.EXECUTION_TIMEOUT_POC == 2400.0
+            assert src.config.EXECUTION_TIMEOUT_PRODUCTION == 3600.0
+            assert src.config.EXECUTION_TIMEOUT_HANDOFF == 1800.0
 
     def test_retry_defaults(self) -> None:
         with patch.dict(os.environ, {}, clear=True):
@@ -69,6 +72,30 @@ class TestConfigDefaults:
             importlib.reload(src.config)
             assert src.config.PHASE_MAX_RETRIES == 2
             assert src.config.PHASE_RETRY_DELAY == 5.0
+
+    def test_sfn_ecs_defaults(self) -> None:
+        with patch.dict(os.environ, {}, clear=True):
+            import importlib
+
+            import src.config
+
+            importlib.reload(src.config)
+            assert src.config.STATE_MACHINE_ARN == ""
+            assert src.config.ECS_CLUSTER_ARN == ""
+            assert src.config.ECS_TASK_DEFINITION == ""
+            assert src.config.ECS_SUBNETS == ""
+            assert src.config.ECS_SECURITY_GROUP == ""
+            assert src.config.SOW_BUCKET == ""
+
+    def test_interrupt_poll_defaults(self) -> None:
+        with patch.dict(os.environ, {}, clear=True):
+            import importlib
+
+            import src.config
+
+            importlib.reload(src.config)
+            assert src.config.INTERRUPT_POLL_INTERVAL == 5.0
+            assert src.config.INTERRUPT_POLL_TIMEOUT == 3600.0
 
     def test_bedrock_client_defaults(self) -> None:
         with patch.dict(os.environ, {}, clear=True):

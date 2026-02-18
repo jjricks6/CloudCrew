@@ -118,6 +118,27 @@ class ParsedSOW(BaseModel):
 # --- Invocation State ---
 
 
+class ApprovalToken(BaseModel):
+    """A stored Step Functions task token awaiting customer approval."""
+
+    project_id: str
+    phase: str
+    task_token: str
+    created_at: str = ""
+
+
+class InterruptRecord(BaseModel):
+    """A mid-phase interrupt requiring customer input."""
+
+    project_id: str
+    interrupt_id: str
+    question: str
+    response: str = ""
+    status: str = Field(description="PENDING or ANSWERED")
+    created_at: str = ""
+    answered_at: str = ""
+
+
 class InvocationState(BaseModel):
     """State passed to every agent invocation via invocation_state kwarg.
 

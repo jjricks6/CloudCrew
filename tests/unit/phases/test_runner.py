@@ -188,6 +188,37 @@ class TestRunPhaseRetryHistory:
 
 
 @pytest.mark.unit
+class TestRunPhaseInterrupted:
+    """Verify INTERRUPTED status is returned immediately without retry."""
+
+    def test_interrupted_returns_immediately(self) -> None:
+        interrupted_result = MagicMock()
+        interrupted_result.status = Status.INTERRUPTED
+
+        swarm = MagicMock(return_value=interrupted_result)
+        factory = MagicMock(return_value=swarm)
+
+        phase_result = run_phase(factory, "task", {}, max_retries=2, retry_delay=0)
+
+        assert phase_result.attempts == 1
+        assert phase_result.result is interrupted_result
+        factory.assert_called_once()  # No retry — only one factory call
+
+    def test_interrupted_not_retried(self) -> None:
+        interrupted_result = MagicMock()
+        interrupted_result.status = Status.INTERRUPTED
+
+        swarm = MagicMock(return_value=interrupted_result)
+        factory = MagicMock(return_value=swarm)
+
+        phase_result = run_phase(factory, "task", {}, max_retries=5, retry_delay=0)
+
+        # Should still be 1 attempt — INTERRUPTED is not a failure
+        assert phase_result.attempts == 1
+        assert len(phase_result.retry_history) == 1
+
+
+@pytest.mark.unit
 class TestPhaseResult:
     """Verify PhaseResult dataclass."""
 

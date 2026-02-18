@@ -9,10 +9,13 @@ from src.tools.git_tools import (
     _resolve_path,
     git_list,
     git_read,
+    git_write_app,
     git_write_architecture,
+    git_write_data,
     git_write_infra,
     git_write_project_plan,
     git_write_security,
+    git_write_tests,
 )
 
 
@@ -303,3 +306,109 @@ class TestGitWriteProjectPlan:
             )
 
         assert "Committed" in result
+
+
+@pytest.mark.unit
+class TestGitWriteApp:
+    """Verify git_write_app tool."""
+
+    def test_rejects_non_app_path(self, tmp_path: Path) -> None:
+        mock_context = MagicMock()
+        mock_context.invocation_state = {"git_repo_url": str(tmp_path)}
+
+        result = git_write_app("infra/main.tf", "content", "msg", mock_context)
+        assert "Error" in result
+
+    def test_writes_and_commits(self, tmp_path: Path) -> None:
+        mock_repo = MagicMock()
+        mock_repo.working_dir = str(tmp_path)
+        mock_context = MagicMock()
+        mock_context.invocation_state = {"git_repo_url": str(tmp_path)}
+
+        with patch("src.tools.git_tools.git.Repo", return_value=mock_repo):
+            result = git_write_app(
+                "app/src/main.py",
+                "print('hello')",
+                "feat: add main entry point",
+                mock_context,
+            )
+
+        assert "Committed" in result
+        written_file = tmp_path / "app" / "src" / "main.py"
+        assert written_file.exists()
+        assert written_file.read_text() == "print('hello')"
+        mock_repo.index.add.assert_called_once()
+        mock_repo.index.commit.assert_called_once_with("feat: add main entry point")
+
+
+@pytest.mark.unit
+class TestGitWriteData:
+    """Verify git_write_data tool."""
+
+    def test_rejects_non_data_path(self, tmp_path: Path) -> None:
+        mock_context = MagicMock()
+        mock_context.invocation_state = {"git_repo_url": str(tmp_path)}
+
+        result = git_write_data("app/main.py", "content", "msg", mock_context)
+        assert "Error" in result
+
+    def test_writes_and_commits(self, tmp_path: Path) -> None:
+        mock_repo = MagicMock()
+        mock_repo.working_dir = str(tmp_path)
+        mock_context = MagicMock()
+        mock_context.invocation_state = {"git_repo_url": str(tmp_path)}
+
+        with patch("src.tools.git_tools.git.Repo", return_value=mock_repo):
+            result = git_write_data(
+                "data/schemas/users.sql",
+                "CREATE TABLE users (id INT);",
+                "data: add users schema",
+                mock_context,
+            )
+
+        assert "Committed" in result
+        written_file = tmp_path / "data" / "schemas" / "users.sql"
+        assert written_file.exists()
+        assert written_file.read_text() == "CREATE TABLE users (id INT);"
+        mock_repo.index.add.assert_called_once()
+        mock_repo.index.commit.assert_called_once_with("data: add users schema")
+
+
+@pytest.mark.unit
+class TestGitWriteTests:
+    """Verify git_write_tests tool."""
+
+    def test_rejects_non_tests_path(self, tmp_path: Path) -> None:
+        mock_context = MagicMock()
+        mock_context.invocation_state = {"git_repo_url": str(tmp_path)}
+
+        result = git_write_tests("app/src/main.py", "content", "msg", mock_context)
+        assert "Error" in result
+
+    def test_rejects_app_without_tests(self, tmp_path: Path) -> None:
+        mock_context = MagicMock()
+        mock_context.invocation_state = {"git_repo_url": str(tmp_path)}
+
+        result = git_write_tests("app/main.py", "content", "msg", mock_context)
+        assert "Error" in result
+
+    def test_writes_and_commits(self, tmp_path: Path) -> None:
+        mock_repo = MagicMock()
+        mock_repo.working_dir = str(tmp_path)
+        mock_context = MagicMock()
+        mock_context.invocation_state = {"git_repo_url": str(tmp_path)}
+
+        with patch("src.tools.git_tools.git.Repo", return_value=mock_repo):
+            result = git_write_tests(
+                "app/tests/test_main.py",
+                "def test_hello(): assert True",
+                "test: add main tests",
+                mock_context,
+            )
+
+        assert "Committed" in result
+        written_file = tmp_path / "app" / "tests" / "test_main.py"
+        assert written_file.exists()
+        assert written_file.read_text() == "def test_hello(): assert True"
+        mock_repo.index.add.assert_called_once()
+        mock_repo.index.commit.assert_called_once_with("test: add main tests")

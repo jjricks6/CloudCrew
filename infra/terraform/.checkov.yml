@@ -1,0 +1,51 @@
+# Checkov configuration for CloudCrew dev environment.
+# Suppressions are dev-only relaxations — revisit for staging/production.
+
+skip-check:
+  # --- Lambda (dev doesn't need DLQ, concurrency limits, code signing, KMS) ---
+  - CKV_AWS_115  # Lambda concurrent execution limit (not needed in dev)
+  - CKV_AWS_116  # Lambda DLQ (not needed in dev)
+  - CKV_AWS_117  # Lambda VPC configuration (not needed in dev)
+  - CKV_AWS_173  # Lambda env vars KMS encryption (no secrets in env vars)
+  - CKV_AWS_272  # Lambda code signing (overkill for dev)
+  - CKV_AWS_50   # Lambda X-Ray tracing (not needed in dev)
+
+  # --- CloudWatch Logs (dev uses short retention, no KMS) ---
+  - CKV_AWS_158  # CloudWatch log groups KMS encryption (overkill for dev)
+  - CKV_AWS_338  # CloudWatch log groups 1-year retention (14 days for dev)
+
+  # --- Networking (dev uses public subnets — no NAT Gateway cost) ---
+  - CKV_AWS_130  # Subnets assign public IP (intentional for ECS Fargate dev)
+  - CKV2_AWS_11  # VPC flow logging (not needed in dev)
+  - CKV2_AWS_12  # Default security group restricts all traffic (dev only)
+
+  # --- DynamoDB (dev uses AWS-managed KMS, no autoscaling) ---
+  - CKV_AWS_119  # DynamoDB customer-managed KMS (AWS-managed is sufficient)
+
+  # --- S3 (dev doesn't need access logging, lifecycle, cross-region replication) ---
+  - CKV_AWS_18   # S3 access logging (not needed in dev)
+  - CKV_AWS_144  # S3 cross-region replication (single-region dev)
+  - CKV_AWS_145  # S3 KMS encryption (AES-256 sufficient for dev)
+  - CKV2_AWS_61  # S3 lifecycle configuration (not needed in dev)
+  - CKV2_AWS_62  # S3 event notifications (not needed in dev)
+
+  # --- ECR (dev uses AES-256 encryption, mutable tags for iteration) ---
+  - CKV_AWS_51   # ECR immutable image tags (mutable for dev iteration)
+  - CKV_AWS_136  # ECR KMS encryption (AES-256 sufficient for dev)
+  - CKV_AWS_336  # ECS containers read-only root filesystem (not feasible with git)
+
+  # --- ECS (dev relaxations) ---
+  - CKV_AWS_237  # API Gateway create-before-destroy (dev only)
+
+  # --- API Gateway (auth deferred to M5/Cognito, logging not needed in dev) ---
+  - CKV_AWS_59   # API Gateway method authorization (deferred to M5 Cognito)
+  - CKV_AWS_73   # API Gateway stage X-Ray tracing (not needed in dev)
+  - CKV_AWS_76   # API Gateway stage access logging (not needed in dev)
+  - CKV_AWS_120  # API Gateway caching (not needed in dev)
+  - CKV2_AWS_4   # API Gateway logging level (not needed in dev)
+  - CKV2_AWS_29  # API Gateway WAF protection (not needed in dev)
+  - CKV2_AWS_51  # API Gateway client certificate auth (deferred to M5)
+  - CKV2_AWS_53  # API Gateway request validation (deferred to M5)
+
+  # --- Step Functions ---
+  - CKV_AWS_284  # State Machine X-Ray tracing (not needed in dev)
