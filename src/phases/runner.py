@@ -113,6 +113,21 @@ def run_phase(
                     retry_history=retry_history,
                 )
 
+            # INTERRUPTED — return immediately, do not retry.
+            # The ECS entrypoint handles interrupt polling separately.
+            if result.status == Status.INTERRUPTED:
+                logger.info(
+                    "Phase interrupted on attempt %d/%d (%.1fs)",
+                    attempt,
+                    total_attempts,
+                    duration,
+                )
+                return PhaseResult(
+                    result=result,
+                    attempts=attempt,
+                    retry_history=retry_history,
+                )
+
             # Status is FAILED (or other non-completed) — retry if possible
             last_result = result
             last_exception = None

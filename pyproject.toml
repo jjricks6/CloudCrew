@@ -56,7 +56,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**/*.py" = ["S101", "ARG001", "T20", "S108"]
+"tests/**/*.py" = ["S101", "ARG001", "T20", "S105", "S108"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["cloudcrew"]

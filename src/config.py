@@ -40,3 +40,15 @@ EXECUTION_TIMEOUT_HANDOFF: float = float(os.environ.get("EXECUTION_TIMEOUT_HANDO
 # --- Phase Retry ---
 PHASE_MAX_RETRIES: int = int(os.environ.get("PHASE_MAX_RETRIES", "2"))
 PHASE_RETRY_DELAY: float = float(os.environ.get("PHASE_RETRY_DELAY", "5.0"))
+
+# --- Step Functions / ECS ---
+STATE_MACHINE_ARN: str = os.environ.get("STATE_MACHINE_ARN", "")
+ECS_CLUSTER_ARN: str = os.environ.get("ECS_CLUSTER_ARN", "")
+ECS_TASK_DEFINITION: str = os.environ.get("ECS_TASK_DEFINITION", "")
+ECS_SUBNETS: str = os.environ.get("ECS_SUBNETS", "")  # comma-separated
+ECS_SECURITY_GROUP: str = os.environ.get("ECS_SECURITY_GROUP", "")
+SOW_BUCKET: str = os.environ.get("SOW_BUCKET", "")
+
+# --- Interrupt Polling ---
+INTERRUPT_POLL_INTERVAL: float = float(os.environ.get("INTERRUPT_POLL_INTERVAL", "5.0"))
+INTERRUPT_POLL_TIMEOUT: float = float(os.environ.get("INTERRUPT_POLL_TIMEOUT", "3600.0"))
