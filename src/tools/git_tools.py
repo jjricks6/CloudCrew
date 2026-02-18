@@ -228,3 +228,99 @@ def git_write_project_plan(
     repo.index.commit(commit_message)
     logger.info("git_write_project_plan: committed %s", file_path)
     return f"Committed: {file_path}"
+
+
+@tool(context=True)
+def git_write_app(
+    file_path: str,
+    content: str,
+    commit_message: str,
+    tool_context: ToolContext,
+) -> str:
+    """Write a file to app/ in the project repo and commit it.
+
+    Only the Dev agent should use this tool. Files must be under app/.
+
+    Args:
+        file_path: Relative path within the repo (must start with app/).
+        content: File content to write.
+        commit_message: Git commit message describing the change.
+        tool_context: Strands tool context (injected by framework).
+
+    Returns:
+        Success message with the committed file path, or an error message.
+    """
+    if not file_path.startswith("app/"):
+        return "Error: Dev agent can only write to app/"
+    repo = _get_repo(tool_context.invocation_state)
+    resolved = _resolve_path(repo, file_path)
+    resolved.parent.mkdir(parents=True, exist_ok=True)
+    resolved.write_text(content)
+    repo.index.add([file_path])
+    repo.index.commit(commit_message)
+    logger.info("git_write_app: committed %s", file_path)
+    return f"Committed: {file_path}"
+
+
+@tool(context=True)
+def git_write_data(
+    file_path: str,
+    content: str,
+    commit_message: str,
+    tool_context: ToolContext,
+) -> str:
+    """Write a file to data/ in the project repo and commit it.
+
+    Only the Data agent should use this tool. Files must be under data/.
+
+    Args:
+        file_path: Relative path within the repo (must start with data/).
+        content: File content to write.
+        commit_message: Git commit message describing the change.
+        tool_context: Strands tool context (injected by framework).
+
+    Returns:
+        Success message with the committed file path, or an error message.
+    """
+    if not file_path.startswith("data/"):
+        return "Error: Data agent can only write to data/"
+    repo = _get_repo(tool_context.invocation_state)
+    resolved = _resolve_path(repo, file_path)
+    resolved.parent.mkdir(parents=True, exist_ok=True)
+    resolved.write_text(content)
+    repo.index.add([file_path])
+    repo.index.commit(commit_message)
+    logger.info("git_write_data: committed %s", file_path)
+    return f"Committed: {file_path}"
+
+
+@tool(context=True)
+def git_write_tests(
+    file_path: str,
+    content: str,
+    commit_message: str,
+    tool_context: ToolContext,
+) -> str:
+    """Write a file to app/tests/ in the project repo and commit it.
+
+    Only the QA agent should use this tool. Files must be under app/tests/.
+
+    Args:
+        file_path: Relative path within the repo (must start with app/tests/).
+        content: File content to write.
+        commit_message: Git commit message describing the change.
+        tool_context: Strands tool context (injected by framework).
+
+    Returns:
+        Success message with the committed file path, or an error message.
+    """
+    if not file_path.startswith("app/tests/"):
+        return "Error: QA agent can only write to app/tests/"
+    repo = _get_repo(tool_context.invocation_state)
+    resolved = _resolve_path(repo, file_path)
+    resolved.parent.mkdir(parents=True, exist_ok=True)
+    resolved.write_text(content)
+    repo.index.add([file_path])
+    repo.index.commit(commit_message)
+    logger.info("git_write_tests: committed %s", file_path)
+    return f"Committed: {file_path}"

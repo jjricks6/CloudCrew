@@ -59,6 +59,9 @@ class TestConfigDefaults:
             assert src.config.NODE_TIMEOUT == 600.0
             assert src.config.EXECUTION_TIMEOUT_DISCOVERY == 1800.0
             assert src.config.EXECUTION_TIMEOUT_ARCHITECTURE == 2400.0
+            assert src.config.EXECUTION_TIMEOUT_POC == 2400.0
+            assert src.config.EXECUTION_TIMEOUT_PRODUCTION == 3600.0
+            assert src.config.EXECUTION_TIMEOUT_HANDOFF == 1800.0
 
     def test_retry_defaults(self) -> None:
         with patch.dict(os.environ, {}, clear=True):

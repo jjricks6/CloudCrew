@@ -33,6 +33,9 @@ BEDROCK_MAX_RETRIES: int = int(os.environ.get("BEDROCK_MAX_RETRIES", "3"))
 NODE_TIMEOUT: float = float(os.environ.get("NODE_TIMEOUT", "600.0"))
 EXECUTION_TIMEOUT_DISCOVERY: float = float(os.environ.get("EXECUTION_TIMEOUT_DISCOVERY", "1800.0"))
 EXECUTION_TIMEOUT_ARCHITECTURE: float = float(os.environ.get("EXECUTION_TIMEOUT_ARCHITECTURE", "2400.0"))
+EXECUTION_TIMEOUT_POC: float = float(os.environ.get("EXECUTION_TIMEOUT_POC", "2400.0"))
+EXECUTION_TIMEOUT_PRODUCTION: float = float(os.environ.get("EXECUTION_TIMEOUT_PRODUCTION", "3600.0"))
+EXECUTION_TIMEOUT_HANDOFF: float = float(os.environ.get("EXECUTION_TIMEOUT_HANDOFF", "1800.0"))
 
 # --- Phase Retry ---
 PHASE_MAX_RETRIES: int = int(os.environ.get("PHASE_MAX_RETRIES", "2"))
