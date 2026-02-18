@@ -49,6 +49,37 @@ class TestConfigDefaults:
             assert src.config.PROJECT_REPO_PATH == ""
             assert src.config.PATTERNS_BUCKET == ""
 
+    def test_timeout_defaults(self) -> None:
+        with patch.dict(os.environ, {}, clear=True):
+            import importlib
+
+            import src.config
+
+            importlib.reload(src.config)
+            assert src.config.NODE_TIMEOUT == 600.0
+            assert src.config.EXECUTION_TIMEOUT_DISCOVERY == 1800.0
+            assert src.config.EXECUTION_TIMEOUT_ARCHITECTURE == 2400.0
+
+    def test_retry_defaults(self) -> None:
+        with patch.dict(os.environ, {}, clear=True):
+            import importlib
+
+            import src.config
+
+            importlib.reload(src.config)
+            assert src.config.PHASE_MAX_RETRIES == 2
+            assert src.config.PHASE_RETRY_DELAY == 5.0
+
+    def test_bedrock_client_defaults(self) -> None:
+        with patch.dict(os.environ, {}, clear=True):
+            import importlib
+
+            import src.config
+
+            importlib.reload(src.config)
+            assert src.config.BEDROCK_READ_TIMEOUT == 300
+            assert src.config.BEDROCK_MAX_RETRIES == 3
+
 
 @pytest.mark.unit
 class TestConfigOverrides:

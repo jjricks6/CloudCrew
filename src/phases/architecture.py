@@ -9,11 +9,14 @@ This module is in phases/ — the ONLY package allowed to import from agents/.
 
 import logging
 
+from strands.hooks import HookProvider
 from strands.multiagent.swarm import Swarm
 
 from src.agents.infra import create_infra_agent
 from src.agents.sa import create_sa_agent
 from src.agents.security import create_security_agent
+from src.config import EXECUTION_TIMEOUT_ARCHITECTURE, NODE_TIMEOUT
+from src.hooks.resilience_hook import ResilienceHook
 
 logger = logging.getLogger(__name__)
 
@@ -28,8 +31,8 @@ def create_architecture_swarm() -> Swarm:
     Configuration:
         - max_handoffs=15: Conservative limit to catch runaway loops
         - max_iterations=15: Matches handoff limit
-        - execution_timeout=1200s: 20 minutes total for the phase
-        - node_timeout=300s: 5 minutes per agent turn
+        - execution_timeout: From config (default 2400s / 40 minutes)
+        - node_timeout: From config (default 600s / 10 minutes)
         - repetitive_handoff_detection_window=8: Catches ping-pong patterns
         - repetitive_handoff_min_unique_agents=3: Requires agent diversity
 
@@ -42,13 +45,16 @@ def create_architecture_swarm() -> Swarm:
 
     logger.info("Creating architecture swarm with agents: sa, infra, security")
 
+    hooks: list[HookProvider] = [ResilienceHook()]
+
     return Swarm(
         nodes=[sa, infra, security],
         entry_point=sa,
         max_handoffs=15,
         max_iterations=15,
-        execution_timeout=1200.0,
-        node_timeout=300.0,
+        execution_timeout=EXECUTION_TIMEOUT_ARCHITECTURE,
+        node_timeout=NODE_TIMEOUT,
+        hooks=hooks,
         repetitive_handoff_detection_window=8,
         repetitive_handoff_min_unique_agents=3,
         id="architecture-swarm",

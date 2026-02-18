@@ -22,6 +22,8 @@ class TestBuildInvocationState:
         assert "git_repo_url" in result
         assert "knowledge_base_id" in result
         assert "patterns_bucket" in result
+        assert "stm_memory_id" in result
+        assert "ltm_memory_id" in result
 
     @patch("src.agents.base.BedrockModel", new_callable=lambda: MagicMock)
     def test_custom_session_id(self, _mock_bedrock: MagicMock) -> None:

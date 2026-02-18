@@ -4,7 +4,118 @@ Shared types used across modules. This module imports only from config — never
 from agents/, tools/, hooks/, or phases/.
 """
 
+from enum import StrEnum
+
 from pydantic import BaseModel, Field
+
+# --- Enums ---
+
+
+class Phase(StrEnum):
+    """Project delivery phases."""
+
+    DISCOVERY = "DISCOVERY"
+    ARCHITECTURE = "ARCHITECTURE"
+    POC = "POC"
+    PRODUCTION = "PRODUCTION"
+    HANDOFF = "HANDOFF"
+    RETROSPECTIVE = "RETROSPECTIVE"
+
+
+class PhaseStatus(StrEnum):
+    """Status of the current phase."""
+
+    IN_PROGRESS = "IN_PROGRESS"
+    AWAITING_APPROVAL = "AWAITING_APPROVAL"
+    APPROVED = "APPROVED"
+    REVISION_REQUESTED = "REVISION_REQUESTED"
+
+
+# --- Task Ledger Entry Models ---
+
+
+class Fact(BaseModel):
+    """A verified piece of information about the project."""
+
+    description: str
+    source: str
+    timestamp: str
+
+
+class Assumption(BaseModel):
+    """An unverified assumption that needs validation."""
+
+    description: str
+    confidence: str = Field(description="HIGH, MEDIUM, or LOW")
+    timestamp: str
+
+
+class Decision(BaseModel):
+    """A project or technical decision with rationale."""
+
+    description: str
+    rationale: str
+    made_by: str
+    timestamp: str
+    adr_path: str = ""
+
+
+class Blocker(BaseModel):
+    """An issue blocking progress."""
+
+    description: str
+    assigned_to: str
+    status: str = Field(description="OPEN or RESOLVED")
+    timestamp: str
+
+
+class DeliverableItem(BaseModel):
+    """A deliverable artifact within a phase."""
+
+    name: str
+    git_path: str
+    status: str = Field(description="IN_PROGRESS, COMPLETE, or NEEDS_REVISION")
+
+
+# --- Task Ledger ---
+
+
+class TaskLedger(BaseModel):
+    """Structured project state stored in DynamoDB.
+
+    Maintained by the PM agent. All agents can read it.
+    Inspired by Magentic-One's research on preventing context drift.
+    """
+
+    project_id: str
+    project_name: str = ""
+    customer: str = ""
+    current_phase: Phase = Phase.DISCOVERY
+    phase_status: PhaseStatus = PhaseStatus.IN_PROGRESS
+    facts: list[Fact] = Field(default_factory=list)
+    assumptions: list[Assumption] = Field(default_factory=list)
+    decisions: list[Decision] = Field(default_factory=list)
+    blockers: list[Blocker] = Field(default_factory=list)
+    deliverables: dict[str, list[DeliverableItem]] = Field(default_factory=dict)
+    created_at: str = ""
+    updated_at: str = ""
+
+
+# --- SOW Parsing ---
+
+
+class ParsedSOW(BaseModel):
+    """Structured requirements extracted from a Statement of Work."""
+
+    objectives: list[str] = Field(default_factory=list)
+    requirements: list[str] = Field(default_factory=list)
+    constraints: list[str] = Field(default_factory=list)
+    deliverables: list[str] = Field(default_factory=list)
+    acceptance_criteria: list[str] = Field(default_factory=list)
+    timeline: str = ""
+
+
+# --- Invocation State ---
 
 
 class InvocationState(BaseModel):
@@ -21,3 +132,5 @@ class InvocationState(BaseModel):
     git_repo_url: str = Field(description="Local path to the project Git repository")
     knowledge_base_id: str = Field(description="Bedrock Knowledge Base ID for project artifacts")
     patterns_bucket: str = Field(description="S3 bucket name for the pattern library")
+    stm_memory_id: str = Field(default="", description="AgentCore Memory ID for short-term memory")
+    ltm_memory_id: str = Field(default="", description="AgentCore Memory ID for long-term memory")
