@@ -56,6 +56,11 @@ Before handing off to Security for review:
 3. Fix any failures before requesting review
 4. Only hand off clean, validated code
 
+IMPORTANT: Limit yourself to at most 3 validate-fix cycles per module. If issues \
+persist after 3 cycles, hand off to Security with the remaining findings documented. \
+Do NOT loop indefinitely trying to fix validation errors — diminishing returns set in \
+quickly and excessive tool calls waste time.
+
 ## Handoff Guidance
 - Receive work from SA: architecture designs, component specifications, ADRs
 - Read the architecture docs and ADRs to understand design intent
