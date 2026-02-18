@@ -50,8 +50,8 @@ class TestProductionSwarm:
         assert call_kwargs.kwargs["entry_point"] is mock_dev
 
         # Verify Swarm configuration
-        assert call_kwargs.kwargs["max_handoffs"] == 15
-        assert call_kwargs.kwargs["max_iterations"] == 15
+        assert call_kwargs.kwargs["max_handoffs"] == 25
+        assert call_kwargs.kwargs["max_iterations"] == 25
         assert call_kwargs.kwargs["execution_timeout"] == 3600.0
         assert call_kwargs.kwargs["node_timeout"] == 600.0
         assert call_kwargs.kwargs["repetitive_handoff_detection_window"] == 8

@@ -30,8 +30,8 @@ def create_production_swarm() -> Swarm:
     production-ready code delivery with quality gates.
 
     Configuration:
-        - max_handoffs=15: Conservative limit to catch runaway loops
-        - max_iterations=15: Matches handoff limit
+        - max_handoffs=25: High enough for per-module Infra->Security cycles
+        - max_iterations=25: Matches handoff limit
         - execution_timeout: From config (default 3600s / 60 minutes)
         - node_timeout: From config (default 600s / 10 minutes)
         - repetitive_handoff_detection_window=8: Catches ping-pong patterns
@@ -53,8 +53,8 @@ def create_production_swarm() -> Swarm:
     return Swarm(
         nodes=[dev, infra, data, security, qa],
         entry_point=dev,
-        max_handoffs=15,
-        max_iterations=15,
+        max_handoffs=25,
+        max_iterations=25,
         execution_timeout=EXECUTION_TIMEOUT_PRODUCTION,
         node_timeout=NODE_TIMEOUT,
         hooks=hooks,

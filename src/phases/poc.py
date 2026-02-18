@@ -30,8 +30,8 @@ def create_poc_swarm() -> Swarm:
     rapid prototyping and proof-of-concept delivery.
 
     Configuration:
-        - max_handoffs=15: Conservative limit to catch runaway loops
-        - max_iterations=15: Matches handoff limit
+        - max_handoffs=25: High enough for per-module Infra->Security cycles
+        - max_iterations=25: Matches handoff limit
         - execution_timeout: From config (default 2400s / 40 minutes)
         - node_timeout: From config (default 600s / 10 minutes)
         - repetitive_handoff_detection_window=8: Catches ping-pong patterns
@@ -53,8 +53,8 @@ def create_poc_swarm() -> Swarm:
     return Swarm(
         nodes=[dev, infra, data, security, sa],
         entry_point=dev,
-        max_handoffs=15,
-        max_iterations=15,
+        max_handoffs=25,
+        max_iterations=25,
         execution_timeout=EXECUTION_TIMEOUT_POC,
         node_timeout=NODE_TIMEOUT,
         hooks=hooks,
