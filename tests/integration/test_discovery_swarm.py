@@ -41,6 +41,11 @@ from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
 
+# Strands SDK uses recursive event_loop_cycle — each tool call adds ~7 stack
+# frames.  Agents making 40+ sequential calls (e.g. Infra validate/fix cycles)
+# can exceed Python's default 1000-frame limit.
+sys.setrecursionlimit(5000)
+
 # Ensure project root is on sys.path for direct script execution
 _PROJECT_ROOT = str(Path(__file__).resolve().parent.parent.parent)
 if _PROJECT_ROOT not in sys.path:
@@ -159,22 +164,32 @@ PHASE_TASKS: dict[str, str] = {
         "Your tasks:\n"
         "1. Read the SOW using git_read\n"
         "2. Parse it with parse_sow to extract structured requirements\n"
-        "3. Update the task ledger with key facts and assumptions from the SOW\n"
-        "4. Create a project plan document at docs/project-plan/plan.md\n"
-        "5. Hand off to the SA for initial architecture thinking based on the "
-        "requirements"
+        "3. Update the task ledger with ALL key facts, assumptions, requirements, "
+        "constraints, and deliverables extracted from the SOW\n"
+        "4. Create a project plan document at docs/project-plan/plan.md that "
+        "outlines the phased delivery approach\n\n"
+        "IMPORTANT: This is the Discovery phase ONLY. Do NOT produce architecture "
+        "design documents, ADRs, or Terraform code. Those are deliverables for "
+        "later phases. Discovery output is strictly: parsed SOW data in the task "
+        "ledger + a project plan document."
     ),
     "ARCHITECTURE": (
         "Continue the Acme Corp engagement. Discovery is complete — the SOW has "
         "been parsed and a project plan exists in docs/project-plan/.\n\n"
+        "BEFORE creating any files, check what already exists:\n"
+        "- Use git_list to see all files under docs/architecture/\n"
+        "- Use read_task_ledger to see recorded deliverables and decisions\n"
+        "- If architecture docs or ADRs already exist from a prior attempt, "
+        "READ them and build on them — do NOT recreate from scratch\n\n"
         "Your tasks:\n"
-        "1. Read the task ledger to understand the requirements and constraints\n"
-        "2. Read the SOW and project plan from the repo\n"
-        "3. Design a target AWS architecture that meets the requirements\n"
-        "4. Write an architecture design document at docs/architecture/design.md\n"
-        "5. Create at least one ADR at docs/architecture/adr/001-*.md\n"
-        "6. Hand off to Infra for Terraform module planning\n"
-        "7. Hand off to Security for initial security review"
+        "1. Read the task ledger, SOW, and project plan to understand requirements\n"
+        "2. Design a target AWS architecture that meets the requirements\n"
+        "3. Write an architecture design document in docs/architecture/\n"
+        "4. Create ADRs for key technology decisions in docs/architecture/adr/\n"
+        "5. Hand off to Infra for Terraform module planning\n"
+        "6. Hand off to Security for initial security review\n\n"
+        "IMPORTANT: Limit Terraform validate/fix iterations to 3 cycles per module. "
+        "If issues remain after 3 cycles, document them and move on."
     ),
     "POC": (
         "Continue the Acme Corp engagement. Architecture design is complete — "
