@@ -52,3 +52,8 @@ SOW_BUCKET: str = os.environ.get("SOW_BUCKET", "")
 # --- Interrupt Polling ---
 INTERRUPT_POLL_INTERVAL: float = float(os.environ.get("INTERRUPT_POLL_INTERVAL", "5.0"))
 INTERRUPT_POLL_TIMEOUT: float = float(os.environ.get("INTERRUPT_POLL_TIMEOUT", "3600.0"))
+
+# --- Dashboard Event Infrastructure ---
+ACTIVITY_TABLE: str = os.environ.get("ACTIVITY_TABLE", "")
+CONNECTIONS_TABLE: str = os.environ.get("CONNECTIONS_TABLE", "")
+WEBSOCKET_API_ENDPOINT: str = os.environ.get("WEBSOCKET_API_ENDPOINT", "")

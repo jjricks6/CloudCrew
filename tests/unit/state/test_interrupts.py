@@ -9,8 +9,9 @@ import pytest
 class TestStoreInterrupt:
     """Verify store_interrupt behavior."""
 
+    @patch("src.state.interrupts.broadcast_to_project")
     @patch("src.state.interrupts.boto3")
-    def test_store_interrupt(self, mock_boto3: MagicMock) -> None:
+    def test_store_interrupt(self, mock_boto3: MagicMock, _mock_broadcast: MagicMock) -> None:
         from src.state.interrupts import store_interrupt
 
         mock_table = MagicMock()

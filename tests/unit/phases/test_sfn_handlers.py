@@ -6,6 +6,7 @@ import pytest
 
 
 @pytest.mark.unit
+@patch("src.phases.sfn_handlers.broadcast_to_project")
 class TestStartPhaseHandler:
     """Verify start_phase_handler behavior."""
 
@@ -17,6 +18,7 @@ class TestStartPhaseHandler:
         mock_boto3: MagicMock,
         mock_read_ledger: MagicMock,
         _mock_write_ledger: MagicMock,
+        _mock_broadcast: MagicMock,
     ) -> None:
         from src.phases.sfn_handlers import start_phase_handler
         from src.state.models import TaskLedger
@@ -51,6 +53,7 @@ class TestStartPhaseHandler:
         mock_boto3: MagicMock,
         mock_read_ledger: MagicMock,
         _mock_write_ledger: MagicMock,
+        _mock_broadcast: MagicMock,
     ) -> None:
         from src.phases.sfn_handlers import start_phase_handler
         from src.state.models import TaskLedger
@@ -85,6 +88,7 @@ class TestStartPhaseHandler:
         mock_boto3: MagicMock,
         mock_read_ledger: MagicMock,
         mock_write_ledger: MagicMock,
+        _mock_broadcast: MagicMock,
     ) -> None:
         """Verify ledger is updated to new phase/IN_PROGRESS before ECS launch."""
         from src.phases.sfn_handlers import start_phase_handler
@@ -121,6 +125,7 @@ class TestStartPhaseHandler:
         mock_boto3: MagicMock,
         mock_read_ledger: MagicMock,
         _mock_write_ledger: MagicMock,
+        _mock_broadcast: MagicMock,
     ) -> None:
         """Verify RuntimeError raised when ECS returns no tasks."""
         from src.phases.sfn_handlers import start_phase_handler
@@ -145,6 +150,7 @@ class TestStartPhaseHandler:
 
 
 @pytest.mark.unit
+@patch("src.phases.sfn_handlers.broadcast_to_project")
 class TestStoreApprovalTokenHandler:
     """Verify store_approval_token_handler behavior."""
 
@@ -156,6 +162,7 @@ class TestStoreApprovalTokenHandler:
         mock_store_token: MagicMock,
         mock_read_ledger: MagicMock,
         mock_write_ledger: MagicMock,
+        _mock_broadcast: MagicMock,
     ) -> None:
         from src.phases.sfn_handlers import store_approval_token_handler
         from src.state.models import PhaseStatus, TaskLedger
@@ -191,6 +198,7 @@ class TestSfnRoute:
         mock_handler.assert_called_once()
         assert result["ecs_task_arn"] == "arn"
 
+    @patch("src.phases.sfn_handlers.broadcast_to_project")
     @patch("src.state.ledger.write_ledger")
     @patch("src.state.ledger.read_ledger")
     @patch("src.phases.sfn_handlers.store_token")
@@ -199,6 +207,7 @@ class TestSfnRoute:
         _mock_store: MagicMock,
         mock_read: MagicMock,
         _mock_write: MagicMock,
+        _mock_broadcast: MagicMock,
     ) -> None:
         from src.phases.sfn_handlers import route
         from src.state.models import TaskLedger

@@ -177,7 +177,7 @@ def execute_phase(
         effective_task = task if attempt == 1 else RECOVERY_PREFIX + task
 
         try:
-            swarm = factory()
+            swarm = factory(project_id=project_id, phase=phase)
             result = swarm(effective_task, invocation_state=invocation_state)
 
             # Handle interrupt loop (same Swarm instance)

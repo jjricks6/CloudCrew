@@ -119,6 +119,30 @@ resource "aws_iam_role_policy" "ecs_task" {
         ]
       },
       {
+        Sid    = "ActivityTable"
+        Effect = "Allow"
+        Action = [
+          "dynamodb:PutItem",
+          "dynamodb:Query",
+        ]
+        Resource = aws_dynamodb_table.activity.arn
+      },
+      {
+        Sid    = "BroadcastConnections"
+        Effect = "Allow"
+        Action = [
+          "dynamodb:Query",
+          "dynamodb:DeleteItem",
+        ]
+        Resource = aws_dynamodb_table.connections.arn
+      },
+      {
+        Sid    = "BroadcastPostToConnection"
+        Effect = "Allow"
+        Action = "execute-api:ManageConnections"
+        Resource = "${aws_apigatewayv2_api.websocket.execution_arn}/${var.environment}/*"
+      },
+      {
         Sid    = "S3Read"
         Effect = "Allow"
         Action = [
@@ -409,6 +433,21 @@ resource "aws_iam_role_policy" "lambda_sfn_handlers" {
           "dynamodb:Query",
         ]
         Resource = aws_dynamodb_table.projects.arn
+      },
+      {
+        Sid    = "BroadcastConnections"
+        Effect = "Allow"
+        Action = [
+          "dynamodb:Query",
+          "dynamodb:DeleteItem",
+        ]
+        Resource = aws_dynamodb_table.connections.arn
+      },
+      {
+        Sid    = "BroadcastPostToConnection"
+        Effect = "Allow"
+        Action = "execute-api:ManageConnections"
+        Resource = "${aws_apigatewayv2_api.websocket.execution_arn}/${var.environment}/*"
       },
     ]
   })

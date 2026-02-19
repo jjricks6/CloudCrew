@@ -54,12 +54,14 @@ resource "aws_lambda_function" "sfn_handlers" {
 
   environment {
     variables = {
-      AWS_DEFAULT_REGION  = var.aws_region
-      TASK_LEDGER_TABLE   = aws_dynamodb_table.projects.name
-      ECS_CLUSTER_ARN     = aws_ecs_cluster.main.arn
-      ECS_TASK_DEFINITION = aws_ecs_task_definition.phase_runner.arn
-      ECS_SUBNETS         = join(",", aws_subnet.public[*].id)
-      ECS_SECURITY_GROUP  = aws_security_group.ecs_tasks.id
+      AWS_DEFAULT_REGION     = var.aws_region
+      TASK_LEDGER_TABLE      = aws_dynamodb_table.projects.name
+      ECS_CLUSTER_ARN        = aws_ecs_cluster.main.arn
+      ECS_TASK_DEFINITION    = aws_ecs_task_definition.phase_runner.arn
+      ECS_SUBNETS            = join(",", aws_subnet.public[*].id)
+      ECS_SECURITY_GROUP     = aws_security_group.ecs_tasks.id
+      CONNECTIONS_TABLE      = aws_dynamodb_table.connections.name
+      WEBSOCKET_API_ENDPOINT = "https://${aws_apigatewayv2_api.websocket.id}.execute-api.${var.aws_region}.amazonaws.com/${var.environment}"
     }
   }
 

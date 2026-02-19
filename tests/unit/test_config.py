@@ -107,6 +107,17 @@ class TestConfigDefaults:
             assert src.config.BEDROCK_READ_TIMEOUT == 300
             assert src.config.BEDROCK_MAX_RETRIES == 3
 
+    def test_dashboard_event_defaults(self) -> None:
+        with patch.dict(os.environ, {}, clear=True):
+            import importlib
+
+            import src.config
+
+            importlib.reload(src.config)
+            assert src.config.ACTIVITY_TABLE == ""
+            assert src.config.CONNECTIONS_TABLE == ""
+            assert src.config.WEBSOCKET_API_ENDPOINT == ""
+
 
 @pytest.mark.unit
 class TestConfigOverrides:

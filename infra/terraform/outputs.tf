@@ -61,10 +61,31 @@ output "subnet_ids" {
   value       = aws_subnet.public[*].id
 }
 
+# --- WebSocket API ---
+output "websocket_api_url" {
+  description = "WebSocket API Gateway URL for dashboard connections"
+  value       = "wss://${aws_apigatewayv2_api.websocket.id}.execute-api.${var.aws_region}.amazonaws.com/${var.environment}"
+}
+
+output "lambda_ws_handlers_arn" {
+  description = "WebSocket handlers Lambda function ARN"
+  value       = aws_lambda_function.ws_handlers.arn
+}
+
 # --- DynamoDB ---
 output "dynamodb_projects_table" {
   description = "DynamoDB projects table name"
   value       = aws_dynamodb_table.projects.name
+}
+
+output "dynamodb_connections_table" {
+  description = "DynamoDB connections table name"
+  value       = aws_dynamodb_table.connections.name
+}
+
+output "dynamodb_activity_table" {
+  description = "DynamoDB activity table name"
+  value       = aws_dynamodb_table.activity.name
 }
 
 # --- S3 ---

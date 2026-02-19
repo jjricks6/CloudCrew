@@ -15,6 +15,7 @@ from strands.multiagent.swarm import Swarm
 from src.agents.pm import create_pm_agent
 from src.agents.sa import create_sa_agent
 from src.config import EXECUTION_TIMEOUT_HANDOFF, NODE_TIMEOUT
+from src.hooks.activity_hook import ActivityHook
 from src.hooks.max_tokens_recovery_hook import MaxTokensRecoveryHook
 from src.hooks.memory_hook import MemoryHook
 from src.hooks.resilience_hook import ResilienceHook
@@ -25,6 +26,8 @@ logger = logging.getLogger(__name__)
 def create_handoff_swarm(
     stm_memory_id: str = "",
     ltm_memory_id: str = "",
+    project_id: str = "",
+    phase: str = "",
 ) -> Swarm:
     """Create the Handoff phase Swarm.
 
@@ -51,7 +54,11 @@ def create_handoff_swarm(
 
     logger.info("Creating handoff swarm with agents: pm, sa")
 
-    hooks: list[HookProvider] = [ResilienceHook(), MaxTokensRecoveryHook()]
+    hooks: list[HookProvider] = [
+        ResilienceHook(),
+        MaxTokensRecoveryHook(),
+        ActivityHook(project_id=project_id, phase=phase),
+    ]
     if stm_memory_id or ltm_memory_id:
         hooks.append(
             MemoryHook(
