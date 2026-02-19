@@ -33,7 +33,7 @@ def create_poc_swarm() -> Swarm:
         - max_handoffs=25: High enough for per-module Infra->Security cycles
         - max_iterations=25: Matches handoff limit
         - execution_timeout: From config (default 2400s / 40 minutes)
-        - node_timeout: From config (default 600s / 10 minutes)
+        - node_timeout: From config (default 1800s / 30 minutes)
         - repetitive_handoff_detection_window=8: Catches ping-pong patterns
         - repetitive_handoff_min_unique_agents=3: Requires agent diversity
 

@@ -32,7 +32,7 @@ def create_architecture_swarm() -> Swarm:
         - max_handoffs=15: Conservative limit to catch runaway loops
         - max_iterations=15: Matches handoff limit
         - execution_timeout: From config (default 2400s / 40 minutes)
-        - node_timeout: From config (default 600s / 10 minutes)
+        - node_timeout: From config (default 1800s / 30 minutes)
         - repetitive_handoff_detection_window=8: Catches ping-pong patterns
         - repetitive_handoff_min_unique_agents=3: Requires agent diversity
 

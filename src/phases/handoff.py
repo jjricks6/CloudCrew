@@ -38,7 +38,7 @@ def create_handoff_swarm(
         - max_handoffs=10: Handoff phase is lightweight
         - max_iterations=10: Matches handoff limit
         - execution_timeout: From config (default 1800s / 30 minutes)
-        - node_timeout: From config (default 600s / 10 minutes)
+        - node_timeout: From config (default 1800s / 30 minutes)
         - repetitive_handoff_detection_window=6: Catches ping-pong patterns
         - repetitive_handoff_min_unique_agents=2: Only 2 agents in this swarm
 

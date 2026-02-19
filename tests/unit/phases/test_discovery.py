@@ -41,7 +41,7 @@ class TestDiscoverySwarm:
         assert call_kwargs.kwargs["max_handoffs"] == 10
         assert call_kwargs.kwargs["max_iterations"] == 10
         assert call_kwargs.kwargs["execution_timeout"] == 1800.0
-        assert call_kwargs.kwargs["node_timeout"] == 600.0
+        assert call_kwargs.kwargs["node_timeout"] == 1800.0
         assert call_kwargs.kwargs["repetitive_handoff_detection_window"] == 6
         assert call_kwargs.kwargs["repetitive_handoff_min_unique_agents"] == 2
         assert call_kwargs.kwargs["id"] == "discovery-swarm"

@@ -93,7 +93,11 @@ def git_list(directory: str, tool_context: ToolContext) -> str:
     repo = _get_repo(tool_context.invocation_state)
     resolved = _resolve_path(repo, directory)
     if not resolved.exists():
-        return f"Error: directory not found: {directory}"
+        return (
+            f"Directory '{directory}' does not exist yet — no files have been "
+            "created there. This is normal if this area of the project hasn't "
+            "been worked on yet. Do not retry with different paths."
+        )
     if not resolved.is_dir():
         return f"Error: not a directory: {directory}"
     logger.info("git_list: %s", directory)

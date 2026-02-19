@@ -45,7 +45,7 @@ class TestArchitectureSwarm:
         assert call_kwargs.kwargs["max_handoffs"] == 15
         assert call_kwargs.kwargs["max_iterations"] == 15
         assert call_kwargs.kwargs["execution_timeout"] == 2400.0
-        assert call_kwargs.kwargs["node_timeout"] == 600.0
+        assert call_kwargs.kwargs["node_timeout"] == 1800.0
         assert call_kwargs.kwargs["repetitive_handoff_detection_window"] == 8
         assert call_kwargs.kwargs["repetitive_handoff_min_unique_agents"] == 3
         assert call_kwargs.kwargs["id"] == "architecture-swarm"

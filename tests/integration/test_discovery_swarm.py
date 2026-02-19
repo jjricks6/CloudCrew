@@ -201,8 +201,8 @@ PHASE_TASKS: dict[str, str] = {
     ),
     # ------------------------------------------------------------------
     # POC: The heavy implementation phase.  Dev leads, Infra writes TF,
-    # Data writes schemas.  Key rule: Infra must hand off to Security
-    # AFTER EACH MODULE so the recursion stack resets between modules.
+    # Data writes schemas.  Infra writes one module per turn (keeps
+    # output small), then Security does one light pass at the end.
     # ------------------------------------------------------------------
     "POC": (
         "Continue the Acme Corp engagement. Architecture design is complete — "
@@ -212,44 +212,57 @@ PHASE_TASKS: dict[str, str] = {
         "- Use read_task_ledger to see recorded deliverables\n"
         "- If modules or code exist from a prior attempt, build on them\n\n"
         "Your tasks:\n"
-        "1. Dev: Read the architecture design and task ledger, then create "
-        "application scaffolding under app/\n"
+        "1. Dev: Read the architecture design and task ledger, then build "
+        "a working application demo under app/ — enough to prove the "
+        "architecture works end-to-end. Include a Dockerfile, dependency "
+        "manifest, database config, a health check endpoint, and one or two "
+        "core features (e.g., basic CRUD for a primary resource). The goal "
+        "is a deployable app the customer can see running — not just empty "
+        "scaffolding, but also not every feature polished. Save comprehensive "
+        "test suites and production hardening for the Production phase.\n"
         "2. Dev: Hand off to Infra for Terraform implementation\n"
-        "3. Infra: Implement ONE Terraform module (start with VPC under "
-        "infra/modules/vpc/), run terraform_validate, then hand off to "
-        "Security for review BEFORE starting the next module\n"
-        "4. Security: Review the module, hand back to Infra for the next one\n"
-        "5. Infra: Implement the next module (compute under "
-        "infra/modules/compute/), validate, hand off to Security again\n"
-        "6. Data: Create initial database schema under data/\n"
-        "7. SA: Validate alignment with the architecture design\n\n"
-        "CRITICAL: Infra must hand off to Security after EACH module — do NOT "
-        "write multiple modules in a single turn. This keeps each turn focused "
-        "and manageable."
+        "3. Infra: Implement Terraform modules one at a time — start with VPC "
+        "(infra/modules/vpc/), run terraform_validate, then continue to the "
+        "next module (compute, then data). Write one module per turn to keep "
+        "output small. After ALL modules are done, hand off to Security.\n"
+        "4. Security: Do a LIGHT review of all modules together — run checkov_scan "
+        "on each, flag any critical issues, but do NOT request multiple fix cycles. "
+        "This is a POC, not production. One pass is sufficient.\n"
+        "5. Data: Create initial database schema under data/\n"
+        "6. SA: Validate alignment with the architecture design\n\n"
+        "CRITICAL: Infra should write one module per turn to keep output small, "
+        "but does NOT need to hand off to Security between modules. Security "
+        "does one review pass at the end after all modules are complete."
     ),
     # ------------------------------------------------------------------
     # PRODUCTION: Harden existing POC code.  Same per-module handoff
     # pattern.  QA validates acceptance criteria at the end.
     # ------------------------------------------------------------------
     "PRODUCTION": (
-        "Continue the Acme Corp engagement. The POC phase is complete — core "
-        "infrastructure modules exist in infra/ and data/.\n\n"
+        "Continue the Acme Corp engagement. The POC phase is complete.\n\n"
+        "The following artifacts exist from POC:\n"
+        "- infra/modules/vpc/ — VPC with subnets, security groups, endpoints\n"
+        "- infra/modules/compute/ — ECS Fargate with ALB\n"
+        "- infra/modules/data/ — RDS PostgreSQL and ElastiCache Redis\n"
+        "- app/ — Application code with Dockerfile and health endpoint\n"
+        "- data/ — Database schema\n\n"
         "BEFORE creating any files, check what already exists:\n"
         "- Use git_list to see existing files in infra/, app/, data/\n"
         "- Use read_task_ledger to see recorded deliverables\n\n"
         "Your tasks:\n"
-        "1. Dev: Read existing code and architecture docs, then harden "
-        "application code and create a CI/CD pipeline config at app/ci/pipeline.yml\n"
-        "2. Dev: Hand off to Infra for infrastructure hardening\n"
-        "3. Infra: Harden existing Terraform modules ONE AT A TIME — add "
-        "encryption, backups, monitoring. After each module, run "
-        "terraform_validate and hand off to Security for review\n"
-        "4. Security: Perform security review of each module, hand back to Infra "
-        "or write the final security review report at docs/security/review.md\n"
-        "5. QA: Create a test plan, validate acceptance criteria from the SOW, "
-        "and write test suites under app/tests/\n\n"
+        "1. Dev: Read existing code and architecture docs, then create a "
+        "CI/CD pipeline config at app/ci/pipeline.yml. Hand off to Infra.\n"
+        "2. Infra: Harden the THREE existing modules (vpc, compute, data) — "
+        "add encryption, backups, monitoring. Do NOT create new modules. "
+        "After each module, run terraform_validate and hand off to Security.\n"
+        "3. Security: Review each module. After the final module review, write "
+        "a consolidated security review report and hand off to QA.\n"
+        "4. QA: Create a test plan and write focused test files under "
+        "app/tests/. Keep each test file small (under 150 lines) — split "
+        "across multiple files rather than writing one large file.\n\n"
         "CRITICAL: Infra must hand off to Security after EACH module — do NOT "
-        "harden multiple modules in a single turn."
+        "harden multiple modules in a single turn. Do NOT create new modules "
+        "like cdn/ or database/ — only harden what already exists."
     ),
     # ------------------------------------------------------------------
     # HANDOFF: PM packages deliverables, SA signs off on architecture.
@@ -362,10 +375,17 @@ def delete_memory_resource(control_client: Any, memory_id: str) -> None:
 
 
 @contextmanager
-def ephemeral_resources(region: str) -> Generator[dict[str, str], None, None]:
+def ephemeral_resources(
+    region: str,
+    keep_artifacts: bool = False,
+) -> Generator[dict[str, str], None, None]:
     """Context manager that creates and destroys all test resources.
 
     Yields a dict with keys: table_name, stm_memory_id, ltm_memory_id, repo_path
+
+    Args:
+        region: AWS region.
+        keep_artifacts: If True, copy the repo to ./test-artifacts/ before cleanup.
     """
     suffix = uuid.uuid4().hex[:8]
     table_name = f"cloudcrew-inttest-{suffix}"
@@ -421,6 +441,13 @@ def ephemeral_resources(region: str) -> Generator[dict[str, str], None, None]:
         print(f"\n{BOLD}{'=' * 70}")
         print("  DESTROYING TEST RESOURCES")
         print(f"{'=' * 70}{RESET}\n")
+
+        # Preserve artifacts before cleanup if requested
+        if keep_artifacts:
+            artifacts_dir = Path(__file__).resolve().parent.parent.parent / "test-artifacts" / suffix
+            print(f"{CYAN}[{_ts()}] Copying artifacts to {artifacts_dir}{RESET}")
+            shutil.copytree(repo_path, str(artifacts_dir), dirs_exist_ok=True)
+            print(f"{GREEN}[{_ts()}] Artifacts saved: {artifacts_dir}{RESET}")
 
         delete_dynamodb_table(table_name, region)
         if stm_memory_id:
@@ -692,11 +719,12 @@ def _print_final_summary(
 # ---------------------------------------------------------------------------
 
 
-def run_test(phases: list[str] | None = None) -> None:
+def run_test(phases: list[str] | None = None, *, keep_artifacts: bool = False) -> None:
     """Run the full lifecycle integration test with live output.
 
     Args:
         phases: List of phase names to run. Defaults to all 5 phases.
+        keep_artifacts: If True, copy deliverables to ./test-artifacts/ before cleanup.
     """
     target_phases = phases or ALL_PHASES
 
@@ -717,7 +745,7 @@ def run_test(phases: list[str] | None = None) -> None:
     print(f"  Phases:     {' -> '.join(target_phases)}")
     print(f"  Region:     {region}\n")
 
-    with ephemeral_resources(region) as resources:
+    with ephemeral_resources(region, keep_artifacts=keep_artifacts) as resources:
         # Set environment variables BEFORE importing src modules
         os.environ["TASK_LEDGER_TABLE"] = resources["table_name"]
         os.environ["STM_MEMORY_ID"] = resources["stm_memory_id"]
@@ -832,6 +860,12 @@ if __name__ == "__main__":
         default=None,
         help="Phases to run (default: all 5). Example: --phases DISCOVERY ARCHITECTURE",
     )
+    parser.add_argument(
+        "--keep-artifacts",
+        action="store_true",
+        default=False,
+        help="Copy deliverables to ./test-artifacts/ before cleanup for review",
+    )
     args = parser.parse_args()
 
     logging.basicConfig(
@@ -844,4 +878,4 @@ if __name__ == "__main__":
     logging.getLogger("strands.multiagent").setLevel(logging.INFO)
     logging.getLogger("src").setLevel(logging.INFO)
 
-    run_test(phases=args.phases)
+    run_test(phases=args.phases, keep_artifacts=args.keep_artifacts)

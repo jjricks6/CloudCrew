@@ -30,7 +30,7 @@ BEDROCK_READ_TIMEOUT: int = int(os.environ.get("BEDROCK_READ_TIMEOUT", "300"))
 BEDROCK_MAX_RETRIES: int = int(os.environ.get("BEDROCK_MAX_RETRIES", "3"))
 
 # --- Timeouts (seconds) ---
-NODE_TIMEOUT: float = float(os.environ.get("NODE_TIMEOUT", "600.0"))
+NODE_TIMEOUT: float = float(os.environ.get("NODE_TIMEOUT", "1800.0"))
 EXECUTION_TIMEOUT_DISCOVERY: float = float(os.environ.get("EXECUTION_TIMEOUT_DISCOVERY", "1800.0"))
 EXECUTION_TIMEOUT_ARCHITECTURE: float = float(os.environ.get("EXECUTION_TIMEOUT_ARCHITECTURE", "2400.0"))
 EXECUTION_TIMEOUT_POC: float = float(os.environ.get("EXECUTION_TIMEOUT_POC", "2400.0"))

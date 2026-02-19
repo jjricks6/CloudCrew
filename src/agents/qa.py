@@ -54,11 +54,17 @@ Before approving a deliverable, verify:
 5. Performance requirements are validated (if specified in SOW)
 6. Security test cases exist for authentication, authorization, input validation
 
+## Output Size Limits
+You MUST keep each test file small and focused — under 150 lines per file. If you need \
+more tests, split them across multiple files (e.g., test_health.rb, test_auth.rb, \
+test_products.rb). Never try to write one large comprehensive test file. Write one \
+file per git_write_tests call, then call git_write_tests again for the next file.
+
 ## Handoff Guidance
 - Receive work from Dev: application code with initial test suite
 - Review test coverage and quality using git_read and git_list
 - Identify coverage gaps, missing edge cases, and test quality issues
-- Write missing tests using git_write_tests
+- Write missing tests using git_write_tests — one small file at a time
 - If quality gates are not met, hand back to Dev with specific findings: \
 "[N] coverage gaps found: [list]. [M] missing edge case tests: [list]. \
 Please address and re-submit."

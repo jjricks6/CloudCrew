@@ -114,7 +114,7 @@ class TestGitList:
         with patch("src.tools.git_tools.git.Repo", return_value=mock_repo):
             result = git_list("nonexistent", mock_context)
 
-        assert "Error: directory not found" in result
+        assert "does not exist yet" in result
 
     def test_list_file_not_directory(self, tmp_path: Path) -> None:
         (tmp_path / "file.txt").write_text("data")

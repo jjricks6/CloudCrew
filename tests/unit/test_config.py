@@ -56,7 +56,7 @@ class TestConfigDefaults:
             import src.config
 
             importlib.reload(src.config)
-            assert src.config.NODE_TIMEOUT == 600.0
+            assert src.config.NODE_TIMEOUT == 1800.0
             assert src.config.EXECUTION_TIMEOUT_DISCOVERY == 1800.0
             assert src.config.EXECUTION_TIMEOUT_ARCHITECTURE == 2400.0
             assert src.config.EXECUTION_TIMEOUT_POC == 2400.0
