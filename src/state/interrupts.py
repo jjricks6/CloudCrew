@@ -35,6 +35,7 @@ def store_interrupt(
     project_id: str,
     interrupt_id: str,
     question: str,
+    phase: str = "",
 ) -> None:
     """Store an interrupt question for a customer to answer.
 
@@ -43,6 +44,7 @@ def store_interrupt(
         project_id: The project identifier.
         interrupt_id: Unique identifier for this interrupt.
         question: The question text for the customer.
+        phase: Current delivery phase name.
     """
     table = _get_table(table_name)
     table.put_item(
@@ -65,6 +67,7 @@ def store_interrupt(
         {
             "event": "interrupt_raised",
             "project_id": project_id,
+            "phase": phase,
             "interrupt_id": interrupt_id,
             "question": question,
         },

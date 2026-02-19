@@ -193,7 +193,7 @@ def execute_phase(
                 interrupt_ids = []
                 for q in interrupts:
                     iid = str(uuid.uuid4())
-                    store_interrupt(TASK_LEDGER_TABLE, project_id, iid, q)
+                    store_interrupt(TASK_LEDGER_TABLE, project_id, iid, q, phase=phase)
                     interrupt_ids.append(iid)
 
                 # Poll for customer responses

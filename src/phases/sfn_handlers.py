@@ -69,7 +69,7 @@ def start_phase_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
             "event": "phase_started",
             "project_id": project_id,
             "phase": phase,
-            "status": "IN_PROGRESS",
+            "detail": f"Phase {phase} started",
         },
     )
 
@@ -156,6 +156,7 @@ def store_approval_token_handler(event: dict[str, Any], context: Any) -> dict[st
             "event": "awaiting_approval",
             "project_id": project_id,
             "phase": phase,
+            "detail": f"Phase {phase} awaiting customer approval",
         },
     )
 
