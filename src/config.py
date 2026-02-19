@@ -8,7 +8,7 @@ import os
 
 # --- Model IDs (cross-region inference prefix for Bedrock) ---
 MODEL_ID_OPUS: str = os.environ.get("MODEL_ID_OPUS", "us.anthropic.claude-opus-4-6-v1")
-MODEL_ID_SONNET: str = os.environ.get("MODEL_ID_SONNET", "us.anthropic.claude-sonnet-4-20250514-v1:0")
+MODEL_ID_SONNET: str = os.environ.get("MODEL_ID_SONNET", "us.anthropic.claude-sonnet-4-6")
 
 # --- AWS Infrastructure ---
 TASK_LEDGER_TABLE: str = os.environ.get("TASK_LEDGER_TABLE", "cloudcrew-projects")

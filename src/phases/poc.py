@@ -18,6 +18,7 @@ from src.agents.infra import create_infra_agent
 from src.agents.sa import create_sa_agent
 from src.agents.security import create_security_agent
 from src.config import EXECUTION_TIMEOUT_POC, NODE_TIMEOUT
+from src.hooks.max_tokens_recovery_hook import MaxTokensRecoveryHook
 from src.hooks.resilience_hook import ResilienceHook
 
 logger = logging.getLogger(__name__)
@@ -48,7 +49,7 @@ def create_poc_swarm() -> Swarm:
 
     logger.info("Creating POC swarm with agents: dev, infra, data, security, sa")
 
-    hooks: list[HookProvider] = [ResilienceHook()]
+    hooks: list[HookProvider] = [ResilienceHook(), MaxTokensRecoveryHook()]
 
     return Swarm(
         nodes=[dev, infra, data, security, sa],

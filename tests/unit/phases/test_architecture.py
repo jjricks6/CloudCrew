@@ -3,6 +3,7 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
+from src.hooks.max_tokens_recovery_hook import MaxTokensRecoveryHook
 from src.hooks.resilience_hook import ResilienceHook
 
 
@@ -50,11 +51,12 @@ class TestArchitectureSwarm:
         assert call_kwargs.kwargs["repetitive_handoff_min_unique_agents"] == 3
         assert call_kwargs.kwargs["id"] == "architecture-swarm"
 
-        # ResilienceHook always attached
+        # ResilienceHook + MaxTokensRecoveryHook always attached
         hooks = call_kwargs.kwargs["hooks"]
         assert hooks is not None
-        assert len(hooks) == 1
+        assert len(hooks) == 2
         assert isinstance(hooks[0], ResilienceHook)
+        assert isinstance(hooks[1], MaxTokensRecoveryHook)
 
         assert swarm is mock_swarm_cls.return_value
 

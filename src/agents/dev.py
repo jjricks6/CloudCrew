@@ -9,7 +9,7 @@ Model: Sonnet — code generation is its strength; deep reasoning not required.
 from strands import Agent
 
 from src.agents.base import SONNET
-from src.tools.git_tools import git_list, git_read, git_write_app
+from src.tools.git_tools import git_list, git_read, git_write_app, git_write_app_batch
 from src.tools.ledger_tools import read_task_ledger
 
 DEV_SYSTEM_PROMPT = """\
@@ -34,6 +34,12 @@ never swallow errors silently
 - **Documentation**: Docstrings for public APIs. Comments only where logic is non-obvious
 - **Naming**: Descriptive names — functions describe actions, variables describe contents
 - **Security**: Never hardcode secrets. Validate all external input. Use parameterized queries
+
+## Batch Writes
+When you have multiple files ready (e.g. a module with main file, config, and tests), \
+use `git_write_app_batch` to write them all in a single commit instead of calling \
+`git_write_app` repeatedly. Pass a JSON array of {"path": "app/...", "content": "..."} \
+objects. This is significantly faster and reduces round-trips.
 
 ## Self-Validation Workflow
 Before handing off code for review:
@@ -85,5 +91,5 @@ def create_dev_agent() -> Agent:
         model=SONNET,
         name="dev",
         system_prompt=DEV_SYSTEM_PROMPT,
-        tools=[git_read, git_list, git_write_app, read_task_ledger],
+        tools=[git_read, git_list, git_write_app, git_write_app_batch, read_task_ledger],
     )

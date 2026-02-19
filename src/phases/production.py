@@ -18,6 +18,7 @@ from src.agents.infra import create_infra_agent
 from src.agents.qa import create_qa_agent
 from src.agents.security import create_security_agent
 from src.config import EXECUTION_TIMEOUT_PRODUCTION, NODE_TIMEOUT
+from src.hooks.max_tokens_recovery_hook import MaxTokensRecoveryHook
 from src.hooks.resilience_hook import ResilienceHook
 
 logger = logging.getLogger(__name__)
@@ -48,7 +49,7 @@ def create_production_swarm() -> Swarm:
 
     logger.info("Creating production swarm with agents: dev, infra, data, security, qa")
 
-    hooks: list[HookProvider] = [ResilienceHook()]
+    hooks: list[HookProvider] = [ResilienceHook(), MaxTokensRecoveryHook()]
 
     return Swarm(
         nodes=[dev, infra, data, security, qa],

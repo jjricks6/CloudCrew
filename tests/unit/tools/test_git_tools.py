@@ -1,5 +1,6 @@
 """Tests for src/tools/git_tools.py."""
 
+import json
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -10,12 +11,16 @@ from src.tools.git_tools import (
     git_list,
     git_read,
     git_write_app,
+    git_write_app_batch,
     git_write_architecture,
     git_write_data,
+    git_write_data_batch,
     git_write_infra,
+    git_write_infra_batch,
     git_write_project_plan,
     git_write_security,
     git_write_tests,
+    git_write_tests_batch,
 )
 
 
@@ -412,3 +417,203 @@ class TestGitWriteTests:
         assert written_file.read_text() == "def test_hello(): assert True"
         mock_repo.index.add.assert_called_once()
         mock_repo.index.commit.assert_called_once_with("test: add main tests")
+
+
+# ---------------------------------------------------------------------------
+# Batch write tool tests
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+class TestGitWriteAppBatch:
+    """Verify git_write_app_batch tool."""
+
+    def test_rejects_non_app_path(self, tmp_path: Path) -> None:
+        mock_repo = MagicMock()
+        mock_repo.working_dir = str(tmp_path)
+        mock_context = MagicMock()
+        mock_context.invocation_state = {"git_repo_url": str(tmp_path)}
+
+        files = json.dumps([{"path": "infra/main.tf", "content": "bad"}])
+        with patch("src.tools.git_tools.git.Repo", return_value=mock_repo):
+            result = git_write_app_batch(files, "msg", mock_context)
+        assert "Error" in result
+
+    def test_writes_multiple_files_single_commit(self, tmp_path: Path) -> None:
+        mock_repo = MagicMock()
+        mock_repo.working_dir = str(tmp_path)
+        mock_context = MagicMock()
+        mock_context.invocation_state = {"git_repo_url": str(tmp_path)}
+
+        files = json.dumps(
+            [
+                {"path": "app/src/main.py", "content": "print('hello')"},
+                {"path": "app/src/config.py", "content": "DEBUG = True"},
+                {"path": "app/requirements.txt", "content": "flask>=3.0"},
+            ]
+        )
+
+        with patch("src.tools.git_tools.git.Repo", return_value=mock_repo):
+            result = git_write_app_batch(files, "feat: add app scaffolding", mock_context)
+
+        assert "Committed 3 files" in result
+        assert (tmp_path / "app" / "src" / "main.py").read_text() == "print('hello')"
+        assert (tmp_path / "app" / "src" / "config.py").read_text() == "DEBUG = True"
+        assert (tmp_path / "app" / "requirements.txt").read_text() == "flask>=3.0"
+        mock_repo.index.add.assert_called_once()
+        mock_repo.index.commit.assert_called_once_with("feat: add app scaffolding")
+
+    def test_rejects_invalid_json(self, tmp_path: Path) -> None:
+        mock_context = MagicMock()
+        mock_context.invocation_state = {"git_repo_url": str(tmp_path)}
+
+        result = git_write_app_batch("not json", "msg", mock_context)
+        assert "Error: invalid JSON" in result
+
+    def test_rejects_empty_array(self, tmp_path: Path) -> None:
+        mock_context = MagicMock()
+        mock_context.invocation_state = {"git_repo_url": str(tmp_path)}
+
+        result = git_write_app_batch("[]", "msg", mock_context)
+        assert "Error" in result
+
+    def test_rejects_missing_keys(self, tmp_path: Path) -> None:
+        mock_context = MagicMock()
+        mock_context.invocation_state = {"git_repo_url": str(tmp_path)}
+
+        files = json.dumps([{"path": "app/foo.py"}])
+        result = git_write_app_batch(files, "msg", mock_context)
+        assert "Error" in result
+
+    def test_no_files_written_if_any_path_invalid(self, tmp_path: Path) -> None:
+        mock_repo = MagicMock()
+        mock_repo.working_dir = str(tmp_path)
+        mock_context = MagicMock()
+        mock_context.invocation_state = {"git_repo_url": str(tmp_path)}
+
+        files = json.dumps(
+            [
+                {"path": "app/good.py", "content": "ok"},
+                {"path": "infra/bad.tf", "content": "nope"},
+            ]
+        )
+        with patch("src.tools.git_tools.git.Repo", return_value=mock_repo):
+            result = git_write_app_batch(files, "msg", mock_context)
+
+        assert "Error" in result
+        assert not (tmp_path / "app" / "good.py").exists()
+
+
+@pytest.mark.unit
+class TestGitWriteInfraBatch:
+    """Verify git_write_infra_batch tool."""
+
+    def test_rejects_non_infra_path(self, tmp_path: Path) -> None:
+        mock_repo = MagicMock()
+        mock_repo.working_dir = str(tmp_path)
+        mock_context = MagicMock()
+        mock_context.invocation_state = {"git_repo_url": str(tmp_path)}
+
+        files = json.dumps([{"path": "app/main.py", "content": "bad"}])
+        with patch("src.tools.git_tools.git.Repo", return_value=mock_repo):
+            result = git_write_infra_batch(files, "msg", mock_context)
+        assert "Error" in result
+
+    def test_writes_module_files_single_commit(self, tmp_path: Path) -> None:
+        mock_repo = MagicMock()
+        mock_repo.working_dir = str(tmp_path)
+        mock_context = MagicMock()
+        mock_context.invocation_state = {"git_repo_url": str(tmp_path)}
+
+        files = json.dumps(
+            [
+                {"path": "infra/modules/vpc/main.tf", "content": 'resource "aws_vpc" "main" {}'},
+                {"path": "infra/modules/vpc/variables.tf", "content": 'variable "cidr" {}'},
+                {"path": "infra/modules/vpc/outputs.tf", "content": 'output "vpc_id" {}'},
+            ]
+        )
+
+        with patch("src.tools.git_tools.git.Repo", return_value=mock_repo):
+            result = git_write_infra_batch(files, "infra: add vpc module", mock_context)
+
+        assert "Committed 3 files" in result
+        assert (tmp_path / "infra" / "modules" / "vpc" / "main.tf").exists()
+        assert (tmp_path / "infra" / "modules" / "vpc" / "variables.tf").exists()
+        assert (tmp_path / "infra" / "modules" / "vpc" / "outputs.tf").exists()
+        mock_repo.index.commit.assert_called_once_with("infra: add vpc module")
+
+
+@pytest.mark.unit
+class TestGitWriteDataBatch:
+    """Verify git_write_data_batch tool."""
+
+    def test_rejects_non_data_path(self, tmp_path: Path) -> None:
+        mock_repo = MagicMock()
+        mock_repo.working_dir = str(tmp_path)
+        mock_context = MagicMock()
+        mock_context.invocation_state = {"git_repo_url": str(tmp_path)}
+
+        files = json.dumps([{"path": "app/main.py", "content": "bad"}])
+        with patch("src.tools.git_tools.git.Repo", return_value=mock_repo):
+            result = git_write_data_batch(files, "msg", mock_context)
+        assert "Error" in result
+
+    def test_writes_multiple_schemas(self, tmp_path: Path) -> None:
+        mock_repo = MagicMock()
+        mock_repo.working_dir = str(tmp_path)
+        mock_context = MagicMock()
+        mock_context.invocation_state = {"git_repo_url": str(tmp_path)}
+
+        files = json.dumps(
+            [
+                {"path": "data/schemas/users.sql", "content": "CREATE TABLE users (id INT);"},
+                {"path": "data/schemas/orders.sql", "content": "CREATE TABLE orders (id INT);"},
+            ]
+        )
+
+        with patch("src.tools.git_tools.git.Repo", return_value=mock_repo):
+            result = git_write_data_batch(files, "data: add schemas", mock_context)
+
+        assert "Committed 2 files" in result
+        assert (tmp_path / "data" / "schemas" / "users.sql").exists()
+        assert (tmp_path / "data" / "schemas" / "orders.sql").exists()
+        mock_repo.index.commit.assert_called_once_with("data: add schemas")
+
+
+@pytest.mark.unit
+class TestGitWriteTestsBatch:
+    """Verify git_write_tests_batch tool."""
+
+    def test_rejects_non_tests_path(self, tmp_path: Path) -> None:
+        mock_repo = MagicMock()
+        mock_repo.working_dir = str(tmp_path)
+        mock_context = MagicMock()
+        mock_context.invocation_state = {"git_repo_url": str(tmp_path)}
+
+        files = json.dumps([{"path": "app/src/main.py", "content": "bad"}])
+        with patch("src.tools.git_tools.git.Repo", return_value=mock_repo):
+            result = git_write_tests_batch(files, "msg", mock_context)
+        assert "Error" in result
+
+    def test_writes_multiple_test_files(self, tmp_path: Path) -> None:
+        mock_repo = MagicMock()
+        mock_repo.working_dir = str(tmp_path)
+        mock_context = MagicMock()
+        mock_context.invocation_state = {"git_repo_url": str(tmp_path)}
+
+        files = json.dumps(
+            [
+                {"path": "app/tests/test_health.py", "content": "def test_health(): pass"},
+                {"path": "app/tests/test_auth.py", "content": "def test_auth(): pass"},
+                {"path": "app/tests/test_api.py", "content": "def test_api(): pass"},
+            ]
+        )
+
+        with patch("src.tools.git_tools.git.Repo", return_value=mock_repo):
+            result = git_write_tests_batch(files, "test: add test suite", mock_context)
+
+        assert "Committed 3 files" in result
+        assert (tmp_path / "app" / "tests" / "test_health.py").exists()
+        assert (tmp_path / "app" / "tests" / "test_auth.py").exists()
+        assert (tmp_path / "app" / "tests" / "test_api.py").exists()
+        mock_repo.index.commit.assert_called_once_with("test: add test suite")

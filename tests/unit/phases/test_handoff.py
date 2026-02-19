@@ -3,6 +3,7 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
+from src.hooks.max_tokens_recovery_hook import MaxTokensRecoveryHook
 from src.hooks.resilience_hook import ResilienceHook
 
 
@@ -91,8 +92,8 @@ class TestHandoffSwarm:
         call_kwargs = mock_swarm_cls.call_args
         hooks = call_kwargs.kwargs["hooks"]
         assert hooks is not None
-        # ResilienceHook + MemoryHook
-        assert len(hooks) == 2
+        # ResilienceHook + MaxTokensRecoveryHook + MemoryHook
+        assert len(hooks) == 3
 
     @patch("src.phases.handoff.Swarm")
     @patch("src.phases.handoff.create_sa_agent")
@@ -110,5 +111,6 @@ class TestHandoffSwarm:
         call_kwargs = mock_swarm_cls.call_args
         hooks = call_kwargs.kwargs["hooks"]
         assert hooks is not None
-        assert len(hooks) == 1
+        assert len(hooks) == 2
         assert isinstance(hooks[0], ResilienceHook)
+        assert isinstance(hooks[1], MaxTokensRecoveryHook)

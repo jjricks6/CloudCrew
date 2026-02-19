@@ -14,6 +14,7 @@ from strands.multiagent.swarm import Swarm
 from src.agents.pm import create_pm_agent
 from src.agents.sa import create_sa_agent
 from src.config import EXECUTION_TIMEOUT_DISCOVERY, NODE_TIMEOUT
+from src.hooks.max_tokens_recovery_hook import MaxTokensRecoveryHook
 from src.hooks.memory_hook import MemoryHook
 from src.hooks.resilience_hook import ResilienceHook
 
@@ -37,7 +38,7 @@ def create_discovery_swarm(
     pm = create_pm_agent()
     sa = create_sa_agent()
 
-    hooks: list[HookProvider] = [ResilienceHook()]
+    hooks: list[HookProvider] = [ResilienceHook(), MaxTokensRecoveryHook()]
     if stm_memory_id or ltm_memory_id:
         hooks.append(
             MemoryHook(
