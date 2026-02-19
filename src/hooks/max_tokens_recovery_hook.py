@@ -69,15 +69,14 @@ class MaxTokensRecoveryHook(HookProvider):
 
         if retries > MAX_RETRIES:
             logger.error(
-                "max_tokens_recovery | agent=%s exhausted %d retries, "
-                "allowing MaxTokensReachedException to propagate",
+                "max_tokens_recovery | agent=%s exhausted %d retries, allowing MaxTokensReachedException to propagate",
                 agent_name,
                 MAX_RETRIES,
             )
             return
 
         logger.warning(
-            "max_tokens_recovery | agent=%s retry %d/%d — " "injecting guidance and retrying model call",
+            "max_tokens_recovery | agent=%s retry %d/%d — injecting guidance and retrying model call",
             agent_name,
             retries,
             MAX_RETRIES,
