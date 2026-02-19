@@ -15,6 +15,7 @@ from strands.multiagent.swarm import Swarm
 from src.agents.pm import create_pm_agent
 from src.agents.sa import create_sa_agent
 from src.config import EXECUTION_TIMEOUT_HANDOFF, NODE_TIMEOUT
+from src.hooks.max_tokens_recovery_hook import MaxTokensRecoveryHook
 from src.hooks.memory_hook import MemoryHook
 from src.hooks.resilience_hook import ResilienceHook
 
@@ -38,7 +39,7 @@ def create_handoff_swarm(
         - max_handoffs=10: Handoff phase is lightweight
         - max_iterations=10: Matches handoff limit
         - execution_timeout: From config (default 1800s / 30 minutes)
-        - node_timeout: From config (default 600s / 10 minutes)
+        - node_timeout: From config (default 1800s / 30 minutes)
         - repetitive_handoff_detection_window=6: Catches ping-pong patterns
         - repetitive_handoff_min_unique_agents=2: Only 2 agents in this swarm
 
@@ -50,7 +51,7 @@ def create_handoff_swarm(
 
     logger.info("Creating handoff swarm with agents: pm, sa")
 
-    hooks: list[HookProvider] = [ResilienceHook()]
+    hooks: list[HookProvider] = [ResilienceHook(), MaxTokensRecoveryHook()]
     if stm_memory_id or ltm_memory_id:
         hooks.append(
             MemoryHook(

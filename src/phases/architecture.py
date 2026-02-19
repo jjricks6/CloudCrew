@@ -16,6 +16,7 @@ from src.agents.infra import create_infra_agent
 from src.agents.sa import create_sa_agent
 from src.agents.security import create_security_agent
 from src.config import EXECUTION_TIMEOUT_ARCHITECTURE, NODE_TIMEOUT
+from src.hooks.max_tokens_recovery_hook import MaxTokensRecoveryHook
 from src.hooks.resilience_hook import ResilienceHook
 
 logger = logging.getLogger(__name__)
@@ -32,7 +33,7 @@ def create_architecture_swarm() -> Swarm:
         - max_handoffs=15: Conservative limit to catch runaway loops
         - max_iterations=15: Matches handoff limit
         - execution_timeout: From config (default 2400s / 40 minutes)
-        - node_timeout: From config (default 600s / 10 minutes)
+        - node_timeout: From config (default 1800s / 30 minutes)
         - repetitive_handoff_detection_window=8: Catches ping-pong patterns
         - repetitive_handoff_min_unique_agents=3: Requires agent diversity
 
@@ -45,7 +46,7 @@ def create_architecture_swarm() -> Swarm:
 
     logger.info("Creating architecture swarm with agents: sa, infra, security")
 
-    hooks: list[HookProvider] = [ResilienceHook()]
+    hooks: list[HookProvider] = [ResilienceHook(), MaxTokensRecoveryHook()]
 
     return Swarm(
         nodes=[sa, infra, security],

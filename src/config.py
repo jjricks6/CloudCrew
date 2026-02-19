@@ -8,7 +8,7 @@ import os
 
 # --- Model IDs (cross-region inference prefix for Bedrock) ---
 MODEL_ID_OPUS: str = os.environ.get("MODEL_ID_OPUS", "us.anthropic.claude-opus-4-6-v1")
-MODEL_ID_SONNET: str = os.environ.get("MODEL_ID_SONNET", "us.anthropic.claude-sonnet-4-20250514-v1:0")
+MODEL_ID_SONNET: str = os.environ.get("MODEL_ID_SONNET", "us.anthropic.claude-sonnet-4-6")
 
 # --- AWS Infrastructure ---
 TASK_LEDGER_TABLE: str = os.environ.get("TASK_LEDGER_TABLE", "cloudcrew-projects")
@@ -30,7 +30,7 @@ BEDROCK_READ_TIMEOUT: int = int(os.environ.get("BEDROCK_READ_TIMEOUT", "300"))
 BEDROCK_MAX_RETRIES: int = int(os.environ.get("BEDROCK_MAX_RETRIES", "3"))
 
 # --- Timeouts (seconds) ---
-NODE_TIMEOUT: float = float(os.environ.get("NODE_TIMEOUT", "600.0"))
+NODE_TIMEOUT: float = float(os.environ.get("NODE_TIMEOUT", "1800.0"))
 EXECUTION_TIMEOUT_DISCOVERY: float = float(os.environ.get("EXECUTION_TIMEOUT_DISCOVERY", "1800.0"))
 EXECUTION_TIMEOUT_ARCHITECTURE: float = float(os.environ.get("EXECUTION_TIMEOUT_ARCHITECTURE", "2400.0"))
 EXECUTION_TIMEOUT_POC: float = float(os.environ.get("EXECUTION_TIMEOUT_POC", "2400.0"))

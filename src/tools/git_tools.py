@@ -8,6 +8,7 @@ from invocation_state["git_repo_url"], which points to a local clone
 This module imports from state/ and config — NEVER from agents/.
 """
 
+import json
 import logging
 from pathlib import Path
 from typing import Any
@@ -93,7 +94,11 @@ def git_list(directory: str, tool_context: ToolContext) -> str:
     repo = _get_repo(tool_context.invocation_state)
     resolved = _resolve_path(repo, directory)
     if not resolved.exists():
-        return f"Error: directory not found: {directory}"
+        return (
+            f"Directory '{directory}' does not exist yet — no files have been "
+            "created there. This is normal if this area of the project hasn't "
+            "been worked on yet. Do not retry with different paths."
+        )
     if not resolved.is_dir():
         return f"Error: not a directory: {directory}"
     logger.info("git_list: %s", directory)
@@ -324,3 +329,146 @@ def git_write_tests(
     repo.index.commit(commit_message)
     logger.info("git_write_tests: committed %s", file_path)
     return f"Committed: {file_path}"
+
+
+# ---------------------------------------------------------------------------
+# Batch write helpers
+# ---------------------------------------------------------------------------
+
+
+def _batch_write(
+    files_json: str,
+    prefix: str,
+    commit_message: str,
+    agent_label: str,
+    tool_context: ToolContext,
+) -> str:
+    """Write multiple files in a single commit.
+
+    Args:
+        files_json: JSON array of objects with "path" and "content" keys.
+        prefix: Required path prefix (e.g. "app/").
+        commit_message: Git commit message for all files.
+        agent_label: Human label for error messages (e.g. "Dev agent").
+        tool_context: Strands tool context (injected by framework).
+
+    Returns:
+        Summary of committed files or an error message.
+    """
+    try:
+        files = json.loads(files_json)
+    except json.JSONDecodeError as exc:
+        return f"Error: invalid JSON — {exc}"
+
+    if not isinstance(files, list) or len(files) == 0:
+        return "Error: files_json must be a non-empty JSON array"
+
+    # Validate every path before writing anything.
+    for entry in files:
+        if not isinstance(entry, dict) or "path" not in entry or "content" not in entry:
+            return "Error: each entry must have 'path' and 'content' keys"
+        if not entry["path"].startswith(prefix):
+            return f"Error: {agent_label} can only write to {prefix} — got {entry['path']}"
+
+    repo = _get_repo(tool_context.invocation_state)
+    written_paths: list[str] = []
+
+    for entry in files:
+        resolved = _resolve_path(repo, entry["path"])
+        resolved.parent.mkdir(parents=True, exist_ok=True)
+        resolved.write_text(entry["content"])
+        written_paths.append(entry["path"])
+
+    repo.index.add(written_paths)
+    repo.index.commit(commit_message)
+    logger.info("batch_write(%s): committed %d files", prefix, len(written_paths))
+    return f"Committed {len(written_paths)} files:\n" + "\n".join(f"  - {p}" for p in written_paths)
+
+
+@tool(context=True)
+def git_write_app_batch(
+    files_json: str,
+    commit_message: str,
+    tool_context: ToolContext,
+) -> str:
+    """Write multiple files to app/ in the project repo in a single commit.
+
+    Use this instead of calling git_write_app repeatedly when you have several
+    files ready at once. Much faster because it makes one commit for all files.
+
+    Args:
+        files_json: JSON array of {"path": "app/...", "content": "..."} objects.
+        commit_message: Git commit message describing the batch of changes.
+        tool_context: Strands tool context (injected by framework).
+
+    Returns:
+        Summary of committed files, or an error message.
+    """
+    return _batch_write(files_json, "app/", commit_message, "Dev agent", tool_context)
+
+
+@tool(context=True)
+def git_write_infra_batch(
+    files_json: str,
+    commit_message: str,
+    tool_context: ToolContext,
+) -> str:
+    """Write multiple files to infra/ in the project repo in a single commit.
+
+    Use this instead of calling git_write_infra repeatedly when you have several
+    files ready at once (e.g. main.tf, variables.tf, outputs.tf for a module).
+    Much faster because it makes one commit for all files.
+
+    Args:
+        files_json: JSON array of {"path": "infra/...", "content": "..."} objects.
+        commit_message: Git commit message describing the batch of changes.
+        tool_context: Strands tool context (injected by framework).
+
+    Returns:
+        Summary of committed files, or an error message.
+    """
+    return _batch_write(files_json, "infra/", commit_message, "Infra agent", tool_context)
+
+
+@tool(context=True)
+def git_write_data_batch(
+    files_json: str,
+    commit_message: str,
+    tool_context: ToolContext,
+) -> str:
+    """Write multiple files to data/ in the project repo in a single commit.
+
+    Use this instead of calling git_write_data repeatedly when you have several
+    files ready at once. Much faster because it makes one commit for all files.
+
+    Args:
+        files_json: JSON array of {"path": "data/...", "content": "..."} objects.
+        commit_message: Git commit message describing the batch of changes.
+        tool_context: Strands tool context (injected by framework).
+
+    Returns:
+        Summary of committed files, or an error message.
+    """
+    return _batch_write(files_json, "data/", commit_message, "Data agent", tool_context)
+
+
+@tool(context=True)
+def git_write_tests_batch(
+    files_json: str,
+    commit_message: str,
+    tool_context: ToolContext,
+) -> str:
+    """Write multiple files to app/tests/ in the project repo in a single commit.
+
+    Use this instead of calling git_write_tests repeatedly when you have several
+    test files ready at once. Much faster because it makes one commit for all files.
+
+    Args:
+        files_json: JSON array of {"path": "app/tests/...", "content": "..."} objects.
+        commit_message: Git commit message describing the batch of changes.
+        tool_context: Strands tool context (injected by framework).
+
+    Returns:
+        Summary of committed files, or an error message.
+    """
+    return _batch_write(files_json, "app/tests/", commit_message, "QA agent", tool_context)

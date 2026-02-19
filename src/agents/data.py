@@ -10,7 +10,7 @@ Model: Sonnet — data modeling and query generation are pattern-following tasks
 from strands import Agent
 
 from src.agents.base import SONNET
-from src.tools.git_tools import git_list, git_read, git_write_data
+from src.tools.git_tools import git_list, git_read, git_write_data, git_write_data_batch
 from src.tools.ledger_tools import read_task_ledger
 
 DATA_SYSTEM_PROMPT = """\
@@ -53,6 +53,12 @@ transformations over custom Lambda-based ETL
 - **Athena**: Ad-hoc SQL queries over S3 data lake. Partition and use columnar \
 formats (Parquet) for cost/performance
 
+## Batch Writes
+When you have multiple files ready (e.g. schemas, migrations, seed data), use \
+`git_write_data_batch` to write them all in a single commit instead of calling \
+`git_write_data` repeatedly. Pass a JSON array of {"path": "data/...", "content": "..."} \
+objects. This is significantly faster and reduces round-trips.
+
 ## Handoff Guidance
 - Receive work from SA: data model requirements, access patterns, performance targets
 - Read the architecture docs and ADRs to understand the data architecture
@@ -88,5 +94,5 @@ def create_data_agent() -> Agent:
         model=SONNET,
         name="data",
         system_prompt=DATA_SYSTEM_PROMPT,
-        tools=[git_read, git_list, git_write_data, read_task_ledger],
+        tools=[git_read, git_list, git_write_data, git_write_data_batch, read_task_ledger],
     )

@@ -9,7 +9,7 @@ Model: Sonnet — code generation is its strength; deep reasoning not required.
 from strands import Agent
 
 from src.agents.base import SONNET
-from src.tools.git_tools import git_list, git_read, git_write_infra
+from src.tools.git_tools import git_list, git_read, git_write_infra, git_write_infra_batch
 from src.tools.ledger_tools import read_task_ledger
 from src.tools.security_tools import checkov_scan
 from src.tools.terraform_tools import terraform_validate
@@ -52,9 +52,32 @@ Follow these patterns:
 ## Self-Validation Workflow
 Before handing off to Security for review:
 1. Run `terraform_validate` on every module you create or modify
-2. Run `checkov_scan` on every module to catch security issues early
-3. Fix any failures before requesting review
-4. Only hand off clean, validated code
+2. If validate fails, read the error, fix the code, and re-validate
+3. Run `checkov_scan` on every module to catch security issues early
+4. Only hand off code where terraform_validate PASSES
+
+HARD RULE: terraform_validate MUST pass before you hand off a module. A Checkov pass \
+does NOT substitute for terraform_validate — Checkov checks security policies while \
+validate checks HCL syntax and provider schema. They test different things.
+
+If you cannot get terraform_validate to pass after multiple attempts and the errors \
+are not decreasing, you MUST explicitly state in your handoff message that validation \
+is failing and what the error is. Never silently hand off a module that does not validate.
+
+## Batch Writes
+When you have multiple files ready for a module (e.g. main.tf, variables.tf, outputs.tf, \
+README.md), use `git_write_infra_batch` to write them all in a single commit instead of \
+calling `git_write_infra` repeatedly. Pass a JSON array of {"path": "infra/...", \
+"content": "..."} objects. This is significantly faster. Keep each individual file \
+under 200 lines — if a file would be longer, split it into multiple files within the \
+same batch call.
+
+## Output Size Limits
+You MUST keep each file written via git_write_infra under 200 lines. If a module's \
+main.tf would exceed this, split resources across multiple files (e.g., main.tf for \
+core resources, nacl.tf for NACLs, endpoints.tf for VPC endpoints, monitoring.tf for \
+CloudWatch resources). Write one file per git_write_infra call. Never try to write an \
+entire module in a single call — break it into focused files.
 
 ## Handoff Guidance
 - Receive work from SA: architecture designs, component specifications, ADRs
@@ -98,5 +121,13 @@ def create_infra_agent() -> Agent:
         model=SONNET,
         name="infra",
         system_prompt=INFRA_SYSTEM_PROMPT,
-        tools=[git_read, git_list, git_write_infra, terraform_validate, checkov_scan, read_task_ledger],
+        tools=[
+            git_read,
+            git_list,
+            git_write_infra,
+            git_write_infra_batch,
+            terraform_validate,
+            checkov_scan,
+            read_task_ledger,
+        ],
     )

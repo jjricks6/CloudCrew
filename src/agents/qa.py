@@ -10,7 +10,7 @@ Model: Sonnet — test planning and coverage analysis are pattern-following task
 from strands import Agent
 
 from src.agents.base import SONNET
-from src.tools.git_tools import git_list, git_read, git_write_tests
+from src.tools.git_tools import git_list, git_read, git_write_tests, git_write_tests_batch
 from src.tools.ledger_tools import read_task_ledger
 
 QA_SYSTEM_PROMPT = """\
@@ -54,11 +54,24 @@ Before approving a deliverable, verify:
 5. Performance requirements are validated (if specified in SOW)
 6. Security test cases exist for authentication, authorization, input validation
 
+## Batch Writes
+When you have multiple test files ready, use `git_write_tests_batch` to write them all \
+in a single commit instead of calling `git_write_tests` repeatedly. Pass a JSON array \
+of {"path": "app/tests/...", "content": "..."} objects. This is significantly faster \
+and reduces round-trips. Keep each individual test file under 150 lines — if you need \
+more tests, use multiple files within the same batch call.
+
+## Output Size Limits
+You MUST keep each test file small and focused — under 150 lines per file. If you need \
+more tests, split them across multiple files (e.g., test_health.rb, test_auth.rb, \
+test_products.rb). Never try to write one large comprehensive test file. Write one \
+file per git_write_tests call, then call git_write_tests again for the next file.
+
 ## Handoff Guidance
 - Receive work from Dev: application code with initial test suite
 - Review test coverage and quality using git_read and git_list
 - Identify coverage gaps, missing edge cases, and test quality issues
-- Write missing tests using git_write_tests
+- Write missing tests using git_write_tests — one small file at a time
 - If quality gates are not met, hand back to Dev with specific findings: \
 "[N] coverage gaps found: [list]. [M] missing edge case tests: [list]. \
 Please address and re-submit."
@@ -89,5 +102,5 @@ def create_qa_agent() -> Agent:
         model=SONNET,
         name="qa",
         system_prompt=QA_SYSTEM_PROMPT,
-        tools=[git_read, git_list, git_write_tests, read_task_ledger],
+        tools=[git_read, git_list, git_write_tests, git_write_tests_batch, read_task_ledger],
     )

@@ -21,6 +21,7 @@ env/
 htmlcov/
 .pytest_cache/
 .mypy_cache/
+test-artifacts/
 
 # IDE
 .idea/

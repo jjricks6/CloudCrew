@@ -27,7 +27,7 @@ class TestConfigDefaults:
             import src.config
 
             importlib.reload(src.config)
-            assert src.config.MODEL_ID_SONNET == "us.anthropic.claude-sonnet-4-20250514-v1:0"
+            assert src.config.MODEL_ID_SONNET == "us.anthropic.claude-sonnet-4-6"
 
     def test_task_ledger_table_default(self) -> None:
         with patch.dict(os.environ, {}, clear=True):
@@ -56,7 +56,7 @@ class TestConfigDefaults:
             import src.config
 
             importlib.reload(src.config)
-            assert src.config.NODE_TIMEOUT == 600.0
+            assert src.config.NODE_TIMEOUT == 1800.0
             assert src.config.EXECUTION_TIMEOUT_DISCOVERY == 1800.0
             assert src.config.EXECUTION_TIMEOUT_ARCHITECTURE == 2400.0
             assert src.config.EXECUTION_TIMEOUT_POC == 2400.0

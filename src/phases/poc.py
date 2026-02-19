@@ -18,6 +18,7 @@ from src.agents.infra import create_infra_agent
 from src.agents.sa import create_sa_agent
 from src.agents.security import create_security_agent
 from src.config import EXECUTION_TIMEOUT_POC, NODE_TIMEOUT
+from src.hooks.max_tokens_recovery_hook import MaxTokensRecoveryHook
 from src.hooks.resilience_hook import ResilienceHook
 
 logger = logging.getLogger(__name__)
@@ -30,10 +31,10 @@ def create_poc_swarm() -> Swarm:
     rapid prototyping and proof-of-concept delivery.
 
     Configuration:
-        - max_handoffs=15: Conservative limit to catch runaway loops
-        - max_iterations=15: Matches handoff limit
+        - max_handoffs=25: High enough for per-module Infra->Security cycles
+        - max_iterations=25: Matches handoff limit
         - execution_timeout: From config (default 2400s / 40 minutes)
-        - node_timeout: From config (default 600s / 10 minutes)
+        - node_timeout: From config (default 1800s / 30 minutes)
         - repetitive_handoff_detection_window=8: Catches ping-pong patterns
         - repetitive_handoff_min_unique_agents=3: Requires agent diversity
 
@@ -48,13 +49,13 @@ def create_poc_swarm() -> Swarm:
 
     logger.info("Creating POC swarm with agents: dev, infra, data, security, sa")
 
-    hooks: list[HookProvider] = [ResilienceHook()]
+    hooks: list[HookProvider] = [ResilienceHook(), MaxTokensRecoveryHook()]
 
     return Swarm(
         nodes=[dev, infra, data, security, sa],
         entry_point=dev,
-        max_handoffs=15,
-        max_iterations=15,
+        max_handoffs=25,
+        max_iterations=25,
         execution_timeout=EXECUTION_TIMEOUT_POC,
         node_timeout=NODE_TIMEOUT,
         hooks=hooks,

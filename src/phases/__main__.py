@@ -260,6 +260,11 @@ def _extract_interrupts(result: Any) -> list[str]:
 
 def main() -> None:
     """Main entry point for the ECS phase runner."""
+    # Strands SDK uses recursive event_loop_cycle — each tool call adds ~7 stack
+    # frames.  Agents that make 40+ sequential tool calls (e.g. Infra doing
+    # validate/fix cycles) can exceed Python's default 1000-frame limit.
+    sys.setrecursionlimit(50000)
+
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s %(name)s %(levelname)s %(message)s",

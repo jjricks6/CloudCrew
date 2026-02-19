@@ -26,7 +26,7 @@ class TestQAAgent:
         assert call_kwargs.kwargs["name"] == "qa"
         assert call_kwargs.kwargs["model"] is mock_sonnet
         assert call_kwargs.kwargs["system_prompt"] == QA_SYSTEM_PROMPT
-        assert len(call_kwargs.kwargs["tools"]) == 4
+        assert len(call_kwargs.kwargs["tools"]) == 5
         assert agent is mock_agent_cls.return_value
 
     def test_system_prompt_has_key_sections(self) -> None:
@@ -35,6 +35,7 @@ class TestQAAgent:
         required_sections = [
             "Your Role",
             "Testing Standards",
+            "Batch Writes",
             "Quality Gates",
             "Handoff Guidance",
             "Recovery Awareness",

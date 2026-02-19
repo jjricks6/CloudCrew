@@ -3,6 +3,7 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
+from src.hooks.max_tokens_recovery_hook import MaxTokensRecoveryHook
 from src.hooks.resilience_hook import ResilienceHook
 
 
@@ -50,19 +51,20 @@ class TestPOCSwarm:
         assert call_kwargs.kwargs["entry_point"] is mock_dev
 
         # Verify Swarm configuration
-        assert call_kwargs.kwargs["max_handoffs"] == 15
-        assert call_kwargs.kwargs["max_iterations"] == 15
+        assert call_kwargs.kwargs["max_handoffs"] == 25
+        assert call_kwargs.kwargs["max_iterations"] == 25
         assert call_kwargs.kwargs["execution_timeout"] == 2400.0
-        assert call_kwargs.kwargs["node_timeout"] == 600.0
+        assert call_kwargs.kwargs["node_timeout"] == 1800.0
         assert call_kwargs.kwargs["repetitive_handoff_detection_window"] == 8
         assert call_kwargs.kwargs["repetitive_handoff_min_unique_agents"] == 3
         assert call_kwargs.kwargs["id"] == "poc-swarm"
 
-        # ResilienceHook always attached
+        # ResilienceHook + MaxTokensRecoveryHook always attached
         hooks = call_kwargs.kwargs["hooks"]
         assert hooks is not None
-        assert len(hooks) == 1
+        assert len(hooks) == 2
         assert isinstance(hooks[0], ResilienceHook)
+        assert isinstance(hooks[1], MaxTokensRecoveryHook)
 
         assert swarm is mock_swarm_cls.return_value
 

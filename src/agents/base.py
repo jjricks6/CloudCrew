@@ -31,8 +31,16 @@ _BEDROCK_CLIENT_CONFIG = BotocoreConfig(
 
 # Model singletons — shared across all agents.
 # In tests, patch these at the module level to avoid AWS calls.
-OPUS = BedrockModel(model_id=MODEL_ID_OPUS, boto_client_config=_BEDROCK_CLIENT_CONFIG)
-SONNET = BedrockModel(model_id=MODEL_ID_SONNET, boto_client_config=_BEDROCK_CLIENT_CONFIG)
+OPUS = BedrockModel(
+    model_id=MODEL_ID_OPUS,
+    max_tokens=32_768,
+    boto_client_config=_BEDROCK_CLIENT_CONFIG,
+)
+SONNET = BedrockModel(
+    model_id=MODEL_ID_SONNET,
+    max_tokens=16_384,
+    boto_client_config=_BEDROCK_CLIENT_CONFIG,
+)
 
 
 def build_invocation_state(
