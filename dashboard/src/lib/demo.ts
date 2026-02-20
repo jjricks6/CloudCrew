@@ -3,7 +3,7 @@
  * deployed infrastructure.  Activated when the projectId is "demo".
  */
 
-import type { ChatMessage, Phase, ProjectStatus } from "./types";
+import type { AgentActivity, BoardTask, ChatMessage, Phase, ProjectStatus } from "./types";
 
 // ---------------------------------------------------------------------------
 // Detection
@@ -67,6 +67,286 @@ export const DEMO_PROJECT_STATUS: ProjectStatus = {
   created_at: "2025-06-01T09:00:00Z",
   updated_at: new Date().toISOString(),
 };
+
+// ---------------------------------------------------------------------------
+// Mock board tasks (kanban board)
+// ---------------------------------------------------------------------------
+
+export const DEMO_BOARD_TASKS: BoardTask[] = [
+  {
+    task_id: "demo-t1",
+    title: "Gather stakeholder requirements",
+    description:
+      "Interview key stakeholders to identify functional and non-functional requirements for the SaaS platform.",
+    phase: "DISCOVERY",
+    status: "done",
+    assigned_to: "pm",
+    comments: [
+      {
+        author: "pm",
+        content: "Completed all 3 stakeholder interviews. Key findings documented.",
+        timestamp: "2025-06-01T12:00:00Z",
+      },
+    ],
+    artifact_path: "docs/requirements.md",
+    created_at: "2025-06-01T09:00:00Z",
+    updated_at: "2025-06-01T12:00:00Z",
+  },
+  {
+    task_id: "demo-t2",
+    title: "Define data model requirements",
+    description: "Identify entities, relationships, and access patterns for the data layer.",
+    phase: "DISCOVERY",
+    status: "done",
+    assigned_to: "data",
+    comments: [
+      {
+        author: "data",
+        content: "Identified 8 core entities with access patterns documented.",
+        timestamp: "2025-06-01T14:00:00Z",
+      },
+    ],
+    artifact_path: "",
+    created_at: "2025-06-01T09:30:00Z",
+    updated_at: "2025-06-01T14:00:00Z",
+  },
+  {
+    task_id: "demo-t3",
+    title: "Design system architecture",
+    description:
+      "Create high-level architecture design following AWS Well-Architected Framework principles.",
+    phase: "ARCHITECTURE",
+    status: "in_progress",
+    assigned_to: "sa",
+    comments: [
+      {
+        author: "sa",
+        content: "Evaluating serverless vs container-based approaches. Leaning serverless for lower ops overhead.",
+        timestamp: "2025-06-02T10:00:00Z",
+      },
+      {
+        author: "sa",
+        content: "Decision: API Gateway + Lambda for API layer. ADR-001 written.",
+        timestamp: "2025-06-02T14:00:00Z",
+      },
+    ],
+    artifact_path: "docs/architecture.md",
+    created_at: "2025-06-02T09:00:00Z",
+    updated_at: "2025-06-02T14:00:00Z",
+  },
+  {
+    task_id: "demo-t4",
+    title: "Design data model",
+    description:
+      "Create DynamoDB table designs with access patterns, GSIs, and entity schemas.",
+    phase: "ARCHITECTURE",
+    status: "in_progress",
+    assigned_to: "data",
+    comments: [
+      {
+        author: "data",
+        content: "Single-table design with 3 GSIs. Working on tenant isolation pattern.",
+        timestamp: "2025-06-02T11:00:00Z",
+      },
+    ],
+    artifact_path: "docs/data-model.md",
+    created_at: "2025-06-02T09:00:00Z",
+    updated_at: "2025-06-02T11:00:00Z",
+  },
+  {
+    task_id: "demo-t5",
+    title: "Write ADR: Authentication approach",
+    description: "Evaluate Cognito vs custom auth and document the decision.",
+    phase: "ARCHITECTURE",
+    status: "review",
+    assigned_to: "sa",
+    comments: [
+      {
+        author: "sa",
+        content: "ADR-002 drafted. Recommending Cognito with JWT tokens.",
+        timestamp: "2025-06-02T13:00:00Z",
+      },
+      {
+        author: "security",
+        content: "Reviewing token scoping and rotation policy.",
+        timestamp: "2025-06-02T15:00:00Z",
+      },
+    ],
+    artifact_path: "",
+    created_at: "2025-06-02T09:30:00Z",
+    updated_at: "2025-06-02T15:00:00Z",
+  },
+  {
+    task_id: "demo-t6",
+    title: "Security review: VPC design",
+    description: "Review network architecture for security compliance.",
+    phase: "ARCHITECTURE",
+    status: "backlog",
+    assigned_to: "security",
+    comments: [],
+    artifact_path: "",
+    created_at: "2025-06-02T10:00:00Z",
+    updated_at: "2025-06-02T10:00:00Z",
+  },
+  {
+    task_id: "demo-t7",
+    title: "Design CI/CD pipeline",
+    description: "Define build, test, and deployment pipeline using CodePipeline or GitHub Actions.",
+    phase: "ARCHITECTURE",
+    status: "backlog",
+    assigned_to: "infra",
+    comments: [],
+    artifact_path: "",
+    created_at: "2025-06-02T10:00:00Z",
+    updated_at: "2025-06-02T10:00:00Z",
+  },
+  {
+    task_id: "demo-t8",
+    title: "Define API contracts",
+    description: "Create OpenAPI specification for all REST endpoints.",
+    phase: "ARCHITECTURE",
+    status: "backlog",
+    assigned_to: "dev",
+    comments: [],
+    artifact_path: "",
+    created_at: "2025-06-02T10:30:00Z",
+    updated_at: "2025-06-02T10:30:00Z",
+  },
+  {
+    task_id: "demo-t9",
+    title: "Create test strategy",
+    description: "Define testing approach: unit, integration, e2e, and performance testing.",
+    phase: "ARCHITECTURE",
+    status: "backlog",
+    assigned_to: "qa",
+    comments: [],
+    artifact_path: "",
+    created_at: "2025-06-02T10:30:00Z",
+    updated_at: "2025-06-02T10:30:00Z",
+  },
+  // POC phase tasks (future — will populate when demo reaches POC)
+  {
+    task_id: "demo-t10",
+    title: "Implement auth proof-of-concept",
+    description: "Build working Cognito integration with login/signup flow.",
+    phase: "POC",
+    status: "backlog",
+    assigned_to: "dev",
+    comments: [],
+    artifact_path: "",
+    created_at: "2025-06-03T09:00:00Z",
+    updated_at: "2025-06-03T09:00:00Z",
+  },
+  {
+    task_id: "demo-t11",
+    title: "Deploy PoC infrastructure",
+    description: "Provision VPC, Lambda, DynamoDB, and API Gateway for PoC environment.",
+    phase: "POC",
+    status: "backlog",
+    assigned_to: "infra",
+    comments: [],
+    artifact_path: "",
+    created_at: "2025-06-03T09:00:00Z",
+    updated_at: "2025-06-03T09:00:00Z",
+  },
+  // PRODUCTION phase tasks
+  {
+    task_id: "demo-t12",
+    title: "Implement tenant isolation",
+    description: "Add row-level security and tenant context propagation across all services.",
+    phase: "PRODUCTION",
+    status: "backlog",
+    assigned_to: "dev",
+    comments: [],
+    artifact_path: "",
+    created_at: "2025-06-04T09:00:00Z",
+    updated_at: "2025-06-04T09:00:00Z",
+  },
+  // HANDOFF phase tasks
+  {
+    task_id: "demo-t13",
+    title: "Write operations runbook",
+    description: "Document monitoring, alerting, scaling, and incident response procedures.",
+    phase: "HANDOFF",
+    status: "backlog",
+    assigned_to: "infra",
+    comments: [],
+    artifact_path: "",
+    created_at: "2025-06-05T09:00:00Z",
+    updated_at: "2025-06-05T09:00:00Z",
+  },
+];
+
+// ---------------------------------------------------------------------------
+// Mock active agents (shown on dashboard in demo mode)
+// ---------------------------------------------------------------------------
+
+export const DEMO_AGENTS: AgentActivity[] = [
+  {
+    agent_name: "Solutions Architect",
+    status: "active",
+    phase: "ARCHITECTURE",
+    detail: "Designing system architecture with serverless-first approach",
+    timestamp: Date.now() - 30_000,
+  },
+  {
+    agent_name: "Data Engineer",
+    status: "active",
+    phase: "ARCHITECTURE",
+    detail: "Creating DynamoDB single-table design with 3 GSIs",
+    timestamp: Date.now() - 45_000,
+  },
+  {
+    agent_name: "Security Engineer",
+    status: "idle",
+    phase: "ARCHITECTURE",
+    detail: "Waiting for VPC design to begin security review",
+    timestamp: Date.now() - 120_000,
+  },
+  {
+    agent_name: "Project Manager",
+    status: "active",
+    phase: "ARCHITECTURE",
+    detail: "Coordinating architecture phase deliverables",
+    timestamp: Date.now() - 10_000,
+  },
+];
+
+// ---------------------------------------------------------------------------
+// Recent activity derived from task comments (shown on dashboard)
+// ---------------------------------------------------------------------------
+
+export interface DemoActivityItem {
+  agent: string;
+  action: string;
+  timestamp: string;
+}
+
+/** Build a recent-activity feed from the demo board task comments. */
+export function getDemoRecentActivity(): DemoActivityItem[] {
+  const items: DemoActivityItem[] = [];
+  for (const task of DEMO_BOARD_TASKS) {
+    for (const comment of task.comments) {
+      items.push({
+        agent: comment.author,
+        action: comment.content,
+        timestamp: comment.timestamp,
+      });
+    }
+    // Also show task status transitions for non-backlog tasks
+    if (task.status !== "backlog") {
+      items.push({
+        agent: task.assigned_to,
+        action: `Moved "${task.title}" to ${task.status}`,
+        timestamp: task.updated_at,
+      });
+    }
+  }
+  // Sort newest first, take top 8
+  return items
+    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+    .slice(0, 8);
+}
 
 // ---------------------------------------------------------------------------
 // Mock chat history (shown on first load)

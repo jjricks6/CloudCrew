@@ -10,6 +10,7 @@ Model: Sonnet — test planning and coverage analysis are pattern-following task
 from strands import Agent
 
 from src.agents.base import SONNET
+from src.tools.board_tools import add_task_comment, create_board_task, update_board_task
 from src.tools.git_tools import git_list, git_read, git_write_tests, git_write_tests_batch
 from src.tools.ledger_tools import read_task_ledger
 
@@ -78,6 +79,13 @@ Please address and re-submit."
 - If quality gates pass: "QA review PASSED. Coverage at [X]%. \
 [N] test categories validated. Ready for approval."
 
+## Board Task Tracking
+As you work, keep the customer dashboard board updated:
+- Use update_board_task to move tasks to "in_progress" when you start \
+and "review" or "done" when you finish
+- Use add_task_comment to log test coverage, quality gate results, or issues
+- Use create_board_task if you discover new work items mid-phase
+
 ## Recovery Awareness
 Before starting any work, ALWAYS check what already exists:
 1. Use read_task_ledger to see what deliverables are recorded
@@ -102,5 +110,14 @@ def create_qa_agent() -> Agent:
         model=SONNET,
         name="qa",
         system_prompt=QA_SYSTEM_PROMPT,
-        tools=[git_read, git_list, git_write_tests, git_write_tests_batch, read_task_ledger],
+        tools=[
+            git_read,
+            git_list,
+            git_write_tests,
+            git_write_tests_batch,
+            read_task_ledger,
+            create_board_task,
+            update_board_task,
+            add_task_comment,
+        ],
     )

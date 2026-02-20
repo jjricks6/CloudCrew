@@ -116,6 +116,7 @@ resource "aws_iam_role_policy" "ecs_task" {
         Resource = [
           aws_dynamodb_table.projects.arn,
           aws_dynamodb_table.metrics.arn,
+          aws_dynamodb_table.board_tasks.arn,
         ]
       },
       {
@@ -137,9 +138,9 @@ resource "aws_iam_role_policy" "ecs_task" {
         Resource = aws_dynamodb_table.connections.arn
       },
       {
-        Sid    = "BroadcastPostToConnection"
-        Effect = "Allow"
-        Action = "execute-api:ManageConnections"
+        Sid      = "BroadcastPostToConnection"
+        Effect   = "Allow"
+        Action   = "execute-api:ManageConnections"
         Resource = "${aws_apigatewayv2_api.websocket.execution_arn}/${var.environment}/*"
       },
       {
@@ -306,9 +307,9 @@ resource "aws_iam_role_policy" "lambda_pm_chat" {
         Resource = aws_dynamodb_table.connections.arn
       },
       {
-        Sid    = "BroadcastPostToConnection"
-        Effect = "Allow"
-        Action = "execute-api:ManageConnections"
+        Sid      = "BroadcastPostToConnection"
+        Effect   = "Allow"
+        Action   = "execute-api:ManageConnections"
         Resource = "${aws_apigatewayv2_api.websocket.execution_arn}/${var.environment}/*"
       },
       {
@@ -432,7 +433,10 @@ resource "aws_iam_role_policy" "lambda_api" {
           "dynamodb:UpdateItem",
           "dynamodb:Query",
         ]
-        Resource = aws_dynamodb_table.projects.arn
+        Resource = [
+          aws_dynamodb_table.projects.arn,
+          aws_dynamodb_table.board_tasks.arn,
+        ]
       },
       {
         Sid    = "S3Upload"
@@ -452,9 +456,9 @@ resource "aws_iam_role_policy" "lambda_api" {
         Resource = aws_sfn_state_machine.orchestrator.arn
       },
       {
-        Sid    = "InvokePMChat"
-        Effect = "Allow"
-        Action = "lambda:InvokeFunction"
+        Sid      = "InvokePMChat"
+        Effect   = "Allow"
+        Action   = "lambda:InvokeFunction"
         Resource = aws_lambda_function.pm_chat.arn
       },
       {
@@ -467,9 +471,9 @@ resource "aws_iam_role_policy" "lambda_api" {
         Resource = aws_dynamodb_table.connections.arn
       },
       {
-        Sid    = "BroadcastPostToConnection"
-        Effect = "Allow"
-        Action = "execute-api:ManageConnections"
+        Sid      = "BroadcastPostToConnection"
+        Effect   = "Allow"
+        Action   = "execute-api:ManageConnections"
         Resource = "${aws_apigatewayv2_api.websocket.execution_arn}/${var.environment}/*"
       },
     ]
@@ -551,9 +555,9 @@ resource "aws_iam_role_policy" "lambda_sfn_handlers" {
         Resource = aws_dynamodb_table.connections.arn
       },
       {
-        Sid    = "BroadcastPostToConnection"
-        Effect = "Allow"
-        Action = "execute-api:ManageConnections"
+        Sid      = "BroadcastPostToConnection"
+        Effect   = "Allow"
+        Action   = "execute-api:ManageConnections"
         Resource = "${aws_apigatewayv2_api.websocket.execution_arn}/${var.environment}/*"
       },
     ]

@@ -186,6 +186,7 @@ resource "aws_lambda_function" "api" {
       PM_CHAT_LAMBDA_NAME    = aws_lambda_function.pm_chat.function_name
       CONNECTIONS_TABLE      = aws_dynamodb_table.connections.name
       WEBSOCKET_API_ENDPOINT = "https://${aws_apigatewayv2_api.websocket.id}.execute-api.${var.aws_region}.amazonaws.com/${var.environment}"
+      BOARD_TASKS_TABLE      = aws_dynamodb_table.board_tasks.name
     }
   }
 

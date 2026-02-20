@@ -27,9 +27,10 @@ class TestInfraAgent:
         assert call_kwargs.kwargs["name"] == "infra"
         assert call_kwargs.kwargs["model"] is mock_sonnet
         assert call_kwargs.kwargs["system_prompt"] == INFRA_SYSTEM_PROMPT
-        # 7 tools: git_read, git_list, git_write_infra, git_write_infra_batch,
-        # terraform_validate, checkov_scan, read_task_ledger
-        assert len(call_kwargs.kwargs["tools"]) == 7
+        # 10 tools: git_read, git_list, git_write_infra, git_write_infra_batch,
+        # terraform_validate, checkov_scan, read_task_ledger,
+        # create_board_task, update_board_task, add_task_comment
+        assert len(call_kwargs.kwargs["tools"]) == 10
         assert agent is mock_agent_cls.return_value
 
     def test_system_prompt_has_key_sections(self) -> None:

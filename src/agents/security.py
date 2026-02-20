@@ -10,6 +10,7 @@ Model: Opus — security analysis requires deep reasoning about subtle risks.
 from strands import Agent
 
 from src.agents.base import OPUS
+from src.tools.board_tools import add_task_comment, create_board_task, update_board_task
 from src.tools.git_tools import git_list, git_read, git_write_security
 from src.tools.ledger_tools import read_task_ledger
 from src.tools.security_review import write_security_review
@@ -92,6 +93,13 @@ A review PASSES when:
 - All Medium findings either fixed or documented with accepted risk rationale
 - Checkov scan shows no new failures versus the previous scan
 
+## Board Task Tracking
+As you work, keep the customer dashboard board updated:
+- Use update_board_task to move tasks to "in_progress" when you start \
+and "review" or "done" when you finish
+- Use add_task_comment to log review findings, severity, or remediation status
+- Use create_board_task if you discover new work items mid-phase
+
 ## Recovery Awareness
 Before starting any work, ALWAYS check what already exists:
 1. Use read_task_ledger to see what decisions and deliverables are recorded
@@ -116,5 +124,15 @@ def create_security_agent() -> Agent:
         model=OPUS,
         name="security",
         system_prompt=SECURITY_SYSTEM_PROMPT,
-        tools=[git_read, git_list, git_write_security, checkov_scan, write_security_review, read_task_ledger],
+        tools=[
+            git_read,
+            git_list,
+            git_write_security,
+            checkov_scan,
+            write_security_review,
+            read_task_ledger,
+            create_board_task,
+            update_board_task,
+            add_task_comment,
+        ],
     )

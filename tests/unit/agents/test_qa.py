@@ -26,7 +26,8 @@ class TestQAAgent:
         assert call_kwargs.kwargs["name"] == "qa"
         assert call_kwargs.kwargs["model"] is mock_sonnet
         assert call_kwargs.kwargs["system_prompt"] == QA_SYSTEM_PROMPT
-        assert len(call_kwargs.kwargs["tools"]) == 5
+        # 8 tools: original 5 + create_board_task, update_board_task, add_task_comment
+        assert len(call_kwargs.kwargs["tools"]) == 8
         assert agent is mock_agent_cls.return_value
 
     def test_system_prompt_has_key_sections(self) -> None:

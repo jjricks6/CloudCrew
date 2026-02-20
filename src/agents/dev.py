@@ -9,6 +9,7 @@ Model: Sonnet — code generation is its strength; deep reasoning not required.
 from strands import Agent
 
 from src.agents.base import SONNET
+from src.tools.board_tools import add_task_comment, create_board_task, update_board_task
 from src.tools.git_tools import git_list, git_read, git_write_app, git_write_app_batch
 from src.tools.ledger_tools import read_task_ledger
 
@@ -67,6 +68,13 @@ When QA or SA hands you feedback:
 4. Re-run your self-validation workflow after every fix
 5. Hand back with: "Fixed [N] issues. All tests passing. Please re-review."
 
+## Board Task Tracking
+As you work, keep the customer dashboard board updated:
+- Use update_board_task to move tasks to "in_progress" when you start \
+and "review" or "done" when you finish
+- Use add_task_comment to log progress, test results, or issues found
+- Use create_board_task if you discover new work items mid-phase
+
 ## Recovery Awareness
 Before starting any work, ALWAYS check what already exists:
 1. Use read_task_ledger to see what deliverables are recorded
@@ -91,5 +99,14 @@ def create_dev_agent() -> Agent:
         model=SONNET,
         name="dev",
         system_prompt=DEV_SYSTEM_PROMPT,
-        tools=[git_read, git_list, git_write_app, git_write_app_batch, read_task_ledger],
+        tools=[
+            git_read,
+            git_list,
+            git_write_app,
+            git_write_app_batch,
+            read_task_ledger,
+            create_board_task,
+            update_board_task,
+            add_task_comment,
+        ],
     )

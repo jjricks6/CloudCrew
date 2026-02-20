@@ -224,6 +224,7 @@ class TestInvocationState:
             "phase",
             "session_id",
             "task_ledger_table",
+            "board_tasks_table",
             "git_repo_url",
             "knowledge_base_id",
             "patterns_bucket",

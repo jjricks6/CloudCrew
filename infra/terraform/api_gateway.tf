@@ -93,6 +93,13 @@ resource "aws_api_gateway_resource" "upload" {
   path_part   = "upload"
 }
 
+# /projects/{id}/tasks
+resource "aws_api_gateway_resource" "tasks" {
+  rest_api_id = aws_api_gateway_rest_api.main.id
+  parent_id   = aws_api_gateway_resource.project.id
+  path_part   = "tasks"
+}
+
 # =============================================================================
 # Methods → Lambda integrations
 # =============================================================================
@@ -250,6 +257,23 @@ resource "aws_api_gateway_integration" "post_upload" {
   uri                     = aws_lambda_function.api.invoke_arn
 }
 
+# GET /projects/{id}/tasks → api Lambda
+resource "aws_api_gateway_method" "get_tasks" {
+  rest_api_id   = aws_api_gateway_rest_api.main.id
+  resource_id   = aws_api_gateway_resource.tasks.id
+  http_method   = "GET"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_integration" "get_tasks" {
+  rest_api_id             = aws_api_gateway_rest_api.main.id
+  resource_id             = aws_api_gateway_resource.tasks.id
+  http_method             = aws_api_gateway_method.get_tasks.http_method
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = aws_lambda_function.api.invoke_arn
+}
+
 # =============================================================================
 # Lambda Permissions for API Gateway
 # =============================================================================
@@ -306,6 +330,9 @@ resource "aws_api_gateway_deployment" "main" {
       aws_api_gateway_integration.post_chat,
       aws_api_gateway_integration.get_chat,
       aws_api_gateway_integration.post_upload,
+      aws_api_gateway_resource.tasks,
+      aws_api_gateway_method.get_tasks,
+      aws_api_gateway_integration.get_tasks,
     ]))
   }
 

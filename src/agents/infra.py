@@ -9,6 +9,7 @@ Model: Sonnet — code generation is its strength; deep reasoning not required.
 from strands import Agent
 
 from src.agents.base import SONNET
+from src.tools.board_tools import add_task_comment, create_board_task, update_board_task
 from src.tools.git_tools import git_list, git_read, git_write_infra, git_write_infra_batch
 from src.tools.ledger_tools import read_task_ledger
 from src.tools.security_tools import checkov_scan
@@ -97,6 +98,13 @@ When Security hands you findings:
 5. Hand back to Security with: "Fixed [N] issues. Remaining [M] Low items \
 are documented. Please re-review."
 
+## Board Task Tracking
+As you work, keep the customer dashboard board updated:
+- Use update_board_task to move tasks to "in_progress" when you start \
+and "review" or "done" when you finish
+- Use add_task_comment to log validation results, scan findings, or fixes
+- Use create_board_task if you discover new work items mid-phase
+
 ## Recovery Awareness
 Before starting any work, ALWAYS check what already exists:
 1. Use read_task_ledger to see what deliverables are recorded
@@ -129,5 +137,8 @@ def create_infra_agent() -> Agent:
             terraform_validate,
             checkov_scan,
             read_task_ledger,
+            create_board_task,
+            update_board_task,
+            add_task_comment,
         ],
     )

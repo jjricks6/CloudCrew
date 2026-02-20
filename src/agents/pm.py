@@ -7,6 +7,7 @@ the team. This is the only agent that writes to the task ledger.
 from strands import Agent
 
 from src.agents.base import OPUS
+from src.tools.board_tools import add_task_comment, create_board_task, update_board_task
 from src.tools.git_tools import git_list, git_read, git_write_project_plan
 from src.tools.ledger_tools import read_task_ledger, update_task_ledger
 from src.tools.sow_parser import parse_sow
@@ -57,6 +58,22 @@ approve and why
 - When receiving work back from specialists, validate it against SOW \
 requirements
 
+## Board Task Management
+You manage a kanban board visible to the customer on the dashboard. \
+At the start of each phase:
+1. Plan the work by creating board tasks for all anticipated work items \
+(e.g., "Research authentication options", "Design API contracts"). \
+Use create_board_task for each.
+2. As you delegate tasks to specialists, update the task's assigned_to \
+and status using update_board_task.
+3. Add progress comments using add_task_comment when milestones are hit.
+4. When new problems arise mid-phase, create additional tasks.
+5. By the end of the phase, all tasks should be in "done" status.
+
+Board tasks are separate from the task ledger — the ledger tracks \
+project-level facts, decisions, and deliverables. Board tasks track \
+granular work items visible to the customer.
+
 ## Standalone Mode
 You may be invoked outside of a Swarm in two scenarios:
 1. PM Review step: After a phase Swarm completes, you review all \
@@ -96,5 +113,8 @@ def create_pm_agent() -> Agent:
             git_read,
             git_list,
             git_write_project_plan,
+            create_board_task,
+            update_board_task,
+            add_task_comment,
         ],
     )

@@ -3,6 +3,7 @@ import { Sidebar } from "./Sidebar";
 import { Header } from "./Header";
 import { useProjectId } from "@/lib/useProjectId";
 import { isDemoMode } from "@/lib/demo";
+import { useProjectStatus } from "@/state/queries/useProjectQueries";
 
 /** Map the last path segment to a page title. */
 function getPageTitle(pathname: string): string {
@@ -21,10 +22,15 @@ export function AppLayout() {
   const projectId = useProjectId();
   const title = getPageTitle(pathname);
   const demo = isDemoMode(projectId);
+  const { data: project } = useProjectStatus(projectId);
 
   return (
     <div className="flex h-screen overflow-hidden">
-      <Sidebar projectName={demo ? "CloudCrew Demo" : "CloudCrew"} />
+      <Sidebar
+        projectName={project?.project_name ?? (demo ? "CloudCrew Demo" : "CloudCrew")}
+        currentPhase={project?.current_phase}
+        phaseStatus={project?.phase_status}
+      />
       <div className="flex flex-1 flex-col overflow-hidden">
         {demo && (
           <div className="border-b border-amber-500/20 bg-amber-50 px-4 py-1.5 text-center text-xs text-amber-700 dark:bg-amber-950/30 dark:text-amber-400">

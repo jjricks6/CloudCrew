@@ -6,6 +6,7 @@
 
 import { create } from "zustand";
 import type { AgentActivity, WebSocketEvent, WsStatus } from "@/lib/types";
+import { queryClient } from "@/state/queryClient";
 import { useChatStore } from "./chatStore";
 
 interface AgentState {
@@ -106,6 +107,21 @@ export const useAgentStore = create<AgentState>((set) => ({
 
       if (event.event === "chat_done") {
         useChatStore.getState().finalizeStream(event.message_id);
+        return { lastEvent: event };
+      }
+
+      // Board task events → invalidate board-tasks query
+      if (event.event === "task_created" || event.event === "task_updated") {
+        void queryClient.invalidateQueries({ queryKey: ["board-tasks"] });
+        return { lastEvent: event };
+      }
+
+      // Phase events → invalidate project query
+      if (
+        event.event === "phase_started" ||
+        event.event === "awaiting_approval"
+      ) {
+        void queryClient.invalidateQueries({ queryKey: ["project"] });
         return { lastEvent: event };
       }
 

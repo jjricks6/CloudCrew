@@ -58,5 +58,8 @@ ACTIVITY_TABLE: str = os.environ.get("ACTIVITY_TABLE", "")
 CONNECTIONS_TABLE: str = os.environ.get("CONNECTIONS_TABLE", "")
 WEBSOCKET_API_ENDPOINT: str = os.environ.get("WEBSOCKET_API_ENDPOINT", "")
 
+# --- Board Tasks (Kanban) ---
+BOARD_TASKS_TABLE: str = os.environ.get("BOARD_TASKS_TABLE", "cloudcrew-board-tasks")
+
 # --- PM Chat ---
 PM_CHAT_LAMBDA_NAME: str = os.environ.get("PM_CHAT_LAMBDA_NAME", "")

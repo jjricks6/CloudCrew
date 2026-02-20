@@ -98,9 +98,9 @@ resource "aws_iam_role_policy" "lambda_ws" {
         Resource = aws_dynamodb_table.connections.arn
       },
       {
-        Sid    = "ManageConnections"
-        Effect = "Allow"
-        Action = "execute-api:ManageConnections"
+        Sid      = "ManageConnections"
+        Effect   = "Allow"
+        Action   = "execute-api:ManageConnections"
         Resource = "${aws_apigatewayv2_api.websocket.execution_arn}/${var.environment}/*"
       },
     ]

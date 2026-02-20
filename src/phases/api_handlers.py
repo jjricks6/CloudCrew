@@ -16,6 +16,7 @@ import boto3
 
 from src.config import (
     AWS_REGION,
+    BOARD_TASKS_TABLE,
     PM_CHAT_LAMBDA_NAME,
     SOW_BUCKET,
     STATE_MACHINE_ARN,
@@ -27,6 +28,7 @@ from src.state.chat import get_chat_history, new_message_id, store_chat_message
 from src.state.interrupts import store_interrupt_response
 from src.state.ledger import format_ledger, read_ledger, write_ledger
 from src.state.models import TaskLedger
+from src.state.tasks import list_tasks
 
 logger = logging.getLogger(__name__)
 
@@ -398,6 +400,22 @@ def upload_url_handler(event: dict[str, Any]) -> dict[str, Any]:
     )
 
 
+def board_tasks_handler(event: dict[str, Any]) -> dict[str, Any]:
+    """Get board tasks for a project, optionally filtered by phase.
+
+    GET /projects/{id}/tasks?phase=ARCHITECTURE
+    """
+    project_id = event.get("pathParameters", {}).get("id", "")
+    if not project_id:
+        return _response(400, {"error": "project_id is required"})
+
+    params = event.get("queryStringParameters") or {}
+    phase_filter: str = params.get("phase", "")
+
+    tasks = list_tasks(BOARD_TASKS_TABLE, project_id, phase=phase_filter)
+    return _response(200, {"project_id": project_id, "tasks": tasks})
+
+
 def route(event: dict[str, Any], context: Any) -> dict[str, Any]:
     """Route API Gateway events to the appropriate handler.
 
@@ -434,6 +452,8 @@ def route(event: dict[str, Any], context: Any) -> dict[str, Any]:
             return pm_chat_get_handler(event)
         if method == "POST" and resource == "/projects/{id}/upload":
             return upload_url_handler(event)
+        if method == "GET" and resource == "/projects/{id}/tasks":
+            return board_tasks_handler(event)
         return _response(404, {"error": f"Not found: {method} {resource}"})
     except Exception:
         logger.exception("Handler error: %s %s", method, resource)

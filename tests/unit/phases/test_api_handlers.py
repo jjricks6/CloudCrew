@@ -445,6 +445,50 @@ class TestUploadUrlHandler:
 
 
 @pytest.mark.unit
+class TestBoardTasksHandler:
+    """Verify board_tasks_handler behavior."""
+
+    @patch("src.phases.api_handlers.list_tasks")
+    def test_returns_tasks(self, mock_list: MagicMock) -> None:
+        from src.phases.api_handlers import board_tasks_handler
+
+        mock_list.return_value = [
+            {"task_id": "t1", "title": "Research auth", "status": "done"},
+            {"task_id": "t2", "title": "Implement auth", "status": "in_progress"},
+        ]
+
+        event = {"pathParameters": {"id": "proj-1"}}
+        result = board_tasks_handler(event)
+
+        assert result["statusCode"] == 200
+        body = json.loads(result["body"])
+        assert body["project_id"] == "proj-1"
+        assert len(body["tasks"]) == 2
+        assert body["tasks"][0]["task_id"] == "t1"
+        mock_list.assert_called_once_with("cloudcrew-board-tasks", "proj-1", phase="")
+
+    @patch("src.phases.api_handlers.list_tasks")
+    def test_returns_empty_list(self, mock_list: MagicMock) -> None:
+        from src.phases.api_handlers import board_tasks_handler
+
+        mock_list.return_value = []
+
+        event = {"pathParameters": {"id": "proj-1"}}
+        result = board_tasks_handler(event)
+
+        assert result["statusCode"] == 200
+        body = json.loads(result["body"])
+        assert body["tasks"] == []
+
+    def test_rejects_missing_project_id(self) -> None:
+        from src.phases.api_handlers import board_tasks_handler
+
+        event = {"pathParameters": {}}
+        result = board_tasks_handler(event)
+        assert result["statusCode"] == 400
+
+
+@pytest.mark.unit
 class TestRoute:
     """Verify API route dispatcher."""
 
@@ -490,6 +534,15 @@ class TestRoute:
 
         mock_handler.return_value = {"statusCode": 200, "body": "{}"}
         event = {"httpMethod": "POST", "resource": "/projects/{id}/upload"}
+        route(event, None)
+        mock_handler.assert_called_once_with(event)
+
+    @patch("src.phases.api_handlers.board_tasks_handler")
+    def test_routes_get_tasks(self, mock_handler: MagicMock) -> None:
+        from src.phases.api_handlers import route
+
+        mock_handler.return_value = {"statusCode": 200, "body": "{}"}
+        event = {"httpMethod": "GET", "resource": "/projects/{id}/tasks"}
         route(event, None)
         mock_handler.assert_called_once_with(event)
 

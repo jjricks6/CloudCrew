@@ -13,9 +13,11 @@ export const Phase = {
   POC: "POC",
   PRODUCTION: "PRODUCTION",
   HANDOFF: "HANDOFF",
+  RETROSPECTIVE: "RETROSPECTIVE",
 } as const;
 export type Phase = (typeof Phase)[keyof typeof Phase];
 
+/** Phases displayed in the timeline (excludes RETROSPECTIVE — deferred to M6). */
 export const PHASE_ORDER: Phase[] = [
   Phase.DISCOVERY,
   Phase.ARCHITECTURE,
@@ -71,6 +73,14 @@ export interface ProjectStatus {
   blockers: Blocker[];
   created_at: string;
   updated_at: string;
+}
+
+/** Slim response from GET /projects/{id}/status (subset of full ProjectStatus). */
+export interface ProjectStatusSummary {
+  project_id: string;
+  project_name: string;
+  current_phase: Phase;
+  phase_status: PhaseStatus;
 }
 
 // --- WebSocket Events ---
@@ -145,7 +155,58 @@ export type WebSocketEvent =
   | ChatMessageEvent
   | ChatThinkingEvent
   | ChatChunkEvent
-  | ChatDoneEvent;
+  | ChatDoneEvent
+  | TaskCreatedEvent
+  | TaskUpdatedEvent;
+
+// --- Board Tasks (Kanban) ---
+
+export const KanbanColumn = {
+  BACKLOG: "backlog",
+  IN_PROGRESS: "in_progress",
+  REVIEW: "review",
+  DONE: "done",
+} as const;
+export type KanbanColumn = (typeof KanbanColumn)[keyof typeof KanbanColumn];
+
+export const KANBAN_COLUMNS: KanbanColumn[] = [
+  KanbanColumn.BACKLOG,
+  KanbanColumn.IN_PROGRESS,
+  KanbanColumn.REVIEW,
+  KanbanColumn.DONE,
+];
+
+export interface TaskComment {
+  author: string;
+  content: string;
+  timestamp: string;
+}
+
+export interface BoardTask {
+  task_id: string;
+  title: string;
+  description: string;
+  phase: string;
+  status: KanbanColumn;
+  assigned_to: string;
+  comments: TaskComment[];
+  artifact_path: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TaskCreatedEvent extends BaseEvent {
+  event: "task_created";
+  task_id: string;
+  title: string;
+  assigned_to: string;
+}
+
+export interface TaskUpdatedEvent extends BaseEvent {
+  event: "task_updated";
+  task_id: string;
+  updates: Record<string, unknown>;
+}
 
 // --- Chat Message (REST + Zustand store) ---
 

@@ -252,6 +252,8 @@ class TestNoNewTopLevelModules:
 
         violations: list[str] = []
         for entry in SRC_DIR.iterdir():
+            if entry.name.startswith("."):
+                continue  # skip hidden files/dirs (.DS_Store, .mypy_cache, etc.)
             if entry.is_dir() and entry.name not in self.ALLOWED_MODULES:
                 violations.append(f"  Unauthorized directory: src/{entry.name}/")
             elif entry.is_file() and entry.name not in self.ALLOWED_FILES:

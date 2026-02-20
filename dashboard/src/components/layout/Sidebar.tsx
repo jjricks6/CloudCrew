@@ -28,17 +28,35 @@ interface SidebarProps {
   phaseStatus?: PhaseStatus;
 }
 
+function getDotColor(
+  dotIndex: number,
+  currentIndex: number,
+  phaseStatus?: PhaseStatus,
+): string {
+  if (dotIndex < currentIndex) return "bg-green-500";
+  if (dotIndex === currentIndex) {
+    if (phaseStatus === "AWAITING_APPROVAL") return "bg-yellow-500";
+    if (phaseStatus === "APPROVED") return "bg-green-500";
+    return "bg-blue-500";
+  }
+  return "bg-muted";
+}
+
 function PhaseIndicator({
   currentPhase,
+  phaseStatus,
 }: {
   currentPhase: Phase | undefined;
+  phaseStatus: PhaseStatus | undefined;
 }) {
   const currentIndex = currentPhase
     ? PHASE_ORDER.indexOf(currentPhase)
     : -1;
+  // Align bar fill with dot positions: justify-between places dots at
+  // 0%, 25%, 50%, 75%, 100% — so progress must use the same scale.
   const progress =
     currentIndex >= 0
-      ? ((currentIndex + 1) / PHASE_ORDER.length) * 100
+      ? (currentIndex / (PHASE_ORDER.length - 1)) * 100
       : 0;
 
   return (
@@ -54,11 +72,7 @@ function PhaseIndicator({
         {PHASE_ORDER.map((phase, i) => (
           <div
             key={phase}
-            className={`h-2 w-2 rounded-full ${
-              i <= currentIndex
-                ? "bg-primary"
-                : "bg-muted"
-            }`}
+            className={`h-2 w-2 rounded-full ${getDotColor(i, currentIndex, phaseStatus)}`}
             title={phase}
           />
         ))}
@@ -87,7 +101,7 @@ export function Sidebar({
 
       {/* Phase progress */}
       <div className="border-b p-4">
-        <PhaseIndicator currentPhase={currentPhase} />
+        <PhaseIndicator currentPhase={currentPhase} phaseStatus={phaseStatus} />
       </div>
 
       {/* Navigation */}

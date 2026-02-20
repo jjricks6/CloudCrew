@@ -12,6 +12,7 @@ from strands.models import BedrockModel
 from src.config import (
     BEDROCK_MAX_RETRIES,
     BEDROCK_READ_TIMEOUT,
+    BOARD_TASKS_TABLE,
     KNOWLEDGE_BASE_ID,
     LTM_MEMORY_ID,
     MODEL_ID_OPUS,
@@ -68,6 +69,7 @@ def build_invocation_state(
         phase=phase,
         session_id=session_id or f"{project_id}-{phase}",
         task_ledger_table=TASK_LEDGER_TABLE,
+        board_tasks_table=BOARD_TASKS_TABLE,
         git_repo_url=PROJECT_REPO_PATH,
         knowledge_base_id=KNOWLEDGE_BASE_ID,
         patterns_bucket=PATTERNS_BUCKET,

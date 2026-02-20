@@ -21,6 +21,7 @@ skip-check:
 
   # --- DynamoDB (dev uses AWS-managed KMS, no autoscaling) ---
   - CKV_AWS_119  # DynamoDB customer-managed KMS (AWS-managed is sufficient)
+  - CKV_AWS_28   # DynamoDB PITR (connections table is ephemeral with 2h TTL)
 
   # --- S3 (dev doesn't need access logging, lifecycle, cross-region replication) ---
   - CKV_AWS_18   # S3 access logging (not needed in dev)
@@ -36,6 +37,9 @@ skip-check:
 
   # --- ECS (dev relaxations) ---
   - CKV_AWS_237  # API Gateway create-before-destroy (dev only)
+
+  # --- WebSocket API (auth deferred to M5g/Cognito) ---
+  - CKV_AWS_309  # WebSocket route authorization (deferred to M5g Cognito)
 
   # --- API Gateway (auth deferred to M5/Cognito, logging not needed in dev) ---
   - CKV_AWS_59   # API Gateway method authorization (deferred to M5 Cognito)
