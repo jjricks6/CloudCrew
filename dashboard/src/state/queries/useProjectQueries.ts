@@ -1,27 +1,35 @@
 /**
  * TanStack Query hooks for project data.
+ *
+ * In demo mode, returns mock project status without hitting the backend.
  */
 
 import { useQuery } from "@tanstack/react-query";
 import { get } from "@/lib/api";
 import type { ProjectStatus } from "@/lib/types";
+import { isDemoMode, DEMO_PROJECT_STATUS } from "@/lib/demo";
 
 export function useProjectStatus(projectId: string | undefined) {
   return useQuery<ProjectStatus>({
     queryKey: ["project", projectId],
-    queryFn: () => get<ProjectStatus>(`/projects/${projectId}/status`),
+    queryFn: () => {
+      if (isDemoMode(projectId)) return DEMO_PROJECT_STATUS;
+      return get<ProjectStatus>(`/projects/${projectId}/status`);
+    },
     enabled: !!projectId,
-    refetchInterval: 30_000,
+    refetchInterval: isDemoMode(projectId) ? false : 30_000,
   });
 }
 
 export function useProjectDeliverables(projectId: string | undefined) {
   return useQuery<ProjectStatus["deliverables"]>({
     queryKey: ["deliverables", projectId],
-    queryFn: () =>
-      get<ProjectStatus["deliverables"]>(
+    queryFn: () => {
+      if (isDemoMode(projectId)) return DEMO_PROJECT_STATUS.deliverables;
+      return get<ProjectStatus["deliverables"]>(
         `/projects/${projectId}/deliverables`,
-      ),
+      );
+    },
     enabled: !!projectId,
   });
 }
