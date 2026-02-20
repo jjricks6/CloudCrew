@@ -4,11 +4,11 @@ import { Progress } from "@/components/ui/progress";
 import { PHASE_ORDER, type Phase, type PhaseStatus } from "@/lib/types";
 
 const NAV_ITEMS = [
-  { to: "/", label: "Dashboard", icon: "grid" },
-  { to: "/chat", label: "Chat", icon: "message" },
-  { to: "/board", label: "Board", icon: "kanban" },
-  { to: "/swarm", label: "Swarm", icon: "cpu" },
-  { to: "/artifacts", label: "Artifacts", icon: "folder" },
+  { to: ".", label: "Dashboard", icon: "grid" },
+  { to: "chat", label: "Chat", icon: "message" },
+  { to: "board", label: "Board", icon: "kanban" },
+  { to: "swarm", label: "Swarm", icon: "cpu" },
+  { to: "artifacts", label: "Artifacts", icon: "folder" },
 ] as const;
 
 const ICON_MAP: Record<string, string> = {
@@ -96,6 +96,7 @@ export function Sidebar({
           <NavLink
             key={to}
             to={to}
+            end={to === "."}
             className={({ isActive }) =>
               `flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors ${
                 isActive

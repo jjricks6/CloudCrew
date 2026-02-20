@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -19,14 +19,18 @@ export default function App() {
         <TooltipProvider>
           <BrowserRouter>
           <Routes>
-            <Route element={<AppLayout />}>
+            {/* Redirect root to a default project for development.
+                In production, this will be replaced by a project list or
+                Cognito auth flow that resolves the project ID. */}
+            <Route index element={<Navigate to="/project/demo" replace />} />
+            <Route path="/project/:projectId" element={<AppLayout />}>
               <Route index element={<DashboardPage />} />
               <Route path="chat" element={<ChatPage />} />
               <Route path="board" element={<BoardPage />} />
               <Route path="swarm" element={<SwarmPage />} />
               <Route path="artifacts" element={<ArtifactsPage />} />
-              <Route path="*" element={<NotFoundPage />} />
             </Route>
+            <Route path="*" element={<NotFoundPage />} />
           </Routes>
           </BrowserRouter>
         </TooltipProvider>

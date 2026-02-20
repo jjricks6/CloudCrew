@@ -56,3 +56,15 @@ variable "lambda_pm_review_timeout" {
   type        = number
   default     = 300
 }
+
+variable "lambda_pm_chat_memory" {
+  description = "Memory (MB) for the PM chat Lambda"
+  type        = number
+  default     = 512
+}
+
+variable "lambda_pm_chat_timeout" {
+  description = "Timeout (seconds) for the PM chat Lambda"
+  type        = number
+  default     = 120
+}

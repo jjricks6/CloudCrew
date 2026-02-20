@@ -57,3 +57,6 @@ INTERRUPT_POLL_TIMEOUT: float = float(os.environ.get("INTERRUPT_POLL_TIMEOUT", "
 ACTIVITY_TABLE: str = os.environ.get("ACTIVITY_TABLE", "")
 CONNECTIONS_TABLE: str = os.environ.get("CONNECTIONS_TABLE", "")
 WEBSOCKET_API_ENDPOINT: str = os.environ.get("WEBSOCKET_API_ENDPOINT", "")
+
+# --- PM Chat ---
+PM_CHAT_LAMBDA_NAME: str = os.environ.get("PM_CHAT_LAMBDA_NAME", "")

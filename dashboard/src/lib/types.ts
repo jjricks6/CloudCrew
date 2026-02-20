@@ -114,13 +114,47 @@ export interface InterruptRaisedEvent extends BaseEvent {
   question: string;
 }
 
+export interface ChatMessageEvent extends BaseEvent {
+  event: "chat_message";
+  message_id: string;
+  role: "customer" | "pm";
+  content: string;
+}
+
+export interface ChatThinkingEvent extends BaseEvent {
+  event: "chat_thinking";
+}
+
+export interface ChatChunkEvent extends BaseEvent {
+  event: "chat_chunk";
+  content: string;
+}
+
+export interface ChatDoneEvent extends BaseEvent {
+  event: "chat_done";
+  message_id: string;
+}
+
 export type WebSocketEvent =
   | AgentActiveEvent
   | AgentIdleEvent
   | HandoffEvent
   | PhaseStartedEvent
   | AwaitingApprovalEvent
-  | InterruptRaisedEvent;
+  | InterruptRaisedEvent
+  | ChatMessageEvent
+  | ChatThinkingEvent
+  | ChatChunkEvent
+  | ChatDoneEvent;
+
+// --- Chat Message (REST + Zustand store) ---
+
+export interface ChatMessage {
+  message_id: string;
+  role: "customer" | "pm";
+  content: string;
+  timestamp: string;
+}
 
 // --- Agent Activity (for Zustand store) ---
 

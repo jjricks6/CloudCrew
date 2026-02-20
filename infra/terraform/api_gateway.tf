@@ -79,6 +79,20 @@ resource "aws_api_gateway_resource" "interrupt_respond" {
   path_part   = "respond"
 }
 
+# /projects/{id}/chat
+resource "aws_api_gateway_resource" "chat" {
+  rest_api_id = aws_api_gateway_rest_api.main.id
+  parent_id   = aws_api_gateway_resource.project.id
+  path_part   = "chat"
+}
+
+# /projects/{id}/upload
+resource "aws_api_gateway_resource" "upload" {
+  rest_api_id = aws_api_gateway_rest_api.main.id
+  parent_id   = aws_api_gateway_resource.project.id
+  path_part   = "upload"
+}
+
 # =============================================================================
 # Methods → Lambda integrations
 # =============================================================================
@@ -185,6 +199,57 @@ resource "aws_api_gateway_integration" "post_interrupt_respond" {
   uri                     = aws_lambda_function.api.invoke_arn
 }
 
+# POST /projects/{id}/chat → api Lambda
+resource "aws_api_gateway_method" "post_chat" {
+  rest_api_id   = aws_api_gateway_rest_api.main.id
+  resource_id   = aws_api_gateway_resource.chat.id
+  http_method   = "POST"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_integration" "post_chat" {
+  rest_api_id             = aws_api_gateway_rest_api.main.id
+  resource_id             = aws_api_gateway_resource.chat.id
+  http_method             = aws_api_gateway_method.post_chat.http_method
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = aws_lambda_function.api.invoke_arn
+}
+
+# GET /projects/{id}/chat → api Lambda
+resource "aws_api_gateway_method" "get_chat" {
+  rest_api_id   = aws_api_gateway_rest_api.main.id
+  resource_id   = aws_api_gateway_resource.chat.id
+  http_method   = "GET"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_integration" "get_chat" {
+  rest_api_id             = aws_api_gateway_rest_api.main.id
+  resource_id             = aws_api_gateway_resource.chat.id
+  http_method             = aws_api_gateway_method.get_chat.http_method
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = aws_lambda_function.api.invoke_arn
+}
+
+# POST /projects/{id}/upload → api Lambda
+resource "aws_api_gateway_method" "post_upload" {
+  rest_api_id   = aws_api_gateway_rest_api.main.id
+  resource_id   = aws_api_gateway_resource.upload.id
+  http_method   = "POST"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_integration" "post_upload" {
+  rest_api_id             = aws_api_gateway_rest_api.main.id
+  resource_id             = aws_api_gateway_resource.upload.id
+  http_method             = aws_api_gateway_method.post_upload.http_method
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = aws_lambda_function.api.invoke_arn
+}
+
 # =============================================================================
 # Lambda Permissions for API Gateway
 # =============================================================================
@@ -221,6 +286,8 @@ resource "aws_api_gateway_deployment" "main" {
       aws_api_gateway_resource.approve,
       aws_api_gateway_resource.revise,
       aws_api_gateway_resource.interrupt_respond,
+      aws_api_gateway_resource.chat,
+      aws_api_gateway_resource.upload,
       aws_api_gateway_method.post_projects,
       aws_api_gateway_method.get_status,
       aws_api_gateway_method.get_deliverables,
@@ -233,6 +300,12 @@ resource "aws_api_gateway_deployment" "main" {
       aws_api_gateway_integration.post_approve,
       aws_api_gateway_integration.post_revise,
       aws_api_gateway_integration.post_interrupt_respond,
+      aws_api_gateway_method.post_chat,
+      aws_api_gateway_method.get_chat,
+      aws_api_gateway_method.post_upload,
+      aws_api_gateway_integration.post_chat,
+      aws_api_gateway_integration.get_chat,
+      aws_api_gateway_integration.post_upload,
     ]))
   }
 

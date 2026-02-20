@@ -6,6 +6,7 @@
 
 import { create } from "zustand";
 import type { AgentActivity, WebSocketEvent, WsStatus } from "@/lib/types";
+import { useChatStore } from "./chatStore";
 
 interface AgentState {
   agents: AgentActivity[];
@@ -76,6 +77,36 @@ export const useAgentStore = create<AgentState>((set) => ({
               : a,
           ),
         };
+      }
+
+      // Chat events → dispatch to chatStore
+      if (event.event === "chat_message") {
+        // Customer messages are added optimistically by ChatPage on send,
+        // so only add PM messages arriving via WebSocket to avoid duplicates.
+        if (event.role === "pm") {
+          useChatStore.getState().addMessage({
+            message_id: event.message_id,
+            role: event.role,
+            content: event.content,
+            timestamp: new Date().toISOString(),
+          });
+        }
+        return { lastEvent: event };
+      }
+
+      if (event.event === "chat_thinking") {
+        useChatStore.getState().setThinking(true);
+        return { lastEvent: event };
+      }
+
+      if (event.event === "chat_chunk") {
+        useChatStore.getState().appendChunk(event.content);
+        return { lastEvent: event };
+      }
+
+      if (event.event === "chat_done") {
+        useChatStore.getState().finalizeStream(event.message_id);
+        return { lastEvent: event };
       }
 
       // For other event types, just update lastEvent

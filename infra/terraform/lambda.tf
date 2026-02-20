@@ -126,6 +126,42 @@ resource "aws_lambda_function" "approval" {
   tags = { Name = "cloudcrew-approval" }
 }
 
+# --- PM Chat (async PM agent for customer chat with streaming) ---
+
+resource "aws_cloudwatch_log_group" "lambda_pm_chat" {
+  name              = "/aws/lambda/cloudcrew-pm-chat"
+  retention_in_days = 14
+
+  tags = { Name = "cloudcrew-pm-chat-logs" }
+}
+
+resource "aws_lambda_function" "pm_chat" {
+  function_name = "cloudcrew-pm-chat"
+  role          = aws_iam_role.lambda_pm_chat.arn
+  package_type  = "Image"
+  image_uri     = "${aws_ecr_repository.phase_runner.repository_url}:latest"
+  memory_size   = var.lambda_pm_chat_memory
+  timeout       = var.lambda_pm_chat_timeout
+
+  image_config {
+    entry_point = ["python", "-m", "awslambdaric"]
+    command     = ["src.phases.pm_chat_handler.handler"]
+  }
+
+  environment {
+    variables = {
+      AWS_DEFAULT_REGION     = var.aws_region
+      TASK_LEDGER_TABLE      = aws_dynamodb_table.projects.name
+      CONNECTIONS_TABLE      = aws_dynamodb_table.connections.name
+      WEBSOCKET_API_ENDPOINT = "https://${aws_apigatewayv2_api.websocket.id}.execute-api.${var.aws_region}.amazonaws.com/${var.environment}"
+    }
+  }
+
+  depends_on = [aws_cloudwatch_log_group.lambda_pm_chat]
+
+  tags = { Name = "cloudcrew-pm-chat" }
+}
+
 # --- API Handler (project CRUD, status, deliverables, interrupt respond) ---
 
 resource "aws_lambda_function" "api" {
@@ -143,10 +179,13 @@ resource "aws_lambda_function" "api" {
 
   environment {
     variables = {
-      AWS_DEFAULT_REGION = var.aws_region
-      TASK_LEDGER_TABLE  = aws_dynamodb_table.projects.name
-      SOW_BUCKET         = aws_s3_bucket.sow_uploads.id
-      STATE_MACHINE_ARN  = aws_sfn_state_machine.orchestrator.arn
+      AWS_DEFAULT_REGION     = var.aws_region
+      TASK_LEDGER_TABLE      = aws_dynamodb_table.projects.name
+      SOW_BUCKET             = aws_s3_bucket.sow_uploads.id
+      STATE_MACHINE_ARN      = aws_sfn_state_machine.orchestrator.arn
+      PM_CHAT_LAMBDA_NAME    = aws_lambda_function.pm_chat.function_name
+      CONNECTIONS_TABLE      = aws_dynamodb_table.connections.name
+      WEBSOCKET_API_ENDPOINT = "https://${aws_apigatewayv2_api.websocket.id}.execute-api.${var.aws_region}.amazonaws.com/${var.environment}"
     }
   }
 

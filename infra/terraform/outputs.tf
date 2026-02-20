@@ -50,6 +50,11 @@ output "lambda_api_arn" {
   value       = aws_lambda_function.api.arn
 }
 
+output "lambda_pm_chat_arn" {
+  description = "PM Chat Lambda function ARN"
+  value       = aws_lambda_function.pm_chat.arn
+}
+
 # --- Networking ---
 output "vpc_id" {
   description = "VPC ID"
