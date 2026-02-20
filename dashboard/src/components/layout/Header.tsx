@@ -1,5 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import type { PhaseStatus } from "@/lib/types";
 
 interface HeaderProps {
@@ -31,6 +32,7 @@ export function Header({ title, phaseStatus }: HeaderProps) {
             {STATUS_LABEL[phaseStatus] ?? phaseStatus}
           </Badge>
         )}
+        <ThemeToggle />
         <Avatar className="h-8 w-8">
           <AvatarFallback className="text-xs">CC</AvatarFallback>
         </Avatar>
