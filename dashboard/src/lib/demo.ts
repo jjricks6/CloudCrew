@@ -55,12 +55,20 @@ export const DEMO_PROJECT_STATUS: ProjectStatus = {
       timestamp: "2025-06-01T10:00:00Z",
     },
   ],
+  assumptions: [
+    {
+      description: "Customer traffic will not exceed 10k requests/minute at launch",
+      confidence: "MEDIUM",
+      timestamp: "2025-06-01T11:00:00Z",
+    },
+  ],
   decisions: [
     {
       description: "Use serverless architecture with API Gateway + Lambda",
       rationale: "Lower operational overhead, pay-per-use pricing",
       made_by: "Solutions Architect",
       timestamp: "2025-06-02T14:00:00Z",
+      adr_path: "",
     },
   ],
   blockers: [],

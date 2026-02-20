@@ -4,6 +4,7 @@ import { Header } from "./Header";
 import { useProjectId } from "@/lib/useProjectId";
 import { isDemoMode } from "@/lib/demo";
 import { useProjectStatus } from "@/state/queries/useProjectQueries";
+import { useCloudCrewSocket } from "@/state/websocket/useCloudCrewSocket";
 
 /** Map the last path segment to a page title. */
 function getPageTitle(pathname: string): string {
@@ -23,6 +24,9 @@ export function AppLayout() {
   const title = getPageTitle(pathname);
   const demo = isDemoMode(projectId);
   const { data: project } = useProjectStatus(projectId);
+
+  // Connect WebSocket for real-time events (no-op in demo mode — socketUrl is null when WS_URL is empty)
+  useCloudCrewSocket(demo ? undefined : projectId);
 
   return (
     <div className="flex h-screen overflow-hidden">

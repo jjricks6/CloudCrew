@@ -19,7 +19,7 @@ SRC_DIR = Path(__file__).parent.parent.parent / "src"
 # --- Import boundary rules ---
 # Format: {module: [list of modules it MUST NOT import from]}
 FORBIDDEN_IMPORTS: dict[str, list[str]] = {
-    "tools": ["agents", "phases"],
+    "tools": ["agents", "hooks", "phases"],
     "hooks": ["agents", "tools", "phases"],
     "state": ["agents", "tools", "hooks", "phases"],
     "templates": ["agents", "tools", "hooks", "state", "phases", "config"],

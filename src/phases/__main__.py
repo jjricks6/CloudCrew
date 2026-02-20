@@ -67,7 +67,7 @@ def get_swarm_factory(phase: str) -> Callable[..., Any]:
 
     module_path, func_name = factory_path.rsplit(":", 1)
     module = importlib.import_module(module_path)
-    return getattr(module, func_name)  # type: ignore[no-any-return]
+    return getattr(module, func_name)  # type: ignore[no-any-return]  # Dynamic import returns Any
 
 
 def _build_invocation_state(project_id: str, phase: str) -> dict[str, Any]:

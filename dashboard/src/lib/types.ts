@@ -48,11 +48,18 @@ export interface Fact {
   timestamp: string;
 }
 
+export interface Assumption {
+  description: string;
+  confidence: "HIGH" | "MEDIUM" | "LOW";
+  timestamp: string;
+}
+
 export interface Decision {
   description: string;
   rationale: string;
   made_by: string;
   timestamp: string;
+  adr_path: string;
 }
 
 export interface Blocker {
@@ -69,6 +76,7 @@ export interface ProjectStatus {
   phase_status: PhaseStatus;
   deliverables: Record<string, DeliverableItem[]>;
   facts: Fact[];
+  assumptions: Assumption[];
   decisions: Decision[];
   blockers: Blocker[];
   created_at: string;
@@ -225,6 +233,18 @@ export interface AgentActivity {
   phase: string;
   detail: string;
   timestamp: number;
+}
+
+// --- Swarm Timeline (for swarm visualization) ---
+
+export interface SwarmTimelineEvent {
+  id: string;
+  type: "agent_active" | "agent_idle" | "handoff";
+  agentName: string;
+  detail: string;
+  phase: string;
+  timestamp: number;
+  fromAgent?: string; // only for handoff events
 }
 
 // --- Connection Status ---

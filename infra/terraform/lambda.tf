@@ -154,6 +154,7 @@ resource "aws_lambda_function" "pm_chat" {
       TASK_LEDGER_TABLE      = aws_dynamodb_table.projects.name
       CONNECTIONS_TABLE      = aws_dynamodb_table.connections.name
       WEBSOCKET_API_ENDPOINT = "https://${aws_apigatewayv2_api.websocket.id}.execute-api.${var.aws_region}.amazonaws.com/${var.environment}"
+      ACTIVITY_TABLE         = aws_dynamodb_table.activity.name
     }
   }
 

@@ -8,7 +8,7 @@ import { KANBAN_COLUMNS, type BoardTask } from "@/lib/types";
 
 export function BoardPage() {
   const { projectId } = useParams<{ projectId: string }>();
-  const { data: tasks, isLoading } = useBoardTasks(projectId);
+  const { data: tasks, isLoading, isError, error } = useBoardTasks(projectId);
   const [selectedTask, setSelectedTask] = useState<BoardTask | null>(null);
 
   if (isLoading) {
@@ -20,6 +20,17 @@ export function BoardPage() {
             <Skeleton key={col} className="h-[400px] rounded-lg" />
           ))}
         </div>
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="space-y-6">
+        <h2 className="text-2xl font-bold">Task Board</h2>
+        <p className="text-sm text-destructive">
+          Failed to load tasks: {error instanceof Error ? error.message : "Unknown error"}
+        </p>
       </div>
     );
   }
