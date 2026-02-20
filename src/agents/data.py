@@ -10,6 +10,7 @@ Model: Sonnet — data modeling and query generation are pattern-following tasks
 from strands import Agent
 
 from src.agents.base import SONNET
+from src.tools.activity_tools import report_activity
 from src.tools.board_tools import add_task_comment, create_board_task, update_board_task
 from src.tools.git_tools import git_list, git_read, git_write_data, git_write_data_batch
 from src.tools.ledger_tools import read_task_ledger
@@ -88,7 +89,13 @@ If work is partially complete from a prior run:
 - Do NOT overwrite schemas or migrations that already contain correct definitions
 - Continue from where the prior work left off — create only missing data artifacts
 - Verify existing schemas match the current architecture design
-- Focus on completing the remaining data components\
+- Focus on completing the remaining data components
+
+## Activity Reporting
+Use report_activity to keep the customer dashboard updated with what you're working on. \
+Call it when you start a significant task or shift focus. Keep messages concise — one sentence. \
+Examples: report_activity(agent_name="data", detail="Designing DynamoDB access patterns for user data") \
+or report_activity(agent_name="data", detail="Optimizing query patterns for analytics pipeline")\
 """
 
 
@@ -111,5 +118,6 @@ def create_data_agent() -> Agent:
             create_board_task,
             update_board_task,
             add_task_comment,
+            report_activity,
         ],
     )

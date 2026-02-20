@@ -10,6 +10,7 @@ Model: Sonnet — test planning and coverage analysis are pattern-following task
 from strands import Agent
 
 from src.agents.base import SONNET
+from src.tools.activity_tools import report_activity
 from src.tools.board_tools import add_task_comment, create_board_task, update_board_task
 from src.tools.git_tools import git_list, git_read, git_write_tests, git_write_tests_batch
 from src.tools.ledger_tools import read_task_ledger
@@ -96,7 +97,13 @@ If work is partially complete from a prior run:
 - Do NOT overwrite test files that already contain correct tests
 - Continue from where the prior work left off — write only missing tests
 - Run through existing tests to verify they are still valid
-- Focus on completing the remaining test coverage gaps\
+- Focus on completing the remaining test coverage gaps
+
+## Activity Reporting
+Use report_activity to keep the customer dashboard updated with what you're working on. \
+Call it when you start a significant task or shift focus. Keep messages concise — one sentence. \
+Examples: report_activity(agent_name="qa", detail="Reviewing test coverage for authentication module") \
+or report_activity(agent_name="qa", detail="Writing integration tests for API endpoints")\
 """
 
 
@@ -119,5 +126,6 @@ def create_qa_agent() -> Agent:
             create_board_task,
             update_board_task,
             add_task_comment,
+            report_activity,
         ],
     )

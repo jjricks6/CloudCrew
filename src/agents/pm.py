@@ -7,6 +7,7 @@ the team. This is the only agent that writes to the task ledger.
 from strands import Agent
 
 from src.agents.base import OPUS
+from src.tools.activity_tools import report_activity
 from src.tools.board_tools import add_task_comment, create_board_task, update_board_task
 from src.tools.git_tools import git_list, git_read, git_write_project_plan
 from src.tools.ledger_tools import read_task_ledger, update_task_ledger
@@ -92,7 +93,13 @@ If work is partially complete from a prior run:
 - Do NOT duplicate existing entries in the task ledger
 - Do NOT rewrite files that already contain correct content
 - Continue from where the prior work left off
-- Focus on completing the remaining deliverables\
+- Focus on completing the remaining deliverables
+
+## Activity Reporting
+Use report_activity to keep the customer dashboard updated with what you're working on. \
+Call it when you start a significant task or shift focus. Keep messages concise — one sentence. \
+Examples: report_activity(agent_name="pm", detail="Parsing SOW to identify workstreams") \
+or report_activity(agent_name="pm", detail="Validating architecture deliverables against acceptance criteria")\
 """
 
 
@@ -116,5 +123,6 @@ def create_pm_agent() -> Agent:
             create_board_task,
             update_board_task,
             add_task_comment,
+            report_activity,
         ],
     )

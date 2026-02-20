@@ -225,6 +225,7 @@ class TestInvocationState:
             "session_id",
             "task_ledger_table",
             "board_tasks_table",
+            "activity_table",
             "git_repo_url",
             "knowledge_base_id",
             "patterns_bucket",

@@ -10,6 +10,7 @@ Model: Opus — security analysis requires deep reasoning about subtle risks.
 from strands import Agent
 
 from src.agents.base import OPUS
+from src.tools.activity_tools import report_activity
 from src.tools.board_tools import add_task_comment, create_board_task, update_board_task
 from src.tools.git_tools import git_list, git_read, git_write_security
 from src.tools.ledger_tools import read_task_ledger
@@ -110,7 +111,13 @@ If work is partially complete from a prior run:
 - Do NOT duplicate security review reports that already exist
 - If a prior review exists, read it and verify its findings are still valid
 - Continue from where the prior work left off
-- Focus on completing any remaining review steps or re-scanning fixed code\
+- Focus on completing any remaining review steps or re-scanning fixed code
+
+## Activity Reporting
+Use report_activity to keep the customer dashboard updated with what you're working on. \
+Call it when you start a significant task or shift focus. Keep messages concise — one sentence. \
+Examples: report_activity(agent_name="security", detail="Reviewing network ACL and IAM policies") \
+or report_activity(agent_name="security", detail="Auditing DynamoDB encryption and backup policies")\
 """
 
 
@@ -134,5 +141,6 @@ def create_security_agent() -> Agent:
             create_board_task,
             update_board_task,
             add_task_comment,
+            report_activity,
         ],
     )

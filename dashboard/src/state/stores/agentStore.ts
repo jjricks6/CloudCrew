@@ -5,24 +5,73 @@
  */
 
 import { create } from "zustand";
-import type { AgentActivity, WebSocketEvent, WsStatus } from "@/lib/types";
+import type {
+  AgentActivity,
+  SwarmTimelineEvent,
+  WebSocketEvent,
+  WsStatus,
+} from "@/lib/types";
 import { queryClient } from "@/state/queryClient";
 import { useChatStore } from "./chatStore";
+
+interface ActiveHandoff {
+  from: string;
+  to: string;
+  id: string;
+}
+
+interface PendingInterrupt {
+  interrupt_id: string;
+  question: string;
+  phase: string;
+  timestamp: number;
+}
 
 interface AgentState {
   agents: AgentActivity[];
   wsStatus: WsStatus;
-  lastEvent: WebSocketEvent | null;
+  swarmEvents: SwarmTimelineEvent[];
+  activeHandoff: ActiveHandoff | null;
+  pendingInterrupt: PendingInterrupt | null;
 
   setWsStatus: (status: WsStatus) => void;
   addEvent: (event: WebSocketEvent) => void;
+  clearHandoff: (id: string) => void;
+  dismissInterrupt: () => void;
   reset: () => void;
 }
 
-export const useAgentStore = create<AgentState>((set) => ({
+function makeTimelineEvent(
+  type: SwarmTimelineEvent["type"],
+  agentName: string,
+  detail: string,
+  phase: string,
+  fromAgent?: string,
+): SwarmTimelineEvent {
+  return {
+    id: crypto.randomUUID(),
+    type,
+    agentName,
+    detail,
+    phase,
+    timestamp: Date.now(),
+    fromAgent,
+  };
+}
+
+function appendEvent(
+  events: SwarmTimelineEvent[],
+  event: SwarmTimelineEvent,
+): SwarmTimelineEvent[] {
+  return [event, ...events].slice(0, 50);
+}
+
+export const useAgentStore = create<AgentState>((set, get) => ({
   agents: [],
   wsStatus: "disconnected",
-  lastEvent: null,
+  swarmEvents: [],
+  activeHandoff: null,
+  pendingInterrupt: null,
 
   setWsStatus: (status) => set({ wsStatus: status }),
 
@@ -31,12 +80,19 @@ export const useAgentStore = create<AgentState>((set) => ({
       const now = Date.now();
 
       if (event.event === "agent_active") {
+        const timelineEvent = makeTimelineEvent(
+          "agent_active",
+          event.agent_name,
+          event.detail,
+          event.phase,
+        );
+
         const existing = state.agents.find(
           (a) => a.agent_name === event.agent_name,
         );
         if (existing) {
           return {
-            lastEvent: event,
+            swarmEvents: appendEvent(state.swarmEvents, timelineEvent),
             agents: state.agents.map((a) =>
               a.agent_name === event.agent_name
                 ? {
@@ -50,7 +106,7 @@ export const useAgentStore = create<AgentState>((set) => ({
           };
         }
         return {
-          lastEvent: event,
+          swarmEvents: appendEvent(state.swarmEvents, timelineEvent),
           agents: [
             ...state.agents,
             {
@@ -65,8 +121,14 @@ export const useAgentStore = create<AgentState>((set) => ({
       }
 
       if (event.event === "agent_idle") {
+        const timelineEvent = makeTimelineEvent(
+          "agent_idle",
+          event.agent_name,
+          event.detail,
+          event.phase,
+        );
         return {
-          lastEvent: event,
+          swarmEvents: appendEvent(state.swarmEvents, timelineEvent),
           agents: state.agents.map((a) =>
             a.agent_name === event.agent_name
               ? {
@@ -80,10 +142,37 @@ export const useAgentStore = create<AgentState>((set) => ({
         };
       }
 
+      if (event.event === "handoff") {
+        // Parse "Handoff from {src} to {dest}"
+        const match = event.detail.match(/Handoff from (.+) to (.+)/);
+        const fromAgent = match?.[1] ?? "unknown";
+
+        const timelineEvent = makeTimelineEvent(
+          "handoff",
+          event.agent_name,
+          event.detail,
+          event.phase,
+          fromAgent,
+        );
+
+        const handoffId = timelineEvent.id;
+
+        // Auto-clear handoff after 2 seconds
+        setTimeout(() => {
+          get().clearHandoff(handoffId);
+        }, 2000);
+
+        // Don't update agent statuses here — the subsequent agent_active
+        // and agent_idle events handle that with proper timing so the
+        // source stays active (with its bubble) while the arc animates.
+        return {
+          activeHandoff: { from: fromAgent, to: event.agent_name, id: handoffId },
+          swarmEvents: appendEvent(state.swarmEvents, timelineEvent),
+        };
+      }
+
       // Chat events → dispatch to chatStore
       if (event.event === "chat_message") {
-        // Customer messages are added optimistically by ChatPage on send,
-        // so only add PM messages arriving via WebSocket to avoid duplicates.
         if (event.role === "pm") {
           useChatStore.getState().addMessage({
             message_id: event.message_id,
@@ -92,28 +181,28 @@ export const useAgentStore = create<AgentState>((set) => ({
             timestamp: new Date().toISOString(),
           });
         }
-        return { lastEvent: event };
+        return {};
       }
 
       if (event.event === "chat_thinking") {
         useChatStore.getState().setThinking(true);
-        return { lastEvent: event };
+        return {};
       }
 
       if (event.event === "chat_chunk") {
         useChatStore.getState().appendChunk(event.content);
-        return { lastEvent: event };
+        return {};
       }
 
       if (event.event === "chat_done") {
         useChatStore.getState().finalizeStream(event.message_id);
-        return { lastEvent: event };
+        return {};
       }
 
       // Board task events → invalidate board-tasks query
       if (event.event === "task_created" || event.event === "task_updated") {
         void queryClient.invalidateQueries({ queryKey: ["board-tasks"] });
-        return { lastEvent: event };
+        return {};
       }
 
       // Phase events → invalidate project query
@@ -122,12 +211,38 @@ export const useAgentStore = create<AgentState>((set) => ({
         event.event === "awaiting_approval"
       ) {
         void queryClient.invalidateQueries({ queryKey: ["project"] });
-        return { lastEvent: event };
+        return {};
       }
 
-      // For other event types, just update lastEvent
-      return { lastEvent: event };
+      // Interrupt events → store for UI notification
+      if (event.event === "interrupt_raised") {
+        void queryClient.invalidateQueries({ queryKey: ["project"] });
+        return {
+          pendingInterrupt: {
+            interrupt_id: event.interrupt_id,
+            question: event.question,
+            phase: event.phase,
+            timestamp: now,
+          },
+        };
+      }
+
+      return {};
     }),
 
-  reset: () => set({ agents: [], wsStatus: "disconnected", lastEvent: null }),
+  clearHandoff: (id) =>
+    set((state) =>
+      state.activeHandoff?.id === id ? { activeHandoff: null } : {},
+    ),
+
+  dismissInterrupt: () => set({ pendingInterrupt: null }),
+
+  reset: () =>
+    set({
+      agents: [],
+      wsStatus: "disconnected",
+      swarmEvents: [],
+      activeHandoff: null,
+      pendingInterrupt: null,
+    }),
 }));

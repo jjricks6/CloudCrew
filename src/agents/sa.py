@@ -10,6 +10,7 @@ Model: Opus — architecture trade-off analysis requires deep reasoning.
 from strands import Agent
 
 from src.agents.base import OPUS
+from src.tools.activity_tools import report_activity
 from src.tools.adr_writer import write_adr
 from src.tools.board_tools import add_task_comment, create_board_task, update_board_task
 from src.tools.git_tools import git_list, git_read, git_write_architecture
@@ -86,7 +87,13 @@ If work is partially complete from a prior run:
 - Do NOT rewrite ADRs or architecture docs that already contain correct content
 - Do NOT duplicate deliverable entries in the task ledger
 - Continue from where the prior work left off — write only missing deliverables
-- Focus on completing the remaining ADRs or architecture documentation\
+- Focus on completing the remaining ADRs or architecture documentation
+
+## Activity Reporting
+Use report_activity to keep the customer dashboard updated with what you're working on. \
+Call it when you start a significant task or shift focus. Keep messages concise — one sentence. \
+Examples: report_activity(agent_name="sa", detail="Designing API Gateway integration patterns") \
+or report_activity(agent_name="sa", detail="Reviewing Infrastructure's VPC module for architecture alignment")\
 """
 
 
@@ -109,5 +116,6 @@ def create_sa_agent() -> Agent:
             create_board_task,
             update_board_task,
             add_task_comment,
+            report_activity,
         ],
     )

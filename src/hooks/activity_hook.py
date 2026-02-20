@@ -21,14 +21,23 @@ from strands.hooks.events import (
 from src.config import ACTIVITY_TABLE
 from src.state.activity import store_activity_event
 from src.state.broadcast import broadcast_to_project
+from src.state.models import AGENT_DISPLAY_NAMES
 
 logger = logging.getLogger(__name__)
 
 
-class ActivityHook(HookProvider):
-    """Hook that emits structured agent activity events for the dashboard.
+def _display_name(node_id: str) -> str:
+    """Translate a Strands node ID to a dashboard display name."""
+    return AGENT_DISPLAY_NAMES.get(node_id, node_id)
 
-    Tracks which agent is active, when handoffs occur, and node outcomes.
+
+class ActivityHook(HookProvider):
+    """Hook that emits handoff and agent_idle events for the dashboard.
+
+    Tracks which agent is active and detects handoffs between agents.
+    Does NOT emit agent_active events — those come from the report_activity
+    tool so agents can provide meaningful detail text.
+
     Events are stored in DynamoDB with 24h TTL and broadcast to connected
     WebSocket clients.
 
@@ -48,7 +57,7 @@ class ActivityHook(HookProvider):
         registry.add_callback(AfterNodeCallEvent, self._on_node_complete)
 
     def _on_node_start(self, event: BeforeNodeCallEvent) -> None:
-        """Emit agent_active event when a node begins execution."""
+        """Detect handoffs when execution transfers between agents."""
         if not ACTIVITY_TABLE:
             return
 
@@ -59,16 +68,11 @@ class ActivityHook(HookProvider):
         if previous_node and previous_node != node_id:
             self._emit(
                 event_type="handoff",
-                agent_name=node_id,
-                detail=f"Handoff from {previous_node} to {node_id}",
+                agent_name=_display_name(node_id),
+                detail=f"Handoff from {_display_name(previous_node)} to {_display_name(node_id)}",
             )
 
         self._last_active_node = node_id
-        self._emit(
-            event_type="agent_active",
-            agent_name=node_id,
-            detail=f"Agent {node_id} started working",
-        )
 
     def _on_node_complete(self, event: AfterNodeCallEvent) -> None:
         """Emit agent_idle event when a node finishes execution."""
@@ -76,18 +80,19 @@ class ActivityHook(HookProvider):
             return
 
         node_id = event.node_id
+        display = _display_name(node_id)
         swarm = event.source
         state = getattr(swarm, "state", None)
         results = getattr(state, "results", {}) if state else {}
         node_result = results.get(node_id)
 
-        detail = f"Agent {node_id} finished"
+        detail = f"{display} finished"
         if node_result is not None and isinstance(node_result.result, Exception):
-            detail = f"Agent {node_id} encountered an error: {node_result.result}"
+            detail = f"{display} encountered an error: {node_result.result}"
 
         self._emit(
             event_type="agent_idle",
-            agent_name=node_id,
+            agent_name=display,
             detail=detail,
         )
 

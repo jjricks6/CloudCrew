@@ -9,6 +9,7 @@ Model: Sonnet — code generation is its strength; deep reasoning not required.
 from strands import Agent
 
 from src.agents.base import SONNET
+from src.tools.activity_tools import report_activity
 from src.tools.board_tools import add_task_comment, create_board_task, update_board_task
 from src.tools.git_tools import git_list, git_read, git_write_infra, git_write_infra_batch
 from src.tools.ledger_tools import read_task_ledger
@@ -115,7 +116,13 @@ If work is partially complete from a prior run:
 - Do NOT overwrite Terraform modules that already contain correct code
 - Continue from where the prior work left off — create only missing modules
 - Re-run terraform_validate and checkov_scan on existing code to verify it
-- Focus on completing the remaining infrastructure components\
+- Focus on completing the remaining infrastructure components
+
+## Activity Reporting
+Use report_activity to keep the customer dashboard updated with what you're working on. \
+Call it when you start a significant task or shift focus. Keep messages concise — one sentence. \
+Examples: report_activity(agent_name="infra", detail="Provisioning VPC subnets and security groups") \
+or report_activity(agent_name="infra", detail="Applying security-recommended NACL rules")\
 """
 
 
@@ -140,5 +147,6 @@ def create_infra_agent() -> Agent:
             create_board_task,
             update_board_task,
             add_task_comment,
+            report_activity,
         ],
     )

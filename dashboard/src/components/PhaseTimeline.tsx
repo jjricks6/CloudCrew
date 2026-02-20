@@ -8,15 +8,7 @@
  */
 
 import { PHASE_ORDER, type Phase, type PhaseStatus } from "@/lib/types";
-
-const PHASE_LABELS: Record<Phase, string> = {
-  DISCOVERY: "Discovery",
-  ARCHITECTURE: "Architecture",
-  POC: "PoC",
-  PRODUCTION: "Production",
-  HANDOFF: "Handoff",
-  RETROSPECTIVE: "Retro",
-};
+import { PHASE_LABELS } from "@/components/swarm/swarm-constants";
 
 interface PhaseTimelineProps {
   currentPhase?: Phase;
