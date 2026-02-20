@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, type KeyboardEvent } from "react";
+import { useState, useRef, useCallback, useEffect, type KeyboardEvent } from "react";
 import { useDropzone } from "react-dropzone";
 
 const ACCEPTED_TYPES: Record<string, string[]> = {
@@ -11,11 +11,17 @@ const ACCEPTED_TYPES: Record<string, string[]> = {
   "image/*": [".png", ".jpg", ".jpeg", ".gif", ".webp"],
 };
 
+export interface ChatInputHandle {
+  focus: () => void;
+}
+
 interface ChatInputProps {
   onSend: (message: string) => void;
   onUpload?: (file: File) => void;
   disabled?: boolean;
   isUploading?: boolean;
+  /** Mutable ref that parent can use to focus the textarea */
+  handleRef?: React.MutableRefObject<ChatInputHandle | null>;
 }
 
 export function ChatInput({
@@ -23,9 +29,20 @@ export function ChatInput({
   onUpload,
   disabled,
   isUploading,
+  handleRef,
 }: ChatInputProps) {
   const [value, setValue] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Expose focus method to parent
+  useEffect(() => {
+    if (handleRef) {
+      handleRef.current = { focus: () => textareaRef.current?.focus() };
+    }
+    return () => {
+      if (handleRef) handleRef.current = null;
+    };
+  }, [handleRef]);
 
   const handleSend = () => {
     const trimmed = value.trim();

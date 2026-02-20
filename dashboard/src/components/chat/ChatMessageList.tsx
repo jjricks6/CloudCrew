@@ -1,12 +1,33 @@
 import { useEffect, useRef } from "react";
 import { useChatStore } from "@/state/stores/chatStore";
+import { useAgentStore } from "@/state/stores/agentStore";
 import { ChatBubble } from "./ChatBubble";
+import { InterruptQuestionCard } from "./InterruptQuestionCard";
+import { ApprovalQuestionCard } from "./ApprovalQuestionCard";
 import { ThinkingIndicator } from "./ThinkingIndicator";
 
-export function ChatMessageList() {
+interface ChatMessageListProps {
+  quickReplies?: readonly string[] | null;
+  onReply?: (message: string) => void;
+  onApprove?: () => void;
+  onRevise?: (feedback: string) => void;
+  onTypeOwn?: () => void;
+  replyDisabled?: boolean;
+}
+
+export function ChatMessageList({
+  quickReplies,
+  onReply,
+  onApprove,
+  onRevise,
+  onTypeOwn,
+  replyDisabled,
+}: ChatMessageListProps) {
   const messages = useChatStore((s) => s.messages);
   const isThinking = useChatStore((s) => s.isThinking);
   const streamingContent = useChatStore((s) => s.streamingContent);
+  const interrupt = useAgentStore((s) => s.pendingInterrupt);
+  const approval = useAgentStore((s) => s.pendingApproval);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll to bottom when messages change
@@ -25,14 +46,55 @@ export function ChatMessageList() {
           </div>
         )}
 
-        {messages.map((msg) => (
-          <ChatBubble
-            key={msg.message_id}
-            role={msg.role}
-            content={msg.content}
-            timestamp={msg.timestamp}
-          />
-        ))}
+        {messages.map((msg) => {
+          // Interrupt messages get the special yellow card treatment
+          if (
+            msg.message_id.startsWith("interrupt-") &&
+            interrupt &&
+            onReply &&
+            onTypeOwn
+          ) {
+            return (
+              <InterruptQuestionCard
+                key={msg.message_id}
+                phase={interrupt.phase}
+                question={interrupt.question}
+                quickReplies={quickReplies ?? null}
+                onReply={onReply}
+                onTypeOwn={onTypeOwn}
+                disabled={replyDisabled}
+              />
+            );
+          }
+
+          // Approval messages get the approval card with approve/revise controls
+          if (
+            msg.message_id.startsWith("approval-") &&
+            approval &&
+            onApprove &&
+            onRevise
+          ) {
+            return (
+              <ApprovalQuestionCard
+                key={msg.message_id}
+                phase={approval.phase}
+                question={msg.content}
+                onApprove={onApprove}
+                onRevise={onRevise}
+                disabled={replyDisabled}
+              />
+            );
+          }
+
+          return (
+            <ChatBubble
+              key={msg.message_id}
+              role={msg.role}
+              content={msg.content}
+              timestamp={msg.timestamp}
+            />
+          );
+        })}
 
         {/* Streaming PM response (token-by-token) */}
         {streamingContent && (

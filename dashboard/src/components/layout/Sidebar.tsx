@@ -1,6 +1,7 @@
 import { NavLink } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { useAgentStore } from "@/state/stores/agentStore";
 import { PHASE_ORDER, type Phase, type PhaseStatus } from "@/lib/types";
 
 const NAV_ITEMS = [
@@ -35,7 +36,8 @@ function getDotColor(
 ): string {
   if (dotIndex < currentIndex) return "bg-green-500";
   if (dotIndex === currentIndex) {
-    if (phaseStatus === "AWAITING_APPROVAL") return "bg-yellow-500";
+    if (phaseStatus === "AWAITING_APPROVAL" || phaseStatus === "AWAITING_INPUT")
+      return "bg-yellow-500";
     if (phaseStatus === "APPROVED") return "bg-green-500";
     return "bg-blue-500";
   }
@@ -86,6 +88,10 @@ export function Sidebar({
   currentPhase,
   phaseStatus,
 }: SidebarProps) {
+  const hasNotification = useAgentStore(
+    (s) => s.pendingInterrupt !== null || s.pendingApproval !== null,
+  );
+
   return (
     <aside className="flex h-screen w-64 flex-col border-r bg-sidebar text-sidebar-foreground">
       {/* Project header */}
@@ -95,6 +101,7 @@ export function Sidebar({
           <Badge variant="secondary" className="mt-1 text-xs">
             {currentPhase}
             {phaseStatus === "AWAITING_APPROVAL" && " — Review"}
+            {phaseStatus === "AWAITING_INPUT" && " — Input Needed"}
           </Badge>
         )}
       </div>
@@ -126,7 +133,12 @@ export function Sidebar({
             >
               <path d={ICON_MAP[icon]} />
             </svg>
-            {label}
+            <span className="relative">
+              {label}
+              {label === "Chat" && hasNotification && (
+                <span className="absolute -top-1 -right-2.5 h-2 w-2 rounded-full bg-red-500" />
+              )}
+            </span>
           </NavLink>
         ))}
       </nav>

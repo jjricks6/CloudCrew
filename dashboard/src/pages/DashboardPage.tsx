@@ -2,8 +2,10 @@ import { useEffect, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PhaseTimeline } from "@/components/PhaseTimeline";
+import { ApprovalBanner } from "@/components/approval/ApprovalBanner";
 import { useAgentStore } from "@/state/stores/agentStore";
 import { useProjectStatus } from "@/state/queries/useProjectQueries";
 import { useBoardTasks } from "@/state/queries/useBoardQueries";
@@ -43,6 +45,7 @@ export function DashboardPage() {
   const navigate = useNavigate();
   const wsStatus = useAgentStore((s) => s.wsStatus);
   const agents = useAgentStore((s) => s.agents);
+  const interrupt = useAgentStore((s) => s.pendingInterrupt);
 
   const { data: project, isLoading: projectLoading } =
     useProjectStatus(projectId);
@@ -87,6 +90,29 @@ export function DashboardPage() {
           {wsStatus === "connected" ? "Live" : "Offline"}
         </Badge>
       </div>
+
+      {/* Agent Question */}
+      {interrupt && (
+        <div className="flex items-center justify-between rounded-lg border border-yellow-500/30 bg-yellow-50 px-4 py-3 dark:bg-yellow-950/20">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium text-yellow-800 dark:text-yellow-300">
+              The agent has a question about the {interrupt.phase} phase.
+            </span>
+            <Badge variant="secondary" className="text-xs">
+              Input Needed
+            </Badge>
+          </div>
+          <Button size="sm" onClick={() => navigate("chat")}>
+            Respond in Chat
+          </Button>
+        </div>
+      )}
+
+      {/* Approval Gate */}
+      <ApprovalBanner
+        currentPhase={project?.current_phase}
+        phaseStatus={project?.phase_status}
+      />
 
       {/* Phase Timeline */}
       <Card>

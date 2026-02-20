@@ -14,7 +14,7 @@ export function useProjectStatus(projectId: string | undefined) {
   return useQuery<ProjectStatusSummary>({
     queryKey: ["project", projectId],
     queryFn: () => {
-      if (isDemoMode(projectId)) return DEMO_PROJECT_STATUS;
+      if (isDemoMode(projectId)) return { ...DEMO_PROJECT_STATUS };
       return get<ProjectStatusSummary>(`/projects/${projectId}/status`);
     },
     enabled: !!projectId,
@@ -26,7 +26,7 @@ export function useProjectDeliverables(projectId: string | undefined) {
   return useQuery<ProjectStatus["deliverables"]>({
     queryKey: ["deliverables", projectId],
     queryFn: () => {
-      if (isDemoMode(projectId)) return DEMO_PROJECT_STATUS.deliverables;
+      if (isDemoMode(projectId)) return { ...DEMO_PROJECT_STATUS.deliverables };
       return get<ProjectStatus["deliverables"]>(
         `/projects/${projectId}/deliverables`,
       );

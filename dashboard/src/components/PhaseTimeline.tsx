@@ -3,7 +3,7 @@
  *
  * - Completed phases: green check
  * - Active phase: blue pulse
- * - Awaiting approval: yellow pause
+ * - Awaiting approval/input: yellow circle
  * - Future phases: gray circle
  */
 
@@ -45,14 +45,8 @@ function PhaseIcon({
 
   if (state === "awaiting") {
     return (
-      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-yellow-500 text-white">
-        <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-          <path
-            fillRule="evenodd"
-            d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z"
-            clipRule="evenodd"
-          />
-        </svg>
+      <div className="flex h-8 w-8 items-center justify-center">
+        <div className="h-4 w-4 rounded-full bg-yellow-500" />
       </div>
     );
   }
@@ -68,7 +62,8 @@ function getPhaseState(
 ): "completed" | "active" | "awaiting" | "future" {
   if (phaseIndex < currentIndex) return "completed";
   if (phaseIndex === currentIndex) {
-    if (phaseStatus === "AWAITING_APPROVAL") return "awaiting";
+    if (phaseStatus === "AWAITING_APPROVAL" || phaseStatus === "AWAITING_INPUT")
+      return "awaiting";
     if (phaseStatus === "APPROVED") return "completed";
     return "active";
   }

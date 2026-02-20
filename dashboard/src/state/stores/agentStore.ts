@@ -27,17 +27,24 @@ interface PendingInterrupt {
   timestamp: number;
 }
 
+interface PendingApproval {
+  phase: string;
+  timestamp: number;
+}
+
 interface AgentState {
   agents: AgentActivity[];
   wsStatus: WsStatus;
   swarmEvents: SwarmTimelineEvent[];
   activeHandoff: ActiveHandoff | null;
   pendingInterrupt: PendingInterrupt | null;
+  pendingApproval: PendingApproval | null;
 
   setWsStatus: (status: WsStatus) => void;
   addEvent: (event: WebSocketEvent) => void;
   clearHandoff: (id: string) => void;
   dismissInterrupt: () => void;
+  dismissApproval: () => void;
   reset: () => void;
 }
 
@@ -72,6 +79,7 @@ export const useAgentStore = create<AgentState>((set, get) => ({
   swarmEvents: [],
   activeHandoff: null,
   pendingInterrupt: null,
+  pendingApproval: null,
 
   setWsStatus: (status) => set({ wsStatus: status }),
 
@@ -206,12 +214,20 @@ export const useAgentStore = create<AgentState>((set, get) => ({
       }
 
       // Phase events → invalidate project query
-      if (
-        event.event === "phase_started" ||
-        event.event === "awaiting_approval"
-      ) {
+      if (event.event === "phase_started") {
         void queryClient.invalidateQueries({ queryKey: ["project"] });
         return {};
+      }
+
+      // Approval events → store for UI notification + invalidate project query
+      if (event.event === "awaiting_approval") {
+        void queryClient.invalidateQueries({ queryKey: ["project"] });
+        return {
+          pendingApproval: {
+            phase: event.phase,
+            timestamp: now,
+          },
+        };
       }
 
       // Interrupt events → store for UI notification
@@ -237,6 +253,8 @@ export const useAgentStore = create<AgentState>((set, get) => ({
 
   dismissInterrupt: () => set({ pendingInterrupt: null }),
 
+  dismissApproval: () => set({ pendingApproval: null }),
+
   reset: () =>
     set({
       agents: [],
@@ -244,5 +262,6 @@ export const useAgentStore = create<AgentState>((set, get) => ({
       swarmEvents: [],
       activeHandoff: null,
       pendingInterrupt: null,
+      pendingApproval: null,
     }),
 }));

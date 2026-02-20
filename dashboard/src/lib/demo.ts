@@ -4,6 +4,7 @@
  */
 
 import type { AgentActivity, BoardTask, ChatMessage, Phase, ProjectStatus } from "./types";
+import { PHASE_ORDER } from "./types";
 
 // ---------------------------------------------------------------------------
 // Detection
@@ -355,6 +356,170 @@ export function getDemoRecentActivity(): DemoActivityItem[] {
     .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
     .slice(0, 8);
 }
+
+// ---------------------------------------------------------------------------
+// M5f: Mock artifact content (markdown previews)
+// ---------------------------------------------------------------------------
+
+export const DEMO_ARTIFACT_CONTENT: Record<string, string> = {
+  "docs/requirements.md": `# Requirements Document
+
+## Functional Requirements
+
+1. **Multi-tenant SaaS platform** supporting 50+ concurrent tenants
+2. **User authentication** via Cognito with role-based access control
+3. **REST API** for all CRUD operations with OpenAPI spec
+4. **Real-time notifications** via WebSocket for status updates
+5. **Document storage** in S3 with tenant isolation
+
+## Non-Functional Requirements
+
+- **Availability**: 99.9% uptime SLA
+- **Latency**: API responses < 200ms p95
+- **Security**: SOC 2 Type II compliance
+- **Scalability**: Auto-scale to 10k requests/minute
+
+## Acceptance Criteria
+
+- All API endpoints documented and tested
+- Load test passes at 2x expected traffic
+- Security scan shows zero critical/high findings
+`,
+  "docs/interviews.md": `# Stakeholder Interviews
+
+## Interview 1: VP of Engineering
+- Primary concern: **operational overhead** — wants serverless where possible
+- Must integrate with existing CI/CD pipeline (GitHub Actions)
+- Budget: $5k/month for infrastructure in first year
+
+## Interview 2: Product Manager
+- Priority: fast iteration on features
+- Needs real-time dashboard for monitoring engagement progress
+- Wants approval gates before each phase transition
+
+## Interview 3: Security Lead
+- Requires tenant data isolation at all layers
+- Encryption at rest and in transit mandatory
+- Audit logging for all data access
+`,
+  "docs/architecture.md": `# System Architecture
+
+## Overview
+
+Serverless-first architecture using AWS managed services to minimize operational overhead.
+
+## Components
+
+### API Layer
+- **API Gateway** (REST) with Lambda integrations
+- Request validation and rate limiting at gateway level
+- Cognito authorizer for JWT-based authentication
+
+### Compute
+- **Lambda** for synchronous API handlers (< 30s)
+- **ECS Fargate** for long-running agent swarms (up to 1 hour)
+- **Step Functions** for phase orchestration with approval gates
+
+### Data
+- **DynamoDB** single-table design for operational data
+- **S3** for document storage and artifact persistence
+- **Bedrock Knowledge Base** for semantic search across project artifacts
+
+### Real-Time
+- **API Gateway WebSocket** for live dashboard updates
+- Connection management via DynamoDB with TTL cleanup
+
+## Architecture Decision Records
+- ADR-001: Serverless over containers for API layer
+- ADR-002: Cognito for authentication (vs custom auth)
+`,
+  "docs/data-model.md": `# Data Model
+
+## DynamoDB Single-Table Design
+
+### Access Patterns
+
+| Pattern | PK | SK |
+|---------|----|----|
+| Get project | PROJECT#{id} | METADATA |
+| List tasks | PROJECT#{id} | TASK#{phase}#{id} |
+| Get activity | PROJECT#{id} | EVENT#{timestamp} |
+
+### Global Secondary Indexes
+
+1. **GSI1**: Phase lookup — PK: PHASE#{name}, SK: PROJECT#{id}
+2. **GSI2**: Agent lookup — PK: AGENT#{name}, SK: TASK#{id}
+3. **GSI3**: Status lookup — PK: STATUS#{status}, SK: timestamp
+`,
+};
+
+/** Get mock markdown content for an artifact, or a placeholder for unknown paths. */
+export function getArtifactContent(gitPath: string): string {
+  return (
+    DEMO_ARTIFACT_CONTENT[gitPath] ??
+    `# ${gitPath.split("/").pop()}\n\n*Content preview available in live mode.*`
+  );
+}
+
+// ---------------------------------------------------------------------------
+// M5f: Approval helpers (mutate demo state locally)
+// ---------------------------------------------------------------------------
+
+/** Advance the demo project to the next phase. Returns the new phase. */
+export function advanceDemoPhase(): Phase {
+  const current = DEMO_PROJECT_STATUS.current_phase;
+  const idx = PHASE_ORDER.indexOf(current);
+  const next = idx < PHASE_ORDER.length - 1 ? PHASE_ORDER[idx + 1] : current;
+  DEMO_PROJECT_STATUS.current_phase = next;
+  DEMO_PROJECT_STATUS.phase_status = "IN_PROGRESS";
+  DEMO_PROJECT_STATUS.updated_at = new Date().toISOString();
+  return next;
+}
+
+/** Set the demo project to AWAITING_APPROVAL status. */
+export function setDemoAwaitingApproval(): void {
+  DEMO_PROJECT_STATUS.phase_status = "AWAITING_APPROVAL";
+  DEMO_PROJECT_STATUS.updated_at = new Date().toISOString();
+}
+
+/** Set the demo project to AWAITING_INPUT (interrupt pending). */
+export function setDemoAwaitingInput(): void {
+  DEMO_PROJECT_STATUS.phase_status = "AWAITING_INPUT";
+  DEMO_PROJECT_STATUS.updated_at = new Date().toISOString();
+}
+
+/** Clear AWAITING_INPUT back to IN_PROGRESS (interrupt answered). */
+export function clearDemoAwaitingInput(): void {
+  if (DEMO_PROJECT_STATUS.phase_status === "AWAITING_INPUT") {
+    DEMO_PROJECT_STATUS.phase_status = "IN_PROGRESS";
+    DEMO_PROJECT_STATUS.updated_at = new Date().toISOString();
+  }
+}
+
+// ---------------------------------------------------------------------------
+// M5f: Mock interrupt
+// ---------------------------------------------------------------------------
+
+export const DEMO_APPROVAL = {
+  question:
+    "The **Architecture** phase is complete. All deliverables have been drafted and reviewed by the team. Please review the artifacts and let us know if you'd like to approve and move to the next phase, or if you have feedback.",
+  quickReplies: [
+    "Approve — looks good, continue to the next phase.",
+    "I have some feedback before we proceed.",
+  ],
+} as const;
+
+export const DEMO_INTERRUPT = {
+  interrupt_id: "demo-int-1",
+  question:
+    "The architecture uses a single DynamoDB table. Should we add a dedicated search index (OpenSearch) for full-text search, or is DynamoDB + GSIs sufficient for the MVP?",
+  phase: "ARCHITECTURE",
+  quickReplies: [
+    "DynamoDB + GSIs is sufficient for the MVP. We can add OpenSearch later if search requirements grow.",
+    "Add OpenSearch now. Full-text search is a core requirement and retrofitting will be harder later.",
+    "Let's start with DynamoDB GSIs but design the data layer so OpenSearch can be added without major refactoring.",
+  ],
+} as const;
 
 // ---------------------------------------------------------------------------
 // Mock chat history (shown on first load)
