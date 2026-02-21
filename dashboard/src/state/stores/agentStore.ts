@@ -13,6 +13,14 @@ import type {
 } from "@/lib/types";
 import { queryClient } from "@/state/queryClient";
 import { useChatStore } from "./chatStore";
+import {
+  isDemoMode,
+  setDemoAwaitingApproval,
+  setDemoAwaitingInput,
+  clearDemoAwaitingInput,
+  clearDemoAwaitingApproval,
+  updateDemoBoardTask,
+} from "@/lib/demo";
 
 interface ActiveHandoff {
   from: string;
@@ -207,8 +215,15 @@ export const useAgentStore = create<AgentState>((set, get) => ({
         return {};
       }
 
-      // Board task events → invalidate board-tasks query
-      if (event.event === "task_created" || event.event === "task_updated") {
+      // Board task events → mutate demo data + invalidate board-tasks query
+      if (event.event === "task_updated") {
+        if (isDemoMode(event.project_id)) {
+          updateDemoBoardTask(event.task_id, event.updates);
+        }
+        void queryClient.invalidateQueries({ queryKey: ["board-tasks"] });
+        return {};
+      }
+      if (event.event === "task_created") {
         void queryClient.invalidateQueries({ queryKey: ["board-tasks"] });
         return {};
       }
@@ -221,6 +236,9 @@ export const useAgentStore = create<AgentState>((set, get) => ({
 
       // Approval events → store for UI notification + invalidate project query
       if (event.event === "awaiting_approval") {
+        if (isDemoMode(event.project_id)) {
+          setDemoAwaitingApproval();
+        }
         void queryClient.invalidateQueries({ queryKey: ["project"] });
         return {
           pendingApproval: {
@@ -232,6 +250,9 @@ export const useAgentStore = create<AgentState>((set, get) => ({
 
       // Interrupt events → store for UI notification
       if (event.event === "interrupt_raised") {
+        if (isDemoMode(event.project_id)) {
+          setDemoAwaitingInput();
+        }
         void queryClient.invalidateQueries({ queryKey: ["project"] });
         return {
           pendingInterrupt: {
@@ -251,9 +272,17 @@ export const useAgentStore = create<AgentState>((set, get) => ({
       state.activeHandoff?.id === id ? { activeHandoff: null } : {},
     ),
 
-  dismissInterrupt: () => set({ pendingInterrupt: null }),
+  dismissInterrupt: () => {
+    clearDemoAwaitingInput();
+    void queryClient.invalidateQueries({ queryKey: ["project"] });
+    set({ pendingInterrupt: null });
+  },
 
-  dismissApproval: () => set({ pendingApproval: null }),
+  dismissApproval: () => {
+    clearDemoAwaitingApproval();
+    void queryClient.invalidateQueries({ queryKey: ["project"] });
+    set({ pendingApproval: null });
+  },
 
   reset: () =>
     set({

@@ -8,11 +8,9 @@ import { useMutation } from "@tanstack/react-query";
 import { post } from "@/lib/api";
 import { queryClient } from "@/state/queryClient";
 import { useAgentStore } from "@/state/stores/agentStore";
-import { useChatStore } from "@/state/stores/chatStore";
 import {
   isDemoMode,
   advanceDemoPhase,
-  clearDemoAwaitingInput,
   simulatePmResponse,
 } from "@/lib/demo";
 
@@ -71,12 +69,12 @@ export function useRespondToInterrupt(projectId: string | undefined) {
       response: string;
     }) => {
       if (isDemoMode(projectId)) {
+        // dismissInterrupt handles clearing demo state + invalidating queries
         useAgentStore.getState().dismissInterrupt();
-        clearDemoAwaitingInput();
-        // Simulate a PM acknowledgment in chat
+        // Simulate a PM acknowledgment in chat via events
         simulatePmResponse(
           `[Interrupt response]: ${response}`,
-          useChatStore.getState(),
+          useAgentStore.getState().addEvent,
         );
         return {
           project_id: "demo",

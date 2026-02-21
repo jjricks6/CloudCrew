@@ -5,7 +5,7 @@ import { useProjectId } from "@/lib/useProjectId";
 import { isDemoMode } from "@/lib/demo";
 import { useProjectStatus } from "@/state/queries/useProjectQueries";
 import { useCloudCrewSocket } from "@/state/websocket/useCloudCrewSocket";
-import { useDemoTimers } from "@/hooks/useDemoTimers";
+import { useDemoEngine } from "@/hooks/useDemoEngine";
 
 /** Map the last path segment to a page title. */
 function getPageTitle(pathname: string): string {
@@ -28,8 +28,8 @@ export function AppLayout() {
 
   // Connect WebSocket for real-time events (no-op in demo mode — socketUrl is null when WS_URL is empty)
   useCloudCrewSocket(demo ? undefined : projectId);
-  // Fire one-shot approval + interrupt events in demo mode
-  useDemoTimers(projectId);
+  // Run consolidated demo engine (seeds agents, drives swarm, fires interrupts/approvals)
+  useDemoEngine(projectId);
 
   return (
     <div className="flex h-screen overflow-hidden">

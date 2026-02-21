@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useRef } from "react";
 import { ChatMessageList } from "@/components/chat/ChatMessageList";
 import { ChatInput, type ChatInputHandle } from "@/components/chat/ChatInput";
 import { useChatStore } from "@/state/stores/chatStore";
@@ -11,20 +11,12 @@ import {
   useRespondToInterrupt,
 } from "@/state/queries/useApprovalQueries";
 import { useProjectId } from "@/lib/useProjectId";
-import { isDemoMode, DEMO_INTERRUPT, DEMO_APPROVAL } from "@/lib/demo";
-
-/** Check if a message with the given ID already exists in the chat store. */
-function hasMessage(messageId: string): boolean {
-  return useChatStore
-    .getState()
-    .messages.some((m) => m.message_id === messageId);
-}
+import { isDemoMode, DEMO_INTERRUPT } from "@/lib/demo";
 
 export function ChatPage() {
   const projectId = useProjectId();
   const isThinking = useChatStore((s) => s.isThinking);
   const interrupt = useAgentStore((s) => s.pendingInterrupt);
-  const approval = useAgentStore((s) => s.pendingApproval);
   const inputHandleRef = useRef<ChatInputHandle | null>(null);
 
   useChatHistory(projectId);
@@ -33,34 +25,6 @@ export function ChatPage() {
   const respondToInterrupt = useRespondToInterrupt(projectId);
   const approvePhase = useApprovePhase(projectId);
   const revisePhase = useRevisePhase(projectId);
-
-  // Inject the interrupt question as a PM message once
-  useEffect(() => {
-    if (!interrupt) return;
-    const key = `interrupt-${interrupt.interrupt_id}`;
-    if (hasMessage(key)) return;
-
-    useChatStore.getState().addMessage({
-      message_id: key,
-      role: "pm",
-      content: interrupt.question,
-      timestamp: new Date().toISOString(),
-    });
-  }, [interrupt]);
-
-  // Inject the approval request as a PM message once
-  useEffect(() => {
-    if (!approval) return;
-    const key = `approval-${approval.phase}`;
-    if (hasMessage(key)) return;
-
-    useChatStore.getState().addMessage({
-      message_id: key,
-      role: "pm",
-      content: DEMO_APPROVAL.question,
-      timestamp: new Date().toISOString(),
-    });
-  }, [approval]);
 
   const isBusy =
     isThinking ||

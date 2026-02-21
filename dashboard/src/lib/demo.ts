@@ -3,7 +3,7 @@
  * deployed infrastructure.  Activated when the projectId is "demo".
  */
 
-import type { AgentActivity, BoardTask, ChatMessage, Phase, ProjectStatus } from "./types";
+import type { BoardTask, ChatMessage, Phase, ProjectStatus, WebSocketEvent } from "./types";
 import { PHASE_ORDER } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -287,77 +287,6 @@ export const DEMO_BOARD_TASKS: BoardTask[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// Mock active agents (shown on dashboard in demo mode)
-// ---------------------------------------------------------------------------
-
-export const DEMO_AGENTS: AgentActivity[] = [
-  {
-    agent_name: "Solutions Architect",
-    status: "active",
-    phase: "ARCHITECTURE",
-    detail: "Designing system architecture with serverless-first approach",
-    timestamp: Date.now() - 30_000,
-  },
-  {
-    agent_name: "Data Engineer",
-    status: "active",
-    phase: "ARCHITECTURE",
-    detail: "Creating DynamoDB single-table design with 3 GSIs",
-    timestamp: Date.now() - 45_000,
-  },
-  {
-    agent_name: "Security Engineer",
-    status: "idle",
-    phase: "ARCHITECTURE",
-    detail: "Waiting for VPC design to begin security review",
-    timestamp: Date.now() - 120_000,
-  },
-  {
-    agent_name: "Project Manager",
-    status: "active",
-    phase: "ARCHITECTURE",
-    detail: "Coordinating architecture phase deliverables",
-    timestamp: Date.now() - 10_000,
-  },
-];
-
-// ---------------------------------------------------------------------------
-// Recent activity derived from task comments (shown on dashboard)
-// ---------------------------------------------------------------------------
-
-export interface DemoActivityItem {
-  agent: string;
-  action: string;
-  timestamp: string;
-}
-
-/** Build a recent-activity feed from the demo board task comments. */
-export function getDemoRecentActivity(): DemoActivityItem[] {
-  const items: DemoActivityItem[] = [];
-  for (const task of DEMO_BOARD_TASKS) {
-    for (const comment of task.comments) {
-      items.push({
-        agent: comment.author,
-        action: comment.content,
-        timestamp: comment.timestamp,
-      });
-    }
-    // Also show task status transitions for non-backlog tasks
-    if (task.status !== "backlog") {
-      items.push({
-        agent: task.assigned_to,
-        action: `Moved "${task.title}" to ${task.status}`,
-        timestamp: task.updated_at,
-      });
-    }
-  }
-  // Sort newest first, take top 8
-  return items
-    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-    .slice(0, 8);
-}
-
-// ---------------------------------------------------------------------------
 // M5f: Mock artifact content (markdown previews)
 // ---------------------------------------------------------------------------
 
@@ -496,6 +425,30 @@ export function clearDemoAwaitingInput(): void {
   }
 }
 
+/** Clear AWAITING_APPROVAL back to IN_PROGRESS (revision requested). */
+export function clearDemoAwaitingApproval(): void {
+  if (DEMO_PROJECT_STATUS.phase_status === "AWAITING_APPROVAL") {
+    DEMO_PROJECT_STATUS.phase_status = "IN_PROGRESS";
+    DEMO_PROJECT_STATUS.updated_at = new Date().toISOString();
+  }
+}
+
+/** Mutate a demo board task in place (for task_updated events). */
+export function updateDemoBoardTask(
+  taskId: string,
+  updates: Record<string, unknown>,
+): void {
+  const task = DEMO_BOARD_TASKS.find((t) => t.task_id === taskId);
+  if (!task) return;
+  if (typeof updates.status === "string") {
+    task.status = updates.status as BoardTask["status"];
+    task.updated_at = new Date().toISOString();
+  }
+  if (typeof updates.assigned_to === "string") {
+    task.assigned_to = updates.assigned_to;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // M5f: Mock interrupt
 // ---------------------------------------------------------------------------
@@ -569,35 +522,34 @@ function pickResponse(message: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// Streaming simulator — drives the chatStore exactly like WebSocket would
+// Streaming simulator — fires events through addEvent (same as WebSocket)
 // ---------------------------------------------------------------------------
 
 /**
- * Simulates token-by-token PM response streaming.
+ * Simulates token-by-token PM response streaming via events.
  *
- * 1. Sets isThinking = true (shows thinking indicator)
- * 2. After a delay, starts appending chunks to streamingContent
- * 3. When done, finalizes the stream into a complete message
- *
- * Uses the same chatStore methods that the real WebSocket handler calls.
+ * Fires chat_thinking → chat_chunk × N → chat_done events through the
+ * provided `addEvent` callback — the exact same path real WebSocket events
+ * take. This means swapping the demo for a real backend changes nothing.
  */
 export function simulatePmResponse(
   message: string,
-  chatStore: {
-    setThinking: (v: boolean) => void;
-    appendChunk: (content: string) => void;
-    finalizeStream: (messageId: string) => void;
-  },
+  addEvent: (event: WebSocketEvent) => void,
 ): void {
   const response = pickResponse(message);
   const messageId = `demo-${crypto.randomUUID()}`;
+  const phase = DEMO_PROJECT_STATUS.current_phase;
 
   // Chunk the response into small pieces for realistic streaming
   const chunks = chunkText(response);
   let chunkIndex = 0;
 
-  // Step 1: Show thinking indicator
-  chatStore.setThinking(true);
+  // Step 1: Fire thinking event
+  addEvent({
+    event: "chat_thinking",
+    project_id: "demo",
+    phase,
+  });
 
   // Step 2: After a "thinking" delay, start streaming chunks
   const thinkingDelay = 800 + Math.random() * 700; // 800-1500ms
@@ -605,12 +557,22 @@ export function simulatePmResponse(
   setTimeout(() => {
     const interval = setInterval(() => {
       if (chunkIndex < chunks.length) {
-        chatStore.appendChunk(chunks[chunkIndex]);
+        addEvent({
+          event: "chat_chunk",
+          project_id: "demo",
+          phase,
+          content: chunks[chunkIndex],
+        });
         chunkIndex++;
       } else {
         // Step 3: Done streaming — finalize
         clearInterval(interval);
-        chatStore.finalizeStream(messageId);
+        addEvent({
+          event: "chat_done",
+          project_id: "demo",
+          phase,
+          message_id: messageId,
+        });
       }
     }, 20 + Math.random() * 30); // 20-50ms per chunk (simulates token speed)
   }, thinkingDelay);

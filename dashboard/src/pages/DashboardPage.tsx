@@ -1,4 +1,3 @@
-import { useEffect, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -10,9 +9,8 @@ import { useAgentStore } from "@/state/stores/agentStore";
 import { useProjectStatus } from "@/state/queries/useProjectQueries";
 import { useBoardTasks } from "@/state/queries/useBoardQueries";
 import { KANBAN_COLUMNS } from "@/lib/types";
-import { isDemoMode, DEMO_AGENTS, getDemoRecentActivity } from "@/lib/demo";
 
-/** Short display name for agent roles. */
+/** Short display name for agent roles — handles both short IDs and full names. */
 const AGENT_SHORT: Record<string, string> = {
   pm: "PM",
   sa: "SA",
@@ -21,23 +19,28 @@ const AGENT_SHORT: Record<string, string> = {
   data: "Data",
   security: "Sec",
   qa: "QA",
+  "project manager": "PM",
+  "solutions architect": "SA",
+  developer: "Dev",
+  infrastructure: "Infra",
+  "data engineer": "Data",
+  "security engineer": "Sec",
+  "qa engineer": "QA",
 };
 
 function formatAgent(name: string): string {
   return AGENT_SHORT[name.toLowerCase()] ?? name;
 }
 
-/** Format an ISO timestamp into a short relative or absolute label. */
-function formatTime(iso: string): string {
-  const d = new Date(iso);
-  const now = Date.now();
-  const diffMs = now - d.getTime();
+/** Format an epoch timestamp into a short relative label. */
+function formatTime(epochMs: number): string {
+  const diffMs = Date.now() - epochMs;
   const diffMin = Math.floor(diffMs / 60_000);
   if (diffMin < 1) return "just now";
   if (diffMin < 60) return `${diffMin}m ago`;
   const diffHr = Math.floor(diffMin / 60);
   if (diffHr < 24) return `${diffHr}h ago`;
-  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  return new Date(epochMs).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
 export function DashboardPage() {
@@ -51,23 +54,6 @@ export function DashboardPage() {
     useProjectStatus(projectId);
   const { data: tasks } = useBoardTasks(projectId);
 
-  // Seed agent store with demo agents on mount (demo mode only)
-  useEffect(() => {
-    if (!isDemoMode(projectId)) return;
-    const store = useAgentStore.getState();
-    if (store.agents.length === 0) {
-      for (const agent of DEMO_AGENTS) {
-        store.addEvent({
-          event: agent.status === "active" ? "agent_active" : "agent_idle",
-          project_id: "demo",
-          phase: agent.phase,
-          agent_name: agent.agent_name,
-          detail: agent.detail,
-        });
-      }
-    }
-  }, [projectId]);
-
   const taskCounts = KANBAN_COLUMNS.reduce(
     (acc, col) => {
       acc[col] = tasks?.filter((t) => t.status === col).length ?? 0;
@@ -76,11 +62,7 @@ export function DashboardPage() {
     {} as Record<string, number>,
   );
 
-  const recentActivity = useMemo(() => {
-    if (isDemoMode(projectId)) return getDemoRecentActivity();
-    // In live mode, activity will come from WebSocket events (M5e).
-    return [];
-  }, [projectId]);
+  const swarmEvents = useAgentStore((s) => s.swarmEvents);
 
   return (
     <div className="space-y-6">
@@ -210,26 +192,26 @@ export function DashboardPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {recentActivity.length > 0 ? (
+            {swarmEvents.length > 0 ? (
               <ul className="space-y-2 text-sm">
-                {recentActivity.map((item, i) => (
-                  <li key={i} className="flex items-start gap-2">
+                {swarmEvents.slice(0, 8).map((evt) => (
+                  <li key={evt.id} className="flex items-start gap-2">
                     <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-blue-500" />
                     <div className="min-w-0 flex-1">
-                      <span className="font-medium">{formatAgent(item.agent)}</span>{" "}
+                      <span className="font-medium">{formatAgent(evt.agentName)}</span>{" "}
                       <span className="text-muted-foreground line-clamp-1">
-                        {item.action}
+                        {evt.detail}
                       </span>
                     </div>
                     <span className="shrink-0 text-xs text-muted-foreground">
-                      {formatTime(item.timestamp)}
+                      {formatTime(evt.timestamp)}
                     </span>
                   </li>
                 ))}
               </ul>
             ) : (
               <p className="text-sm text-muted-foreground">
-                Activity timeline will be populated by WebSocket events.
+                Activity timeline will be populated when agents start working.
               </p>
             )}
           </CardContent>

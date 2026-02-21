@@ -9,6 +9,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { get, post } from "@/lib/api";
 import type { ChatMessage } from "@/lib/types";
 import { useChatStore } from "@/state/stores/chatStore";
+import { useAgentStore } from "@/state/stores/agentStore";
 import {
   isDemoMode,
   DEMO_CHAT_HISTORY,
@@ -47,8 +48,8 @@ export function useSendMessage(projectId: string | undefined) {
     mutationFn: async (message: string) => {
       if (isDemoMode(projectId)) {
         const messageId = `demo-sent-${crypto.randomUUID()}`;
-        // Simulate PM response via the chatStore (same path as WebSocket)
-        simulatePmResponse(message, useChatStore.getState());
+        // Simulate PM response via events (same path as real WebSocket)
+        simulatePmResponse(message, useAgentStore.getState().addEvent);
         return { message_id: messageId };
       }
       return post<SendMessageResponse>(`/projects/${projectId}/chat`, {

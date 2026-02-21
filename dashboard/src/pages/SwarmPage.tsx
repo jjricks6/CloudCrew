@@ -12,7 +12,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useAgentStore } from "@/state/stores/agentStore";
 import { useProjectStatus } from "@/state/queries/useProjectQueries";
 import { useProjectId } from "@/lib/useProjectId";
-import { useSwarmDemo } from "@/hooks/useSwarmDemo";
 import type { AgentActivity } from "@/lib/types";
 import { SwarmVisualization } from "@/components/swarm/SwarmVisualization";
 import { ActivityTimeline } from "@/components/swarm/ActivityTimeline";
@@ -27,9 +26,6 @@ export function SwarmPage() {
   const [selectedAgent, setSelectedAgent] = useState<AgentActivity | null>(
     null,
   );
-
-  // Run demo simulation when in demo mode
-  useSwarmDemo(projectId);
 
   if (isLoading) {
     return (
