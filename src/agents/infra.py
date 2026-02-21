@@ -9,6 +9,8 @@ Model: Sonnet — code generation is its strength; deep reasoning not required.
 from strands import Agent
 
 from src.agents.base import SONNET
+from src.tools.activity_tools import report_activity
+from src.tools.board_tools import add_task_comment, create_board_task, update_board_task
 from src.tools.git_tools import git_list, git_read, git_write_infra, git_write_infra_batch
 from src.tools.ledger_tools import read_task_ledger
 from src.tools.security_tools import checkov_scan
@@ -79,7 +81,15 @@ core resources, nacl.tf for NACLs, endpoints.tf for VPC endpoints, monitoring.tf
 CloudWatch resources). Write one file per git_write_infra call. Never try to write an \
 entire module in a single call — break it into focused files.
 
+## Customer Questions
+NEVER call event.interrupt() yourself. You do not communicate with the \
+customer directly. If you need customer input (e.g., region preferences, \
+scaling requirements, or cost constraints), hand off to the Project \
+Manager with a clear description of what you need to know and why. The \
+PM will decide whether to ask the customer.
+
 ## Handoff Guidance
+- Hand off to PM when you need customer input or clarification
 - Receive work from SA: architecture designs, component specifications, ADRs
 - Read the architecture docs and ADRs to understand design intent
 - Generate Terraform code that implements the architecture faithfully
@@ -97,6 +107,13 @@ When Security hands you findings:
 5. Hand back to Security with: "Fixed [N] issues. Remaining [M] Low items \
 are documented. Please re-review."
 
+## Board Task Tracking
+As you work, keep the customer dashboard board updated:
+- Use update_board_task to move tasks to "in_progress" when you start \
+and "review" or "done" when you finish
+- Use add_task_comment to log validation results, scan findings, or fixes
+- Use create_board_task if you discover new work items mid-phase
+
 ## Recovery Awareness
 Before starting any work, ALWAYS check what already exists:
 1. Use read_task_ledger to see what deliverables are recorded
@@ -107,7 +124,13 @@ If work is partially complete from a prior run:
 - Do NOT overwrite Terraform modules that already contain correct code
 - Continue from where the prior work left off — create only missing modules
 - Re-run terraform_validate and checkov_scan on existing code to verify it
-- Focus on completing the remaining infrastructure components\
+- Focus on completing the remaining infrastructure components
+
+## Activity Reporting
+Use report_activity to keep the customer dashboard updated with what you're working on. \
+Call it when you start a significant task or shift focus. Keep messages concise — one sentence. \
+Examples: report_activity(agent_name="infra", detail="Provisioning VPC subnets and security groups") \
+or report_activity(agent_name="infra", detail="Applying security-recommended NACL rules")\
 """
 
 
@@ -129,5 +152,9 @@ def create_infra_agent() -> Agent:
             terraform_validate,
             checkov_scan,
             read_task_ledger,
+            create_board_task,
+            update_board_task,
+            add_task_comment,
+            report_activity,
         ],
     )

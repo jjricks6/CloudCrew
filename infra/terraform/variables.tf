@@ -56,3 +56,31 @@ variable "lambda_pm_review_timeout" {
   type        = number
   default     = 300
 }
+
+variable "lambda_pm_chat_memory" {
+  description = "Memory (MB) for the PM chat Lambda"
+  type        = number
+  default     = 512
+}
+
+variable "lambda_pm_chat_timeout" {
+  description = "Timeout (seconds) for the PM chat Lambda"
+  type        = number
+  default     = 120
+}
+
+# --- Auth ---
+
+variable "enable_auth" {
+  description = "Enable Cognito authorizer on API Gateway methods"
+  type        = bool
+  default     = false
+}
+
+# --- Dashboard ---
+
+variable "dashboard_origin" {
+  description = "Allowed CORS origin for the dashboard (CloudFront domain or * for dev). Use * only in dev — set to the CloudFront domain in staging/prod."
+  type        = string
+  default     = "*"
+}

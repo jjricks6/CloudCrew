@@ -1,0 +1,53 @@
+import { Outlet, useLocation } from "react-router-dom";
+import { Sidebar } from "./Sidebar";
+import { Header } from "./Header";
+import { useProjectId } from "@/lib/useProjectId";
+import { isDemoMode } from "@/lib/demo";
+import { useProjectStatus } from "@/state/queries/useProjectQueries";
+import { useCloudCrewSocket } from "@/state/websocket/useCloudCrewSocket";
+import { useDemoEngine } from "@/hooks/useDemoEngine";
+
+/** Map the last path segment to a page title. */
+function getPageTitle(pathname: string): string {
+  const segment = pathname.split("/").filter(Boolean).pop() ?? "";
+  const titles: Record<string, string> = {
+    chat: "Project Manager Chat",
+    board: "Task Board",
+    artifacts: "Artifacts",
+  };
+  return titles[segment] ?? "Dashboard";
+}
+
+export function AppLayout() {
+  const { pathname } = useLocation();
+  const projectId = useProjectId();
+  const title = getPageTitle(pathname);
+  const demo = isDemoMode(projectId);
+  const { data: project } = useProjectStatus(projectId);
+
+  // Connect WebSocket for real-time events (no-op in demo mode — socketUrl is null when WS_URL is empty)
+  useCloudCrewSocket(demo ? undefined : projectId);
+  // Run consolidated demo engine (seeds agents, drives swarm, fires interrupts/approvals)
+  useDemoEngine(projectId);
+
+  return (
+    <div className="flex h-screen overflow-hidden">
+      <Sidebar
+        projectName={project?.project_name ?? (demo ? "CloudCrew Demo" : "CloudCrew")}
+        currentPhase={project?.current_phase}
+        phaseStatus={project?.phase_status}
+      />
+      <div className="flex flex-1 flex-col overflow-hidden">
+        {demo && (
+          <div className="border-b border-amber-500/20 bg-amber-50 px-4 py-1.5 text-center text-xs text-amber-700 dark:bg-amber-950/30 dark:text-amber-400">
+            Demo Mode — responses are simulated. Connect a backend for live data.
+          </div>
+        )}
+        <Header title={title} />
+        <main className="flex-1 overflow-y-auto p-6">
+          <Outlet />
+        </main>
+      </div>
+    </div>
+  );
+}

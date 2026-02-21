@@ -18,13 +18,17 @@ from src.agents.infra import create_infra_agent
 from src.agents.qa import create_qa_agent
 from src.agents.security import create_security_agent
 from src.config import EXECUTION_TIMEOUT_PRODUCTION, NODE_TIMEOUT
+from src.hooks.activity_hook import ActivityHook
 from src.hooks.max_tokens_recovery_hook import MaxTokensRecoveryHook
 from src.hooks.resilience_hook import ResilienceHook
 
 logger = logging.getLogger(__name__)
 
 
-def create_production_swarm() -> Swarm:
+def create_production_swarm(
+    project_id: str = "",
+    phase: str = "",
+) -> Swarm:
     """Create the Production phase Swarm.
 
     Assembles Dev (entry point) -> Infra -> Data -> Security -> QA for
@@ -49,7 +53,11 @@ def create_production_swarm() -> Swarm:
 
     logger.info("Creating production swarm with agents: dev, infra, data, security, qa")
 
-    hooks: list[HookProvider] = [ResilienceHook(), MaxTokensRecoveryHook()]
+    hooks: list[HookProvider] = [
+        ResilienceHook(),
+        MaxTokensRecoveryHook(),
+        ActivityHook(project_id=project_id, phase=phase),
+    ]
 
     return Swarm(
         nodes=[dev, infra, data, security, qa],

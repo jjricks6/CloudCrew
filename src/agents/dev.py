@@ -9,6 +9,8 @@ Model: Sonnet — code generation is its strength; deep reasoning not required.
 from strands import Agent
 
 from src.agents.base import SONNET
+from src.tools.activity_tools import report_activity
+from src.tools.board_tools import add_task_comment, create_board_task, update_board_task
 from src.tools.git_tools import git_list, git_read, git_write_app, git_write_app_batch
 from src.tools.ledger_tools import read_task_ledger
 
@@ -50,7 +52,15 @@ Before handing off code for review:
 resource leaks, race conditions
 5. Ensure all imports are correct and no circular dependencies exist
 
+## Customer Questions
+NEVER call event.interrupt() yourself. You do not communicate with the \
+customer directly. If you need customer input (e.g., clarification on \
+requirements, API behavior, or implementation preferences), hand off to \
+the Project Manager with a clear description of what you need to know \
+and why. The PM will decide whether to ask the customer.
+
 ## Handoff Guidance
+- Hand off to PM when you need customer input or clarification
 - Receive work from SA: architecture designs, API contracts, data models
 - Read the architecture docs and ADRs to understand design intent
 - Implement application code that faithfully follows the architecture
@@ -67,6 +77,13 @@ When QA or SA hands you feedback:
 4. Re-run your self-validation workflow after every fix
 5. Hand back with: "Fixed [N] issues. All tests passing. Please re-review."
 
+## Board Task Tracking
+As you work, keep the customer dashboard board updated:
+- Use update_board_task to move tasks to "in_progress" when you start \
+and "review" or "done" when you finish
+- Use add_task_comment to log progress, test results, or issues found
+- Use create_board_task if you discover new work items mid-phase
+
 ## Recovery Awareness
 Before starting any work, ALWAYS check what already exists:
 1. Use read_task_ledger to see what deliverables are recorded
@@ -77,7 +94,13 @@ If work is partially complete from a prior run:
 - Do NOT overwrite application code that already contains correct implementations
 - Continue from where the prior work left off — implement only missing features
 - Run through the existing code to verify it matches the architecture design
-- Focus on completing the remaining application components\
+- Focus on completing the remaining application components
+
+## Activity Reporting
+Use report_activity to keep the customer dashboard updated with what you're working on. \
+Call it when you start a significant task or shift focus. Keep messages concise — one sentence. \
+Examples: report_activity(agent_name="dev", detail="Implementing authentication API endpoints") \
+or report_activity(agent_name="dev", detail="Writing unit tests for user service")\
 """
 
 
@@ -91,5 +114,15 @@ def create_dev_agent() -> Agent:
         model=SONNET,
         name="dev",
         system_prompt=DEV_SYSTEM_PROMPT,
-        tools=[git_read, git_list, git_write_app, git_write_app_batch, read_task_ledger],
+        tools=[
+            git_read,
+            git_list,
+            git_write_app,
+            git_write_app_batch,
+            read_task_ledger,
+            create_board_task,
+            update_board_task,
+            add_task_comment,
+            report_activity,
+        ],
     )

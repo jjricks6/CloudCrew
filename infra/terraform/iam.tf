@@ -116,7 +116,32 @@ resource "aws_iam_role_policy" "ecs_task" {
         Resource = [
           aws_dynamodb_table.projects.arn,
           aws_dynamodb_table.metrics.arn,
+          aws_dynamodb_table.board_tasks.arn,
         ]
+      },
+      {
+        Sid    = "ActivityTable"
+        Effect = "Allow"
+        Action = [
+          "dynamodb:PutItem",
+          "dynamodb:Query",
+        ]
+        Resource = aws_dynamodb_table.activity.arn
+      },
+      {
+        Sid    = "BroadcastConnections"
+        Effect = "Allow"
+        Action = [
+          "dynamodb:Query",
+          "dynamodb:DeleteItem",
+        ]
+        Resource = aws_dynamodb_table.connections.arn
+      },
+      {
+        Sid      = "BroadcastPostToConnection"
+        Effect   = "Allow"
+        Action   = "execute-api:ManageConnections"
+        Resource = "${aws_apigatewayv2_api.websocket.execution_arn}/${var.environment}/*"
       },
       {
         Sid    = "S3Read"
@@ -200,6 +225,92 @@ resource "aws_iam_role_policy" "lambda_pm_review" {
           "dynamodb:Query",
         ]
         Resource = aws_dynamodb_table.projects.arn
+      },
+      {
+        Sid    = "S3Read"
+        Effect = "Allow"
+        Action = [
+          "s3:GetObject",
+        ]
+        Resource = [
+          "${aws_s3_bucket.sow_uploads.arn}/*",
+          "${aws_s3_bucket.kb_data.arn}/*",
+        ]
+      },
+    ]
+  })
+}
+
+# =============================================================================
+# Lambda: PM Chat (async PM agent for customer chat with streaming)
+# =============================================================================
+
+resource "aws_iam_role" "lambda_pm_chat" {
+  name = "cloudcrew-lambda-pm-chat-${var.environment}"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect    = "Allow"
+      Principal = { Service = "lambda.amazonaws.com" }
+      Action    = "sts:AssumeRole"
+    }]
+  })
+
+  tags = { Name = "cloudcrew-lambda-pm-chat-${var.environment}" }
+}
+
+resource "aws_iam_role_policy" "lambda_pm_chat" {
+  name = "pm-chat"
+  role = aws_iam_role.lambda_pm_chat.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "Logs"
+        Effect = "Allow"
+        Action = [
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents",
+        ]
+        Resource = "${aws_cloudwatch_log_group.lambda_pm_chat.arn}:*"
+      },
+      {
+        Sid    = "Bedrock"
+        Effect = "Allow"
+        Action = [
+          "bedrock:InvokeModel",
+          "bedrock:InvokeModelWithResponseStream",
+        ]
+        Resource = "arn:aws:bedrock:${var.aws_region}::foundation-model/*"
+      },
+      {
+        Sid    = "DynamoDB"
+        Effect = "Allow"
+        Action = [
+          "dynamodb:GetItem",
+          "dynamodb:PutItem",
+          "dynamodb:UpdateItem",
+          "dynamodb:Query",
+        ]
+        Resource = aws_dynamodb_table.projects.arn
+      },
+      {
+        Sid    = "BroadcastConnections"
+        Effect = "Allow"
+        Action = [
+          "dynamodb:Query",
+          "dynamodb:DeleteItem",
+        ]
+        Resource = aws_dynamodb_table.connections.arn
+      },
+      {
+        Sid      = "BroadcastPostToConnection"
+        Effect   = "Allow"
+        Action   = "execute-api:ManageConnections"
+        Resource = "${aws_apigatewayv2_api.websocket.execution_arn}/${var.environment}/*"
       },
       {
         Sid    = "S3Read"
@@ -322,7 +433,10 @@ resource "aws_iam_role_policy" "lambda_api" {
           "dynamodb:UpdateItem",
           "dynamodb:Query",
         ]
-        Resource = aws_dynamodb_table.projects.arn
+        Resource = [
+          aws_dynamodb_table.projects.arn,
+          aws_dynamodb_table.board_tasks.arn,
+        ]
       },
       {
         Sid    = "S3Upload"
@@ -340,6 +454,27 @@ resource "aws_iam_role_policy" "lambda_api" {
           "states:StartExecution",
         ]
         Resource = aws_sfn_state_machine.orchestrator.arn
+      },
+      {
+        Sid      = "InvokePMChat"
+        Effect   = "Allow"
+        Action   = "lambda:InvokeFunction"
+        Resource = aws_lambda_function.pm_chat.arn
+      },
+      {
+        Sid    = "BroadcastConnections"
+        Effect = "Allow"
+        Action = [
+          "dynamodb:Query",
+          "dynamodb:DeleteItem",
+        ]
+        Resource = aws_dynamodb_table.connections.arn
+      },
+      {
+        Sid      = "BroadcastPostToConnection"
+        Effect   = "Allow"
+        Action   = "execute-api:ManageConnections"
+        Resource = "${aws_apigatewayv2_api.websocket.execution_arn}/${var.environment}/*"
       },
     ]
   })
@@ -409,6 +544,21 @@ resource "aws_iam_role_policy" "lambda_sfn_handlers" {
           "dynamodb:Query",
         ]
         Resource = aws_dynamodb_table.projects.arn
+      },
+      {
+        Sid    = "BroadcastConnections"
+        Effect = "Allow"
+        Action = [
+          "dynamodb:Query",
+          "dynamodb:DeleteItem",
+        ]
+        Resource = aws_dynamodb_table.connections.arn
+      },
+      {
+        Sid      = "BroadcastPostToConnection"
+        Effect   = "Allow"
+        Action   = "execute-api:ManageConnections"
+        Resource = "${aws_apigatewayv2_api.websocket.execution_arn}/${var.environment}/*"
       },
     ]
   })

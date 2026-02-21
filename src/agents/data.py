@@ -10,6 +10,8 @@ Model: Sonnet — data modeling and query generation are pattern-following tasks
 from strands import Agent
 
 from src.agents.base import SONNET
+from src.tools.activity_tools import report_activity
+from src.tools.board_tools import add_task_comment, create_board_task, update_board_task
 from src.tools.git_tools import git_list, git_read, git_write_data, git_write_data_batch
 from src.tools.ledger_tools import read_task_ledger
 
@@ -59,7 +61,15 @@ When you have multiple files ready (e.g. schemas, migrations, seed data), use \
 `git_write_data` repeatedly. Pass a JSON array of {"path": "data/...", "content": "..."} \
 objects. This is significantly faster and reduces round-trips.
 
+## Customer Questions
+NEVER call event.interrupt() yourself. You do not communicate with the \
+customer directly. If you need customer input (e.g., data retention \
+policies, access patterns, or compliance requirements), hand off to the \
+Project Manager with a clear description of what you need to know and \
+why. The PM will decide whether to ask the customer.
+
 ## Handoff Guidance
+- Hand off to PM when you need customer input or clarification
 - Receive work from SA: data model requirements, access patterns, performance targets
 - Read the architecture docs and ADRs to understand the data architecture
 - Design schemas, migrations, and data pipelines that implement the architecture
@@ -69,6 +79,13 @@ Key access patterns documented. Ready for application integration."
 - When Dev or SA hands back findings, address schema changes carefully — \
 consider migration impact
 - Hand off to Security when data contains PII or sensitive fields
+
+## Board Task Tracking
+As you work, keep the customer dashboard board updated:
+- Use update_board_task to move tasks to "in_progress" when you start \
+and "review" or "done" when you finish
+- Use add_task_comment to log schema decisions, migration status, or issues
+- Use create_board_task if you discover new work items mid-phase
 
 ## Recovery Awareness
 Before starting any work, ALWAYS check what already exists:
@@ -80,7 +97,13 @@ If work is partially complete from a prior run:
 - Do NOT overwrite schemas or migrations that already contain correct definitions
 - Continue from where the prior work left off — create only missing data artifacts
 - Verify existing schemas match the current architecture design
-- Focus on completing the remaining data components\
+- Focus on completing the remaining data components
+
+## Activity Reporting
+Use report_activity to keep the customer dashboard updated with what you're working on. \
+Call it when you start a significant task or shift focus. Keep messages concise — one sentence. \
+Examples: report_activity(agent_name="data", detail="Designing DynamoDB access patterns for user data") \
+or report_activity(agent_name="data", detail="Optimizing query patterns for analytics pipeline")\
 """
 
 
@@ -94,5 +117,15 @@ def create_data_agent() -> Agent:
         model=SONNET,
         name="data",
         system_prompt=DATA_SYSTEM_PROMPT,
-        tools=[git_read, git_list, git_write_data, git_write_data_batch, read_task_ledger],
+        tools=[
+            git_read,
+            git_list,
+            git_write_data,
+            git_write_data_batch,
+            read_task_ledger,
+            create_board_task,
+            update_board_task,
+            add_task_comment,
+            report_activity,
+        ],
     )

@@ -10,6 +10,7 @@ dependencies = [
     "pydantic>=2.0.0",
     "gitpython>=3.1.0",
     "awslambdaric>=2.0.0",
+    "python-jose[cryptography]>=3.3.0",
 ]
 
 [project.optional-dependencies]
@@ -80,6 +81,7 @@ module = [
     "strands.*",
     "strands_tools.*",
     "git.*",
+    "jose.*",
 ]
 ignore_missing_imports = true
 
@@ -118,4 +120,4 @@ exclude_lines = [
 # --- Bandit (security) ---
 [tool.bandit]
 exclude_dirs = ["tests"]
-skips = ["B101", "B404", "B603", "B607"]  # B404/B603/B607: subprocess used intentionally for terraform/checkov CLI tools
+skips = ["B101", "B310", "B404", "B603", "B607"]  # B310: urlopen on trusted AWS Cognito JWKS endpoint; B404/B603/B607: subprocess used intentionally for terraform/checkov CLI tools

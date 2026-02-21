@@ -16,13 +16,17 @@ from src.agents.infra import create_infra_agent
 from src.agents.sa import create_sa_agent
 from src.agents.security import create_security_agent
 from src.config import EXECUTION_TIMEOUT_ARCHITECTURE, NODE_TIMEOUT
+from src.hooks.activity_hook import ActivityHook
 from src.hooks.max_tokens_recovery_hook import MaxTokensRecoveryHook
 from src.hooks.resilience_hook import ResilienceHook
 
 logger = logging.getLogger(__name__)
 
 
-def create_architecture_swarm() -> Swarm:
+def create_architecture_swarm(
+    project_id: str = "",
+    phase: str = "",
+) -> Swarm:
     """Create the Architecture phase Swarm.
 
     Assembles SA (entry point) -> Infra -> Security with review cycle support.
@@ -46,7 +50,11 @@ def create_architecture_swarm() -> Swarm:
 
     logger.info("Creating architecture swarm with agents: sa, infra, security")
 
-    hooks: list[HookProvider] = [ResilienceHook(), MaxTokensRecoveryHook()]
+    hooks: list[HookProvider] = [
+        ResilienceHook(),
+        MaxTokensRecoveryHook(),
+        ActivityHook(project_id=project_id, phase=phase),
+    ]
 
     return Swarm(
         nodes=[sa, infra, security],

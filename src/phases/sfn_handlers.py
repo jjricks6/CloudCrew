@@ -20,6 +20,7 @@ from src.config import (
     TASK_LEDGER_TABLE,
 )
 from src.state.approval import store_token
+from src.state.broadcast import broadcast_to_project
 
 logger = logging.getLogger(__name__)
 
@@ -60,6 +61,17 @@ def start_phase_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
     ledger.current_phase = Phase(phase)
     ledger.phase_status = PhaseStatus.IN_PROGRESS
     write_ledger(TASK_LEDGER_TABLE, project_id, ledger)
+
+    # Broadcast phase_started event to connected dashboard clients
+    broadcast_to_project(
+        project_id,
+        {
+            "event": "phase_started",
+            "project_id": project_id,
+            "phase": phase,
+            "detail": f"Phase {phase} started",
+        },
+    )
 
     ecs = boto3.client("ecs", region_name=AWS_REGION)
 
@@ -136,6 +148,17 @@ def store_approval_token_handler(event: dict[str, Any], context: Any) -> dict[st
     ledger = read_ledger(TASK_LEDGER_TABLE, project_id)
     ledger.phase_status = PhaseStatus.AWAITING_APPROVAL
     write_ledger(TASK_LEDGER_TABLE, project_id, ledger)
+
+    # Broadcast awaiting_approval event to connected dashboard clients
+    broadcast_to_project(
+        project_id,
+        {
+            "event": "awaiting_approval",
+            "project_id": project_id,
+            "phase": phase,
+            "detail": f"Phase {phase} awaiting customer approval",
+        },
+    )
 
     return {
         "project_id": project_id,

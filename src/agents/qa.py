@@ -10,6 +10,8 @@ Model: Sonnet — test planning and coverage analysis are pattern-following task
 from strands import Agent
 
 from src.agents.base import SONNET
+from src.tools.activity_tools import report_activity
+from src.tools.board_tools import add_task_comment, create_board_task, update_board_task
 from src.tools.git_tools import git_list, git_read, git_write_tests, git_write_tests_batch
 from src.tools.ledger_tools import read_task_ledger
 
@@ -67,7 +69,16 @@ more tests, split them across multiple files (e.g., test_health.rb, test_auth.rb
 test_products.rb). Never try to write one large comprehensive test file. Write one \
 file per git_write_tests call, then call git_write_tests again for the next file.
 
+## Customer Questions
+NEVER call event.interrupt() yourself. You do not communicate with the \
+customer directly. If you need customer input (e.g., acceptance criteria \
+clarification, expected behavior for edge cases, or test environment \
+preferences), hand off to the Project Manager with a clear description \
+of what you need to know and why. The PM will decide whether to ask the \
+customer.
+
 ## Handoff Guidance
+- Hand off to PM when you need customer input or clarification
 - Receive work from Dev: application code with initial test suite
 - Review test coverage and quality using git_read and git_list
 - Identify coverage gaps, missing edge cases, and test quality issues
@@ -77,6 +88,13 @@ file per git_write_tests call, then call git_write_tests again for the next file
 Please address and re-submit."
 - If quality gates pass: "QA review PASSED. Coverage at [X]%. \
 [N] test categories validated. Ready for approval."
+
+## Board Task Tracking
+As you work, keep the customer dashboard board updated:
+- Use update_board_task to move tasks to "in_progress" when you start \
+and "review" or "done" when you finish
+- Use add_task_comment to log test coverage, quality gate results, or issues
+- Use create_board_task if you discover new work items mid-phase
 
 ## Recovery Awareness
 Before starting any work, ALWAYS check what already exists:
@@ -88,7 +106,13 @@ If work is partially complete from a prior run:
 - Do NOT overwrite test files that already contain correct tests
 - Continue from where the prior work left off — write only missing tests
 - Run through existing tests to verify they are still valid
-- Focus on completing the remaining test coverage gaps\
+- Focus on completing the remaining test coverage gaps
+
+## Activity Reporting
+Use report_activity to keep the customer dashboard updated with what you're working on. \
+Call it when you start a significant task or shift focus. Keep messages concise — one sentence. \
+Examples: report_activity(agent_name="qa", detail="Reviewing test coverage for authentication module") \
+or report_activity(agent_name="qa", detail="Writing integration tests for API endpoints")\
 """
 
 
@@ -102,5 +126,15 @@ def create_qa_agent() -> Agent:
         model=SONNET,
         name="qa",
         system_prompt=QA_SYSTEM_PROMPT,
-        tools=[git_read, git_list, git_write_tests, git_write_tests_batch, read_task_ledger],
+        tools=[
+            git_read,
+            git_list,
+            git_write_tests,
+            git_write_tests_batch,
+            read_task_ledger,
+            create_board_task,
+            update_board_task,
+            add_task_comment,
+            report_activity,
+        ],
     )

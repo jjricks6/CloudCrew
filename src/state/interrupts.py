@@ -14,6 +14,7 @@ from typing import Any
 import boto3
 
 from src.config import AWS_REGION
+from src.state.broadcast import broadcast_to_project
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +35,7 @@ def store_interrupt(
     project_id: str,
     interrupt_id: str,
     question: str,
+    phase: str = "",
 ) -> None:
     """Store an interrupt question for a customer to answer.
 
@@ -42,6 +44,7 @@ def store_interrupt(
         project_id: The project identifier.
         interrupt_id: Unique identifier for this interrupt.
         question: The question text for the customer.
+        phase: Current delivery phase name.
     """
     table = _get_table(table_name)
     table.put_item(
@@ -57,6 +60,18 @@ def store_interrupt(
         },
     )
     logger.info("Stored interrupt %s for project %s", interrupt_id, project_id)
+
+    # Broadcast interrupt_raised event to connected dashboard clients
+    broadcast_to_project(
+        project_id,
+        {
+            "event": "interrupt_raised",
+            "project_id": project_id,
+            "phase": phase,
+            "interrupt_id": interrupt_id,
+            "question": question,
+        },
+    )
 
 
 def get_interrupt_response(
@@ -122,3 +137,13 @@ def store_interrupt_response(
         },
     )
     logger.info("Stored response for interrupt %s, project %s", interrupt_id, project_id)
+
+    # Broadcast interrupt_answered event so the dashboard knows to resume
+    broadcast_to_project(
+        project_id,
+        {
+            "event": "interrupt_answered",
+            "project_id": project_id,
+            "interrupt_id": interrupt_id,
+        },
+    )

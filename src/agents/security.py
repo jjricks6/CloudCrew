@@ -10,6 +10,8 @@ Model: Opus — security analysis requires deep reasoning about subtle risks.
 from strands import Agent
 
 from src.agents.base import OPUS
+from src.tools.activity_tools import report_activity
+from src.tools.board_tools import add_task_comment, create_board_task, update_board_task
 from src.tools.git_tools import git_list, git_read, git_write_security
 from src.tools.ledger_tools import read_task_ledger
 from src.tools.security_review import write_security_review
@@ -74,7 +76,15 @@ When you receive infrastructure code to review:
 4. Write a structured security review using `write_security_review`
 5. If Critical or High findings exist, hand back to Infra with specific remediation guidance
 
+## Customer Questions
+NEVER call event.interrupt() yourself. You do not communicate with the \
+customer directly. If you need customer input (e.g., compliance \
+requirements, risk tolerance, or security policy preferences), hand off \
+to the Project Manager with a clear description of what you need to know \
+and why. The PM will decide whether to ask the customer.
+
 ## Handoff Guidance
+- Hand off to PM when you need customer input or clarification
 - Receive work from Infra: Terraform code ready for security review
 - Run your review process (automated + manual)
 - If findings are Critical/High: hand back to Infra with the specific file paths, \
@@ -92,6 +102,13 @@ A review PASSES when:
 - All Medium findings either fixed or documented with accepted risk rationale
 - Checkov scan shows no new failures versus the previous scan
 
+## Board Task Tracking
+As you work, keep the customer dashboard board updated:
+- Use update_board_task to move tasks to "in_progress" when you start \
+and "review" or "done" when you finish
+- Use add_task_comment to log review findings, severity, or remediation status
+- Use create_board_task if you discover new work items mid-phase
+
 ## Recovery Awareness
 Before starting any work, ALWAYS check what already exists:
 1. Use read_task_ledger to see what decisions and deliverables are recorded
@@ -102,7 +119,13 @@ If work is partially complete from a prior run:
 - Do NOT duplicate security review reports that already exist
 - If a prior review exists, read it and verify its findings are still valid
 - Continue from where the prior work left off
-- Focus on completing any remaining review steps or re-scanning fixed code\
+- Focus on completing any remaining review steps or re-scanning fixed code
+
+## Activity Reporting
+Use report_activity to keep the customer dashboard updated with what you're working on. \
+Call it when you start a significant task or shift focus. Keep messages concise — one sentence. \
+Examples: report_activity(agent_name="security", detail="Reviewing network ACL and IAM policies") \
+or report_activity(agent_name="security", detail="Auditing DynamoDB encryption and backup policies")\
 """
 
 
@@ -116,5 +139,16 @@ def create_security_agent() -> Agent:
         model=OPUS,
         name="security",
         system_prompt=SECURITY_SYSTEM_PROMPT,
-        tools=[git_read, git_list, git_write_security, checkov_scan, write_security_review, read_task_ledger],
+        tools=[
+            git_read,
+            git_list,
+            git_write_security,
+            checkov_scan,
+            write_security_review,
+            read_task_ledger,
+            create_board_task,
+            update_board_task,
+            add_task_comment,
+            report_activity,
+        ],
     )

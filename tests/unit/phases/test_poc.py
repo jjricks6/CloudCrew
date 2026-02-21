@@ -3,6 +3,7 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
+from src.hooks.activity_hook import ActivityHook
 from src.hooks.max_tokens_recovery_hook import MaxTokensRecoveryHook
 from src.hooks.resilience_hook import ResilienceHook
 
@@ -62,9 +63,10 @@ class TestPOCSwarm:
         # ResilienceHook + MaxTokensRecoveryHook always attached
         hooks = call_kwargs.kwargs["hooks"]
         assert hooks is not None
-        assert len(hooks) == 2
+        assert len(hooks) == 3
         assert isinstance(hooks[0], ResilienceHook)
         assert isinstance(hooks[1], MaxTokensRecoveryHook)
+        assert isinstance(hooks[2], ActivityHook)
 
         assert swarm is mock_swarm_cls.return_value
 

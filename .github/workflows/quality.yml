@@ -75,6 +75,28 @@ jobs:
           fi
           echo "All files within size limits"
 
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: dashboard/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+        working-directory: dashboard
+      - name: Type check
+        run: npx tsc -b
+        working-directory: dashboard
+      - name: Lint
+        run: npx eslint .
+        working-directory: dashboard
+      - name: Build
+        run: npx vite build
+        working-directory: dashboard
+
   terraform-validate:
     runs-on: ubuntu-latest
     steps:

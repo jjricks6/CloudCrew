@@ -34,7 +34,7 @@ class TestPhaseStatusEnum:
     """Verify PhaseStatus enum."""
 
     def test_all_statuses_defined(self) -> None:
-        expected = {"IN_PROGRESS", "AWAITING_APPROVAL", "APPROVED", "REVISION_REQUESTED"}
+        expected = {"IN_PROGRESS", "AWAITING_INPUT", "AWAITING_APPROVAL", "APPROVED", "REVISION_REQUESTED"}
         assert {s.value for s in PhaseStatus} == expected
 
     def test_str_value(self) -> None:
@@ -224,6 +224,8 @@ class TestInvocationState:
             "phase",
             "session_id",
             "task_ledger_table",
+            "board_tasks_table",
+            "activity_table",
             "git_repo_url",
             "knowledge_base_id",
             "patterns_bucket",

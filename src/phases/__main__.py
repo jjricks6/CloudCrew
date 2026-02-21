@@ -67,7 +67,7 @@ def get_swarm_factory(phase: str) -> Callable[..., Any]:
 
     module_path, func_name = factory_path.rsplit(":", 1)
     module = importlib.import_module(module_path)
-    return getattr(module, func_name)  # type: ignore[no-any-return]
+    return getattr(module, func_name)  # type: ignore[no-any-return]  # Dynamic import returns Any
 
 
 def _build_invocation_state(project_id: str, phase: str) -> dict[str, Any]:
@@ -177,7 +177,7 @@ def execute_phase(
         effective_task = task if attempt == 1 else RECOVERY_PREFIX + task
 
         try:
-            swarm = factory()
+            swarm = factory(project_id=project_id, phase=phase)
             result = swarm(effective_task, invocation_state=invocation_state)
 
             # Handle interrupt loop (same Swarm instance)
@@ -193,7 +193,7 @@ def execute_phase(
                 interrupt_ids = []
                 for q in interrupts:
                     iid = str(uuid.uuid4())
-                    store_interrupt(TASK_LEDGER_TABLE, project_id, iid, q)
+                    store_interrupt(TASK_LEDGER_TABLE, project_id, iid, q, phase=phase)
                     interrupt_ids.append(iid)
 
                 # Poll for customer responses

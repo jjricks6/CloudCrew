@@ -23,9 +23,14 @@ class Phase(StrEnum):
 
 
 class PhaseStatus(StrEnum):
-    """Status of the current phase."""
+    """Status of the current phase.
+
+    Lifecycle: IN_PROGRESS → (optionally AWAITING_INPUT when an interrupt
+    fires) → AWAITING_APPROVAL → APPROVED | REVISION_REQUESTED.
+    """
 
     IN_PROGRESS = "IN_PROGRESS"
+    AWAITING_INPUT = "AWAITING_INPUT"
     AWAITING_APPROVAL = "AWAITING_APPROVAL"
     APPROVED = "APPROVED"
     REVISION_REQUESTED = "REVISION_REQUESTED"
@@ -115,6 +120,36 @@ class ParsedSOW(BaseModel):
     timeline: str = ""
 
 
+# --- Board Tasks (Kanban) ---
+
+
+class TaskComment(BaseModel):
+    """A comment on a board task, added by an agent."""
+
+    author: str
+    content: str
+    timestamp: str
+
+
+class BoardTask(BaseModel):
+    """A granular work item on the kanban board.
+
+    Created and managed by agents during phase execution. Separate from
+    deliverables — tasks are work items, deliverables are artifacts.
+    """
+
+    task_id: str
+    title: str
+    description: str
+    phase: str
+    status: str = Field(description="backlog | in_progress | review | done")
+    assigned_to: str
+    comments: list[TaskComment] = Field(default_factory=list)
+    artifact_path: str = ""
+    created_at: str = ""
+    updated_at: str = ""
+
+
 # --- Invocation State ---
 
 
@@ -139,6 +174,19 @@ class InterruptRecord(BaseModel):
     answered_at: str = ""
 
 
+# Maps short agent IDs (Strands node names) to dashboard display names.
+# Must stay in sync with dashboard/src/components/swarm/swarm-constants.ts.
+AGENT_DISPLAY_NAMES: dict[str, str] = {
+    "pm": "Project Manager",
+    "sa": "Solutions Architect",
+    "dev": "Developer",
+    "infra": "Infrastructure",
+    "data": "Data Engineer",
+    "security": "Security Engineer",
+    "qa": "QA Engineer",
+}
+
+
 class InvocationState(BaseModel):
     """State passed to every agent invocation via invocation_state kwarg.
 
@@ -153,5 +201,7 @@ class InvocationState(BaseModel):
     git_repo_url: str = Field(description="Local path to the project Git repository")
     knowledge_base_id: str = Field(description="Bedrock Knowledge Base ID for project artifacts")
     patterns_bucket: str = Field(description="S3 bucket name for the pattern library")
+    board_tasks_table: str = Field(default="", description="DynamoDB table for board tasks")
+    activity_table: str = Field(default="", description="DynamoDB table for activity events")
     stm_memory_id: str = Field(default="", description="AgentCore Memory ID for short-term memory")
     ltm_memory_id: str = Field(default="", description="AgentCore Memory ID for long-term memory")

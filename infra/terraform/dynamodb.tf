@@ -65,3 +65,99 @@ resource "aws_dynamodb_table" "metrics" {
 
   tags = { Name = "cloudcrew-metrics" }
 }
+
+# Table: cloudcrew-connections
+# - WebSocket connection registry for real-time dashboard push
+# PK: projectId, SK: connectionId, TTL: 2h
+resource "aws_dynamodb_table" "connections" {
+  name         = "cloudcrew-connections"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "PK"
+  range_key    = "SK"
+
+  attribute {
+    name = "PK"
+    type = "S"
+  }
+
+  attribute {
+    name = "SK"
+    type = "S"
+  }
+
+  ttl {
+    attribute_name = "ttl"
+    enabled        = true
+  }
+
+  server_side_encryption {
+    enabled = true
+  }
+
+  tags = { Name = "cloudcrew-connections" }
+}
+
+# Table: cloudcrew-activity
+# - Agent activity events for dashboard visualization
+# PK: PROJECT#{id}, SK: EVENT#{timestamp}#{uuid}, TTL: 24h
+resource "aws_dynamodb_table" "activity" {
+  name         = "cloudcrew-activity"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "PK"
+  range_key    = "SK"
+
+  attribute {
+    name = "PK"
+    type = "S"
+  }
+
+  attribute {
+    name = "SK"
+    type = "S"
+  }
+
+  ttl {
+    attribute_name = "ttl"
+    enabled        = true
+  }
+
+  point_in_time_recovery {
+    enabled = true
+  }
+
+  server_side_encryption {
+    enabled = true
+  }
+
+  tags = { Name = "cloudcrew-activity" }
+}
+
+# Table: cloudcrew-board-tasks
+# - Kanban board tasks managed by agents, visible to customer on dashboard
+# PK: PROJECT#{project_id}, SK: TASK#{phase}#{task_id}
+resource "aws_dynamodb_table" "board_tasks" {
+  name         = "cloudcrew-board-tasks"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "PK"
+  range_key    = "SK"
+
+  attribute {
+    name = "PK"
+    type = "S"
+  }
+
+  attribute {
+    name = "SK"
+    type = "S"
+  }
+
+  point_in_time_recovery {
+    enabled = true
+  }
+
+  server_side_encryption {
+    enabled = true
+  }
+
+  tags = { Name = "cloudcrew-board-tasks" }
+}

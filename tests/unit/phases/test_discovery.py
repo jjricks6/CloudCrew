@@ -3,6 +3,7 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
+from src.hooks.activity_hook import ActivityHook
 from src.hooks.max_tokens_recovery_hook import MaxTokensRecoveryHook
 from src.hooks.resilience_hook import ResilienceHook
 
@@ -92,8 +93,8 @@ class TestDiscoverySwarm:
         call_kwargs = mock_swarm_cls.call_args
         hooks = call_kwargs.kwargs["hooks"]
         assert hooks is not None
-        # ResilienceHook + MaxTokensRecoveryHook + MemoryHook
-        assert len(hooks) == 3
+        # ResilienceHook + MaxTokensRecoveryHook + ActivityHook + MemoryHook
+        assert len(hooks) == 4
 
     @patch("src.phases.discovery.Swarm")
     @patch("src.phases.discovery.create_sa_agent")
@@ -111,6 +112,7 @@ class TestDiscoverySwarm:
         call_kwargs = mock_swarm_cls.call_args
         hooks = call_kwargs.kwargs["hooks"]
         assert hooks is not None
-        assert len(hooks) == 2
+        assert len(hooks) == 3
         assert isinstance(hooks[0], ResilienceHook)
         assert isinstance(hooks[1], MaxTokensRecoveryHook)
+        assert isinstance(hooks[2], ActivityHook)

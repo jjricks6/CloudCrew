@@ -43,6 +43,10 @@ resource "aws_ecs_task_definition" "phase_runner" {
         { name = "AWS_DEFAULT_REGION", value = var.aws_region },
         { name = "TASK_LEDGER_TABLE", value = aws_dynamodb_table.projects.name },
         { name = "SOW_BUCKET", value = aws_s3_bucket.sow_uploads.id },
+        { name = "ACTIVITY_TABLE", value = aws_dynamodb_table.activity.name },
+        { name = "CONNECTIONS_TABLE", value = aws_dynamodb_table.connections.name },
+        { name = "WEBSOCKET_API_ENDPOINT", value = "https://${aws_apigatewayv2_api.websocket.id}.execute-api.${var.aws_region}.amazonaws.com/${var.environment}" },
+        { name = "BOARD_TASKS_TABLE", value = aws_dynamodb_table.board_tasks.name },
       ]
 
       # PROJECT_ID, PHASE, TASK_TOKEN, CUSTOMER_FEEDBACK set at run_task time
