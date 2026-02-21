@@ -1,7 +1,7 @@
 /**
  * Swarm Visualization page — animated real-time view of agents collaborating.
  *
- * Top section: radial agent layout with handoff arcs and thought bubbles.
+ * Top section: radial agent layout with handoff arcs and center detail text.
  * Bottom section: scrollable activity timeline.
  */
 
@@ -60,7 +60,6 @@ export function SwarmPage() {
           <SwarmVisualization
             agents={agents}
             phase={project?.current_phase}
-            phaseStatus={project?.phase_status}
             activeHandoff={activeHandoff}
             onAgentClick={setSelectedAgent}
           />

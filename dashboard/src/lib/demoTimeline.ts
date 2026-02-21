@@ -84,12 +84,7 @@ function taskUpdate(
 // SEED — initial agents appear (runs once on mount)
 // ---------------------------------------------------------------------------
 
-export const SEED_SEGMENT: TimelineStep[] = [
-  active("Project Manager", "Coordinating architecture phase deliverables", 0),
-  active("Solutions Architect", "Designing system architecture with serverless-first approach", 300),
-  active("Data Engineer", "Creating DynamoDB single-table design with 3 GSIs", 300),
-  idle("Security Engineer", "Waiting for VPC design to begin security review", 300),
-];
+export const SEED_SEGMENT: TimelineStep[] = [];
 
 // ---------------------------------------------------------------------------
 // WORK_LOOP — repeating swarm collaboration cycle (~82s)
@@ -159,11 +154,14 @@ const INTERRUPT_QUESTION =
   "The architecture uses a single DynamoDB table. Should we add a dedicated search index (OpenSearch) for full-text search, or is DynamoDB + GSIs sufficient for the MVP?";
 
 export const INTERRUPT_SEGMENT: TimelineStep[] = [
-  idle("Project Manager", "Paused — waiting for customer input", 0),
-  idle("Solutions Architect", "Paused — waiting for customer input", 100),
-  idle("Infrastructure", "Paused — waiting for customer input", 100),
-  idle("Data Engineer", "Paused — waiting for customer input", 100),
-  idle("Security Engineer", "Paused — waiting for customer input", 100),
+  // PM announces the pause (shows in activity timeline + center text)
+  active("Project Manager", "Pausing work — awaiting customer input", 0),
+  // All agents go idle (visual state only — no timeline entries)
+  idle("Project Manager", "", 500),
+  idle("Solutions Architect", "", 100),
+  idle("Infrastructure", "", 100),
+  idle("Data Engineer", "", 100),
+  idle("Security Engineer", "", 100),
   {
     delayMs: 500,
     event: {
@@ -196,11 +194,14 @@ const APPROVAL_QUESTION =
   "The **Architecture** phase is complete. All deliverables have been drafted and reviewed by the team. Please review the artifacts and let us know if you'd like to approve and move to the next phase, or if you have feedback.";
 
 export const APPROVAL_SEGMENT: TimelineStep[] = [
-  idle("Project Manager", "Phase work complete — awaiting approval", 0),
-  idle("Solutions Architect", "Phase work complete — awaiting approval", 100),
-  idle("Infrastructure", "Phase work complete — awaiting approval", 100),
-  idle("Data Engineer", "Phase work complete — awaiting approval", 100),
-  idle("Security Engineer", "Phase work complete — awaiting approval", 100),
+  // PM announces completion (shows in activity timeline + center text)
+  active("Project Manager", "Architecture phase complete — preparing for review", 0),
+  // All agents go idle (visual state only — no timeline entries)
+  idle("Project Manager", "", 500),
+  idle("Solutions Architect", "", 100),
+  idle("Infrastructure", "", 100),
+  idle("Data Engineer", "", 100),
+  idle("Security Engineer", "", 100),
   // Move remaining in_progress tasks to done
   taskUpdate("demo-t3", { status: "done" }, 0),
   taskUpdate("demo-t4", { status: "done" }, 0),

@@ -137,14 +137,10 @@ export const useAgentStore = create<AgentState>((set, get) => ({
       }
 
       if (event.event === "agent_idle") {
-        const timelineEvent = makeTimelineEvent(
-          "agent_idle",
-          event.agent_name,
-          event.detail,
-          event.phase,
-        );
+        // Idle events update visual state only — no timeline entry.
+        // The real backend fires these when agents finish; the meaningful
+        // work updates come from agent_active (report_activity tool).
         return {
-          swarmEvents: appendEvent(state.swarmEvents, timelineEvent),
           agents: state.agents.map((a) =>
             a.agent_name === event.agent_name
               ? {
@@ -159,31 +155,20 @@ export const useAgentStore = create<AgentState>((set, get) => ({
       }
 
       if (event.event === "handoff") {
+        // Handoff events drive the arc animation only — no timeline entry.
         // Parse "Handoff from {src} to {dest}"
         const match = event.detail.match(/Handoff from (.+) to (.+)/);
         const fromAgent = match?.[1] ?? "unknown";
 
-        const timelineEvent = makeTimelineEvent(
-          "handoff",
-          event.agent_name,
-          event.detail,
-          event.phase,
-          fromAgent,
-        );
-
-        const handoffId = timelineEvent.id;
+        const handoffId = crypto.randomUUID();
 
         // Auto-clear handoff after 2 seconds
         setTimeout(() => {
           get().clearHandoff(handoffId);
         }, 2000);
 
-        // Don't update agent statuses here — the subsequent agent_active
-        // and agent_idle events handle that with proper timing so the
-        // source stays active (with its bubble) while the arc animates.
         return {
           activeHandoff: { from: fromAgent, to: event.agent_name, id: handoffId },
-          swarmEvents: appendEvent(state.swarmEvents, timelineEvent),
         };
       }
 

@@ -1,187 +1,178 @@
 /**
  * Animated agent circle for the swarm visualization.
  *
- * - Active: pulsing glow, full opacity, thought bubble with current task
- * - Idle: muted, smaller, no bubble
+ * - Active: pulsing glow, full opacity
+ * - Idle: muted, smaller
  * - Smooth transitions between states (0.5s)
+ * - Draggable with spring-back to original position
  */
 
-import { useState, useEffect, useRef } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { useRef, useMemo } from "react";
+import { motion, useMotionValue, animate } from "framer-motion";
 import {
   getAgentConfig,
   NODE_SIZE_ACTIVE,
-  NODE_SIZE_IDLE,
+  type NodeSizes,
 } from "./swarm-constants";
+import { AgentPolyhedron } from "./AgentPolyhedron";
+import { useTheme } from "@/hooks/useTheme";
+
+/** Derive a stable number from an agent name for staggered animations. */
+function nameHash(name: string): number {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) {
+    h = (h * 31 + name.charCodeAt(i)) | 0;
+  }
+  return Math.abs(h);
+}
 
 interface AgentNodeProps {
   name: string;
   status: "active" | "idle";
-  detail: string;
   x: number;
   y: number;
-  /** Which side to place the thought bubble on. */
-  bubbleSide: "left" | "right";
+  /** Dynamic sizes based on container. Falls back to hardcoded constants. */
+  nodeSizes?: NodeSizes;
   onClick: () => void;
-}
-
-function ThoughtBubble({
-  detail,
-  side,
-}: {
-  detail: string;
-  side: "left" | "right";
-}) {
-  const truncated =
-    detail.length > 60 ? detail.slice(0, 57) + "..." : detail;
-
-  const isRight = side === "right";
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, x: isRight ? -6 : 6 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: isRight ? -6 : 6 }}
-      transition={{ duration: 0.3, ease: "easeOut" }}
-      className={`absolute top-1/2 -translate-y-1/2 ${
-        isRight ? "left-full ml-3" : "right-full mr-3"
-      }`}
-    >
-      <div className="relative w-[240px] rounded-lg border bg-card px-3 py-1.5 text-xs text-card-foreground shadow-md">
-        <p className="leading-relaxed">{truncated}</p>
-        {/* Triangle tail pointing toward the agent circle */}
-        <div
-          className={`absolute top-1/2 -translate-y-1/2 ${
-            isRight ? "right-full" : "left-full"
-          }`}
-        >
-          {isRight ? (
-            <>
-              <div className="h-0 w-0 border-y-[6px] border-r-[6px] border-y-transparent border-r-border" />
-              <div className="-ml-[1px] -mt-[12px] h-0 w-0 border-y-[6px] border-r-[6px] border-y-transparent border-r-card" />
-            </>
-          ) : (
-            <>
-              <div className="h-0 w-0 border-y-[6px] border-l-[6px] border-y-transparent border-l-border" />
-              <div className="-mr-[1px] -mt-[12px] h-0 w-0 border-y-[6px] border-l-[6px] border-y-transparent border-l-card" />
-            </>
-          )}
-        </div>
-      </div>
-    </motion.div>
-  );
 }
 
 export function AgentNode({
   name,
   status,
-  detail,
   x,
   y,
-  bubbleSide,
+  nodeSizes,
   onClick,
 }: AgentNodeProps) {
+  const { theme } = useTheme();
+  const isDark =
+    theme === "dark" ||
+    (theme === "system" &&
+      window.matchMedia("(prefers-color-scheme: dark)").matches);
+
   const config = getAgentConfig(name);
   const isActive = status === "active";
-  const size = isActive ? NODE_SIZE_ACTIVE : NODE_SIZE_IDLE;
+  const activeSize = nodeSizes?.active ?? NODE_SIZE_ACTIVE;
+  const fontSize = nodeSizes?.fontSize ?? 14;
+  const labelSize = nodeSizes?.labelSize ?? 10;
 
-  // Delay bubble appearance by 1s when transitioning idle → active.
-  // When going idle, keep bubble visible for 4s so "Finished" messages are readable.
-  const [showBubble, setShowBubble] = useState(false);
-  const timerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  // Motion values for drag — we animate the spring-back manually so fling
+  // velocity carries through as overshoot before bouncing home.
+  const dragX = useMotionValue(0);
+  const dragY = useMotionValue(0);
 
-  useEffect(() => {
-    clearTimeout(timerRef.current);
-    if (isActive) {
-      timerRef.current = setTimeout(() => setShowBubble(true), 1000);
-    } else {
-      // Keep bubble visible for 4s after going idle so the user can read the message
-      timerRef.current = setTimeout(() => setShowBubble(false), 4000);
-    }
-    return () => {
-      clearTimeout(timerRef.current);
-    };
-  }, [isActive]);
+  // Drag tracking — prevent onClick from firing after a drag release.
+  const dragging = useRef(false);
+
+  // Staggered float timing so agents bob independently.
+  const floatDuration = useMemo(() => 3 + (nameHash(name) % 20) / 10, [name]);
+  const floatDelay = useMemo(() => (nameHash(name) % 10) / 10, [name]);
 
   return (
     <motion.div
-      layout
-      className="absolute flex items-center"
-      style={{ left: x, top: y }}
-      initial={{ opacity: 0, scale: 0.8, x: "-50%", y: "-50%" }}
+      className="absolute flex items-center justify-center"
+      style={{
+        left: x,
+        top: y,
+        x: dragX,
+        y: dragY,
+        width: activeSize,
+        height: activeSize,
+        marginLeft: -activeSize / 2,
+        marginTop: -activeSize / 2,
+        cursor: "grab",
+      }}
+      drag
+      dragMomentum={false}
+      whileDrag={{ scale: 1.12, cursor: "grabbing", zIndex: 50 }}
+      onDragStart={() => {
+        dragging.current = true;
+      }}
+      onDragEnd={(_, info) => {
+        // Spring back to origin, carrying the fling velocity as overshoot.
+        animate(dragX, 0, {
+          type: "spring",
+          velocity: info.velocity.x,
+          stiffness: 120,
+          damping: 8,
+        });
+        animate(dragY, 0, {
+          type: "spring",
+          velocity: info.velocity.y,
+          stiffness: 120,
+          damping: 8,
+        });
+        setTimeout(() => {
+          dragging.current = false;
+        }, 0);
+      }}
+      initial={{ opacity: 0, scale: 0.8 }}
       animate={{
-        x: "-50%",
-        y: "-50%",
         opacity: isActive ? 1 : 0.5,
         scale: 1,
       }}
       exit={{ opacity: 0, scale: 0.8 }}
       transition={{ type: "spring", stiffness: 200, damping: 25 }}
     >
-      <div className="flex flex-col items-center">
-        {/* Agent circle */}
-        <motion.button
-          type="button"
-          onClick={onClick}
-          aria-label={config.label}
-          className="relative flex items-center justify-center rounded-full border-[3px] bg-card transition-colors hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          style={{ borderColor: config.color }}
-          animate={{
-            width: size,
-            height: size,
-            boxShadow: isActive
-              ? [
-                  `0 0 12px 2px ${config.color}60`,
-                  `0 0 24px 6px ${config.color}40`,
-                  `0 0 12px 2px ${config.color}60`,
-                ]
-              : `0 0 0px 0px ${config.color}00`,
-            scale: isActive ? [1, 1.06, 1] : 1,
-          }}
-          transition={
-            isActive
-              ? {
-                  boxShadow: { duration: 2, repeat: Infinity, ease: "easeInOut" },
-                  scale: { duration: 2, repeat: Infinity, ease: "easeInOut" },
-                  width: { duration: 0.5 },
-                  height: { duration: 0.5 },
-                }
-              : { duration: 0.5, ease: "easeOut" }
-          }
-        >
-          <span
-            className="text-sm font-bold select-none"
-            style={{ color: config.color }}
-          >
-            {config.abbr}
-          </span>
-        </motion.button>
+      {/* 3D polyhedron + abbreviation overlay */}
+      <motion.div
+        role="button"
+        tabIndex={0}
+        onClick={() => {
+          if (!dragging.current) onClick();
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && !dragging.current) onClick();
+        }}
+        aria-label={config.label}
+        className="relative focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:rounded-full"
+        whileHover={{ scale: 1.1 }}
+        animate={{
+          y: [0, -5, 0],
+        }}
+        transition={{
+          y: { duration: floatDuration, delay: floatDelay, repeat: Infinity, ease: "easeInOut" },
+        }}
+        style={{ width: activeSize, height: activeSize, overflow: "visible" }}
+      >
+        {/* 3D Canvas */}
+        <AgentPolyhedron
+          shape={config.shape}
+          color={config.color}
+          isActive={isActive}
+        />
 
-        {/* Role label */}
+        {/* Abbreviation overlay centered on top of the 3D scene */}
         <span
-          className="mt-1.5 text-[10px] font-medium whitespace-nowrap transition-opacity duration-500"
+          className="pointer-events-none absolute inset-0 flex items-center justify-center font-bold select-none"
           style={{
-            color: isActive ? config.color : undefined,
-            opacity: isActive ? 1 : 0.5,
+            color: config.color,
+            fontSize,
+            textShadow: isDark
+              ? `0 0 8px ${config.color}80`
+              : `0 1px 3px rgba(0,0,0,0.25), 0 0 6px ${config.color}30`,
           }}
         >
-          {!isActive && (
-            <span className="text-muted-foreground">{config.label}</span>
-          )}
-          {isActive && config.label}
+          {config.abbr}
         </span>
-      </div>
+      </motion.div>
 
-      {/* Thought bubble (to the side, delayed after activation) */}
-      <AnimatePresence mode="wait">
-        {showBubble && detail && (
-          <ThoughtBubble
-            key={`bubble-${name}`}
-            detail={detail}
-            side={bubbleSide}
-          />
+      {/* Role label — below the circle */}
+      <span
+        className="absolute left-1/2 -translate-x-1/2 font-medium whitespace-nowrap transition-opacity duration-500"
+        style={{
+          top: "100%",
+          marginTop: 6,
+          color: isActive ? config.color : undefined,
+          opacity: isActive ? 1 : 0.5,
+          fontSize: labelSize,
+        }}
+      >
+        {!isActive && (
+          <span className="text-muted-foreground">{config.label}</span>
         )}
-      </AnimatePresence>
+        {isActive && config.label}
+      </span>
     </motion.div>
   );
 }

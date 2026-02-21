@@ -1,5 +1,6 @@
 /**
- * Scrollable feed of recent swarm events (agent active, idle, handoffs).
+ * Scrollable feed of recent agent activity.
+ * Each entry shows the agent name and what they're working on.
  * New entries animate in from the top.
  */
 
@@ -7,16 +8,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import type { SwarmTimelineEvent } from "@/lib/types";
 import { formatRelativeTime } from "@/lib/time";
 import { getAgentConfig } from "./swarm-constants";
-
-function eventLabel(ev: SwarmTimelineEvent): string {
-  if (ev.type === "handoff" && ev.fromAgent) {
-    const from = getAgentConfig(ev.fromAgent).abbr;
-    const to = getAgentConfig(ev.agentName).abbr;
-    return `Handoff: ${from} → ${to}`;
-  }
-  if (ev.type === "agent_active") return `Started: ${ev.detail}`;
-  return `Finished: ${ev.detail}`;
-}
 
 interface ActivityTimelineProps {
   events: SwarmTimelineEvent[];
@@ -35,12 +26,7 @@ export function ActivityTimeline({ events }: ActivityTimelineProps) {
     <div className="overflow-y-auto pr-1">
       <AnimatePresence initial={false}>
         {events.map((ev) => {
-          // For handoffs, attribute the event to the sender (fromAgent)
-          const displayAgent =
-            ev.type === "handoff" && ev.fromAgent
-              ? ev.fromAgent
-              : ev.agentName;
-          const config = getAgentConfig(displayAgent);
+          const config = getAgentConfig(ev.agentName);
           return (
             <motion.div
               key={ev.id}
@@ -60,7 +46,7 @@ export function ActivityTimeline({ events }: ActivityTimelineProps) {
                     {config.label}
                   </span>{" "}
                   <span className="text-muted-foreground line-clamp-1">
-                    {eventLabel(ev)}
+                    {ev.detail}
                   </span>
                 </div>
                 <span className="shrink-0 text-muted-foreground">

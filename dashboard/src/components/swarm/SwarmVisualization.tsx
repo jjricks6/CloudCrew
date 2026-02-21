@@ -2,25 +2,27 @@
  * Main swarm visualization container.
  *
  * Measures its own size via ResizeObserver, computes radial positions,
- * renders the orbit ring (SVG), center hub, agent nodes, and handoff arcs.
+ * renders the orbit ring (SVG), center detail text, agent nodes, and
+ * handoff arcs.
  */
 
 import { useRef, useState, useEffect, useMemo } from "react";
-import { AnimatePresence } from "framer-motion";
-import type { AgentActivity, Phase, PhaseStatus } from "@/lib/types";
+import { motion, AnimatePresence } from "framer-motion";
+import type { AgentActivity, Phase } from "@/lib/types";
 import {
+  ALL_AGENTS,
+  getAgentConfig,
   getAgentPositions,
+  getNodeSizes,
   PHASE_AGENTS,
   type AgentPosition,
 } from "./swarm-constants";
 import { AgentNode } from "./AgentNode";
-import { CenterHub } from "./CenterHub";
 import { HandoffArc, HandoffGlowFilter } from "./HandoffArc";
 
 interface SwarmVisualizationProps {
   agents: AgentActivity[];
   phase?: Phase;
-  phaseStatus?: PhaseStatus;
   activeHandoff: { from: string; to: string; id: string } | null;
   onAgentClick: (agent: AgentActivity) => void;
 }
@@ -28,7 +30,6 @@ interface SwarmVisualizationProps {
 export function SwarmVisualization({
   agents,
   phase,
-  phaseStatus,
   activeHandoff,
   onAgentClick,
 }: SwarmVisualizationProps) {
@@ -53,23 +54,19 @@ export function SwarmVisualization({
     };
   }, []);
 
-  // Determine which agents belong in the current phase's swarm
+  // Which agents are part of the current phase's swarm (used for active styling)
   const phaseAgentNames = useMemo(
     () => (phase ? (PHASE_AGENTS[phase] ?? []) : []),
     [phase],
   );
 
-  // Compute positions only for agents that should be in the ring
+  // All 7 agents are always positioned in the ring
   const positions = useMemo(
     () =>
-      dimensions.width > 0 && phaseAgentNames.length > 0
-        ? getAgentPositions(
-            phaseAgentNames,
-            dimensions.width,
-            dimensions.height,
-          )
+      dimensions.width > 0
+        ? getAgentPositions(ALL_AGENTS, dimensions.width, dimensions.height)
         : [],
-    [phaseAgentNames, dimensions.width, dimensions.height],
+    [dimensions.width, dimensions.height],
   );
 
   // Build a lookup: agent name → position
@@ -90,26 +87,44 @@ export function SwarmVisualization({
     return map;
   }, [agents]);
 
-  // For each expected phase agent, get or create a stub
+  // For each agent, merge store data with position. Agents outside the
+  // current phase are always shown as idle.
   const resolvedAgents = useMemo(() => {
+    const phaseSet = new Set(phaseAgentNames);
     const result: (AgentActivity & { pos: AgentPosition })[] = [];
     for (const pos of positions) {
       const storeAgent = agentMap.get(pos.name);
+      const inPhase = phaseSet.has(pos.name);
       result.push({
         agent_name: pos.name,
-        status: storeAgent?.status ?? "idle",
+        status: inPhase ? (storeAgent?.status ?? "idle") : "idle",
         phase: storeAgent?.phase ?? (phase ?? ""),
-        detail: storeAgent?.detail ?? "",
+        detail: inPhase ? (storeAgent?.detail ?? "") : "",
         timestamp: storeAgent?.timestamp ?? 0,
         pos,
       });
     }
     return result;
-  }, [positions, agentMap, phase]);
+  }, [positions, agentMap, phase, phaseAgentNames]);
+
+  // Find the active agent with a detail message for the center display
+  const activeDetail = useMemo(() => {
+    const active = resolvedAgents.find(
+      (a) => a.status === "active" && a.detail,
+    );
+    if (!active) return null;
+    return { agentName: active.agent_name, detail: active.detail };
+  }, [resolvedAgents]);
 
   const cx = dimensions.width / 2;
   const cy = dimensions.height / 2;
   const orbitRadius = Math.min(cx, cy) * 0.55;
+
+  // Dynamic node sizes based on container dimensions
+  const nodeSizes = useMemo(
+    () => getNodeSizes(dimensions.width, dimensions.height),
+    [dimensions.width, dimensions.height],
+  );
 
   // Resolve handoff positions
   const handoffFrom = activeHandoff
@@ -118,6 +133,11 @@ export function SwarmVisualization({
   const handoffTo = activeHandoff
     ? positionMap.get(activeHandoff.to)
     : undefined;
+
+  // Config for the active agent (color for the center label)
+  const activeConfig = activeDetail
+    ? getAgentConfig(activeDetail.agentName)
+    : null;
 
   return (
     <div ref={containerRef} className="relative h-full w-full overflow-hidden">
@@ -134,10 +154,10 @@ export function SwarmVisualization({
                 cy={cy}
                 r={orbitRadius}
                 fill="none"
-                className="stroke-border"
-                strokeWidth={1}
-                strokeDasharray="6 4"
-                opacity={0.5}
+                className="stroke-muted-foreground"
+                strokeWidth={1.5}
+                strokeDasharray="8 5"
+                opacity={0.35}
               >
                 <animateTransform
                   attributeName="transform"
@@ -165,13 +185,40 @@ export function SwarmVisualization({
             </AnimatePresence>
           </svg>
 
-          {/* Center hub */}
-          <CenterHub
-            phase={phase}
-            phaseStatus={phaseStatus}
-            cx={cx}
-            cy={cy}
-          />
+          {/* Center: active agent's current work */}
+          <div
+            className="pointer-events-none absolute flex items-center justify-center"
+            style={{
+              left: cx,
+              top: cy,
+              transform: "translate(-50%, -50%)",
+              width: orbitRadius * 1.3,
+              height: orbitRadius * 1.3,
+            }}
+          >
+            <AnimatePresence mode="wait">
+              {activeDetail && activeConfig && (
+                <motion.div
+                  key={`${activeDetail.agentName}-${activeDetail.detail}`}
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  transition={{ duration: 0.4, ease: "easeInOut" }}
+                  className="flex flex-col items-center gap-1.5 text-center"
+                >
+                  <span
+                    className="text-xs font-semibold uppercase tracking-wider"
+                    style={{ color: activeConfig.color }}
+                  >
+                    {activeConfig.label}
+                  </span>
+                  <span className="text-sm leading-relaxed text-muted-foreground">
+                    {activeDetail.detail}
+                  </span>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
 
           {/* Agent nodes */}
           <AnimatePresence>
@@ -180,10 +227,9 @@ export function SwarmVisualization({
                 key={agent.agent_name}
                 name={agent.agent_name}
                 status={agent.status}
-                detail={agent.detail}
                 x={agent.pos.x}
                 y={agent.pos.y}
-                bubbleSide={agent.pos.x >= cx ? "right" : "left"}
+                nodeSizes={nodeSizes}
                 onClick={() => onAgentClick(agent)}
               />
             ))}

@@ -22,23 +22,36 @@ export const PHASE_LABELS: Record<Phase, string> = {
 // Agent identity
 // ---------------------------------------------------------------------------
 
+export type AgentShape =
+  | "dodecahedron"
+  | "icosahedron"
+  | "octahedron"
+  | "box"
+  | "tetrahedron"
+  | "gem"
+  | "cone";
+
 export interface AgentConfig {
   key: string;
   abbr: string;
   color: string;
   label: string;
+  shape: AgentShape;
 }
 
 /** Maps full agent name → visual config. */
 export const AGENT_CONFIG: Record<string, AgentConfig> = {
-  "Project Manager": { key: "pm", abbr: "PM", color: "#3b82f6", label: "Project Manager" },
-  "Solutions Architect": { key: "sa", abbr: "SA", color: "#a855f7", label: "Solutions Architect" },
-  Developer: { key: "dev", abbr: "DV", color: "#22c55e", label: "Developer" },
-  Infrastructure: { key: "infra", abbr: "IF", color: "#f97316", label: "Infrastructure" },
-  "Data Engineer": { key: "data", abbr: "DA", color: "#06b6d4", label: "Data Engineer" },
-  "Security Engineer": { key: "security", abbr: "SC", color: "#f43f5e", label: "Security" },
-  "QA Engineer": { key: "qa", abbr: "QA", color: "#f59e0b", label: "QA Engineer" },
+  "Project Manager": { key: "pm", abbr: "PM", color: "#3b82f6", label: "Project Manager", shape: "dodecahedron" },
+  "Solutions Architect": { key: "sa", abbr: "SA", color: "#a855f7", label: "Solutions Architect", shape: "icosahedron" },
+  Developer: { key: "dev", abbr: "DV", color: "#22c55e", label: "Developer", shape: "octahedron" },
+  Infrastructure: { key: "infra", abbr: "IF", color: "#f97316", label: "Infrastructure", shape: "box" },
+  "Data Engineer": { key: "data", abbr: "DA", color: "#06b6d4", label: "Data Engineer", shape: "tetrahedron" },
+  "Security Engineer": { key: "security", abbr: "SC", color: "#f43f5e", label: "Security", shape: "gem" },
+  "QA Engineer": { key: "qa", abbr: "QA", color: "#f59e0b", label: "QA Engineer", shape: "cone" },
 };
+
+/** All agent names in consistent display order. */
+export const ALL_AGENTS = Object.keys(AGENT_CONFIG);
 
 /** Fallback config for unknown agents. */
 const UNKNOWN_AGENT: AgentConfig = {
@@ -46,6 +59,7 @@ const UNKNOWN_AGENT: AgentConfig = {
   abbr: "??",
   color: "#6b7280",
   label: "Unknown",
+  shape: "octahedron",
 };
 
 export function getAgentConfig(name: string): AgentConfig {
@@ -101,8 +115,29 @@ export function getAgentPositions(
 }
 
 // ---------------------------------------------------------------------------
-// Sizing
+// Sizing — scales dynamically based on container dimensions
 // ---------------------------------------------------------------------------
 
-export const NODE_SIZE_ACTIVE = 80;
-export const NODE_SIZE_IDLE = 64;
+export const NODE_SIZE_ACTIVE = 110;
+export const NODE_SIZE_IDLE = 88;
+
+function clamp(min: number, value: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
+}
+
+export interface NodeSizes {
+  active: number;
+  idle: number;
+  fontSize: number;
+  labelSize: number;
+}
+
+/** Compute node sizes that scale with the container. */
+export function getNodeSizes(width: number, height: number): NodeSizes {
+  const minDim = Math.min(width, height);
+  const active = Math.round(clamp(88, minDim * 0.18, 160));
+  const idle = Math.round(active * 0.8);
+  const fontSize = Math.round(clamp(14, active * 0.16, 22));
+  const labelSize = Math.round(clamp(10, active * 0.1, 14));
+  return { active, idle, fontSize, labelSize };
+}
