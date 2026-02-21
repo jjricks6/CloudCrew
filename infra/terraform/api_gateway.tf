@@ -101,6 +101,23 @@ resource "aws_api_gateway_resource" "tasks" {
 }
 
 # =============================================================================
+# Cognito Authorizer (conditional — only enforced when var.enable_auth is true)
+# =============================================================================
+
+resource "aws_api_gateway_authorizer" "cognito" {
+  name            = "cloudcrew-cognito-${var.environment}"
+  rest_api_id     = aws_api_gateway_rest_api.main.id
+  type            = "COGNITO_USER_POOLS"
+  provider_arns   = [aws_cognito_user_pool.main.arn]
+  identity_source = "method.request.header.Authorization"
+}
+
+locals {
+  auth_type     = var.enable_auth ? "COGNITO_USER_POOLS" : "NONE"
+  authorizer_id = var.enable_auth ? aws_api_gateway_authorizer.cognito.id : null
+}
+
+# =============================================================================
 # Methods → Lambda integrations
 # =============================================================================
 
@@ -109,7 +126,8 @@ resource "aws_api_gateway_method" "post_projects" {
   rest_api_id   = aws_api_gateway_rest_api.main.id
   resource_id   = aws_api_gateway_resource.projects.id
   http_method   = "POST"
-  authorization = "NONE" # IAM auth for M4; Cognito in M5
+  authorization = local.auth_type
+  authorizer_id = local.authorizer_id
 }
 
 resource "aws_api_gateway_integration" "post_projects" {
@@ -126,7 +144,8 @@ resource "aws_api_gateway_method" "get_status" {
   rest_api_id   = aws_api_gateway_rest_api.main.id
   resource_id   = aws_api_gateway_resource.status.id
   http_method   = "GET"
-  authorization = "NONE"
+  authorization = local.auth_type
+  authorizer_id = local.authorizer_id
 }
 
 resource "aws_api_gateway_integration" "get_status" {
@@ -143,7 +162,8 @@ resource "aws_api_gateway_method" "get_deliverables" {
   rest_api_id   = aws_api_gateway_rest_api.main.id
   resource_id   = aws_api_gateway_resource.deliverables.id
   http_method   = "GET"
-  authorization = "NONE"
+  authorization = local.auth_type
+  authorizer_id = local.authorizer_id
 }
 
 resource "aws_api_gateway_integration" "get_deliverables" {
@@ -160,7 +180,8 @@ resource "aws_api_gateway_method" "post_approve" {
   rest_api_id   = aws_api_gateway_rest_api.main.id
   resource_id   = aws_api_gateway_resource.approve.id
   http_method   = "POST"
-  authorization = "NONE"
+  authorization = local.auth_type
+  authorizer_id = local.authorizer_id
 }
 
 resource "aws_api_gateway_integration" "post_approve" {
@@ -177,7 +198,8 @@ resource "aws_api_gateway_method" "post_revise" {
   rest_api_id   = aws_api_gateway_rest_api.main.id
   resource_id   = aws_api_gateway_resource.revise.id
   http_method   = "POST"
-  authorization = "NONE"
+  authorization = local.auth_type
+  authorizer_id = local.authorizer_id
 }
 
 resource "aws_api_gateway_integration" "post_revise" {
@@ -194,7 +216,8 @@ resource "aws_api_gateway_method" "post_interrupt_respond" {
   rest_api_id   = aws_api_gateway_rest_api.main.id
   resource_id   = aws_api_gateway_resource.interrupt_respond.id
   http_method   = "POST"
-  authorization = "NONE"
+  authorization = local.auth_type
+  authorizer_id = local.authorizer_id
 }
 
 resource "aws_api_gateway_integration" "post_interrupt_respond" {
@@ -211,7 +234,8 @@ resource "aws_api_gateway_method" "post_chat" {
   rest_api_id   = aws_api_gateway_rest_api.main.id
   resource_id   = aws_api_gateway_resource.chat.id
   http_method   = "POST"
-  authorization = "NONE"
+  authorization = local.auth_type
+  authorizer_id = local.authorizer_id
 }
 
 resource "aws_api_gateway_integration" "post_chat" {
@@ -228,7 +252,8 @@ resource "aws_api_gateway_method" "get_chat" {
   rest_api_id   = aws_api_gateway_rest_api.main.id
   resource_id   = aws_api_gateway_resource.chat.id
   http_method   = "GET"
-  authorization = "NONE"
+  authorization = local.auth_type
+  authorizer_id = local.authorizer_id
 }
 
 resource "aws_api_gateway_integration" "get_chat" {
@@ -245,7 +270,8 @@ resource "aws_api_gateway_method" "post_upload" {
   rest_api_id   = aws_api_gateway_rest_api.main.id
   resource_id   = aws_api_gateway_resource.upload.id
   http_method   = "POST"
-  authorization = "NONE"
+  authorization = local.auth_type
+  authorizer_id = local.authorizer_id
 }
 
 resource "aws_api_gateway_integration" "post_upload" {
@@ -262,7 +288,8 @@ resource "aws_api_gateway_method" "get_tasks" {
   rest_api_id   = aws_api_gateway_rest_api.main.id
   resource_id   = aws_api_gateway_resource.tasks.id
   http_method   = "GET"
-  authorization = "NONE"
+  authorization = local.auth_type
+  authorizer_id = local.authorizer_id
 }
 
 resource "aws_api_gateway_integration" "get_tasks" {
@@ -333,6 +360,13 @@ resource "aws_api_gateway_deployment" "main" {
       aws_api_gateway_resource.tasks,
       aws_api_gateway_method.get_tasks,
       aws_api_gateway_integration.get_tasks,
+      aws_api_gateway_authorizer.cognito,
+      aws_api_gateway_gateway_response.cors_4xx,
+      aws_api_gateway_gateway_response.cors_5xx,
+      aws_api_gateway_method.options,
+      aws_api_gateway_integration.options,
+      aws_api_gateway_method_response.options,
+      aws_api_gateway_integration_response.options,
     ]))
   }
 

@@ -1,10 +1,10 @@
 .PHONY: check test lint format typecheck security arch-test file-size-check \
-       install install-hooks clean checkov-scan \
+       install install-hooks clean checkov-scan dashboard-check \
        bootstrap-init bootstrap-apply tf-init tf-plan tf-apply tf-destroy tf-validate \
        docker-build docker-push
 
 # Run ALL CI checks locally — agents MUST run this before committing and pushing
-check: format lint typecheck test security file-size-check tf-validate checkov-scan
+check: format lint typecheck test security file-size-check tf-validate checkov-scan dashboard-check
 
 # Install dependencies
 install:
@@ -99,6 +99,11 @@ tf-validate:
 # Checkov security scan on Terraform code (uses .checkov.yml for dev suppressions)
 checkov-scan:
 	checkov -d infra/ --framework terraform --quiet --compact --config-file infra/terraform/.checkov.yml
+
+# --- Dashboard: frontend lint, typecheck, build ---
+
+dashboard-check:
+	cd dashboard && npx tsc -b && npx eslint . && npx vite build
 
 # --- Docker: ECS phase runner image ---
 

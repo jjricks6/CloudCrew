@@ -41,8 +41,8 @@ skip-check:
   # --- WebSocket API (auth deferred to M5g/Cognito) ---
   - CKV_AWS_309  # WebSocket route authorization (deferred to M5g Cognito)
 
-  # --- API Gateway (auth deferred to M5/Cognito, logging not needed in dev) ---
-  - CKV_AWS_59   # API Gateway method authorization (deferred to M5 Cognito)
+  # --- API Gateway (auth conditional via var.enable_auth, logging not needed in dev) ---
+  - CKV_AWS_59   # API Gateway method authorization (conditional via var.enable_auth)
   - CKV_AWS_73   # API Gateway stage X-Ray tracing (not needed in dev)
   - CKV_AWS_76   # API Gateway stage access logging (not needed in dev)
   - CKV_AWS_120  # API Gateway caching (not needed in dev)
@@ -50,6 +50,20 @@ skip-check:
   - CKV2_AWS_29  # API Gateway WAF protection (not needed in dev)
   - CKV2_AWS_51  # API Gateway client certificate auth (deferred to M5)
   - CKV2_AWS_53  # API Gateway request validation (deferred to M5)
+
+  # --- CloudFront (dev doesn't need WAF, logging, custom headers, or geo restriction) ---
+  - CKV_AWS_68   # CloudFront WAF enabled (not needed in dev)
+  - CKV_AWS_86   # CloudFront access logging (not needed in dev)
+  - CKV_AWS_174  # CloudFront response headers policy (not needed in dev)
+  - CKV_AWS_310  # CloudFront geo restriction (no restriction in dev)
+  - CKV_AWS_374  # CloudFront geo restriction enabled (no restriction in dev)
+  - CKV2_AWS_32  # CloudFront origin failover (single origin in dev)
+  - CKV2_AWS_42  # CloudFront custom SSL certificate (using default cert in dev)
+  - CKV2_AWS_47  # CloudFront WAF association (not needed in dev)
+
+  # --- Cognito (dev relaxations) ---
+  - CKV_AWS_163  # Cognito user pool MFA (not needed in dev)
+  - CKV_AWS_164  # Cognito temporary password validity (using default)
 
   # --- Step Functions ---
   - CKV_AWS_284  # State Machine X-Ray tracing (not needed in dev)

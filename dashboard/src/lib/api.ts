@@ -2,15 +2,30 @@
  * REST API client for the CloudCrew backend.
  *
  * Base URL is configured via VITE_API_URL environment variable.
+ * When Cognito auth is enabled, injects the ID token as a Bearer header.
  */
+
+import { getIdToken, isAuthEnabled } from "./auth";
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+
+  // Inject Cognito token when auth is enabled
+  if (isAuthEnabled()) {
+    const token = await getIdToken();
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+  }
+
   const res = await fetch(`${BASE_URL}${path}`, {
     ...options,
     headers: {
-      "Content-Type": "application/json",
+      ...headers,
       ...options?.headers,
     },
   });

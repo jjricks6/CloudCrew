@@ -61,5 +61,9 @@ WEBSOCKET_API_ENDPOINT: str = os.environ.get("WEBSOCKET_API_ENDPOINT", "")
 # --- Board Tasks (Kanban) ---
 BOARD_TASKS_TABLE: str = os.environ.get("BOARD_TASKS_TABLE", "cloudcrew-board-tasks")
 
+# --- Cognito Auth ---
+COGNITO_USER_POOL_ID: str = os.environ.get("COGNITO_USER_POOL_ID", "")
+COGNITO_CLIENT_ID: str = os.environ.get("COGNITO_CLIENT_ID", "")
+
 # --- PM Chat ---
 PM_CHAT_LAMBDA_NAME: str = os.environ.get("PM_CHAT_LAMBDA_NAME", "")

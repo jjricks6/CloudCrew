@@ -98,3 +98,35 @@ output "sow_bucket" {
   description = "SOW uploads S3 bucket name"
   value       = aws_s3_bucket.sow_uploads.id
 }
+
+output "dashboard_bucket" {
+  description = "Dashboard static hosting S3 bucket name"
+  value       = aws_s3_bucket.dashboard.id
+}
+
+# --- Cognito ---
+output "cognito_user_pool_id" {
+  description = "Cognito user pool ID for dashboard authentication"
+  value       = aws_cognito_user_pool.main.id
+}
+
+output "cognito_client_id" {
+  description = "Cognito app client ID for dashboard SPA"
+  value       = aws_cognito_user_pool_client.dashboard.id
+}
+
+output "cognito_domain" {
+  description = "Cognito hosted UI domain"
+  value       = aws_cognito_user_pool_domain.main.domain
+}
+
+# --- CloudFront ---
+output "cloudfront_domain" {
+  description = "CloudFront distribution domain for the dashboard"
+  value       = aws_cloudfront_distribution.dashboard.domain_name
+}
+
+output "cloudfront_distribution_id" {
+  description = "CloudFront distribution ID (for cache invalidation)"
+  value       = aws_cloudfront_distribution.dashboard.id
+}

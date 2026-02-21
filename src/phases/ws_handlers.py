@@ -4,6 +4,9 @@ Manages WebSocket connections (connect/disconnect) in DynamoDB. The
 broadcast_to_project utility lives in src/state/broadcast.py so that
 state modules can import it without violating architecture boundaries.
 
+When Cognito auth is enabled (COGNITO_USER_POOL_ID set), the $connect
+handler validates the JWT token passed as a query parameter.
+
 This module is in phases/ — the ONLY package allowed to import from agents/.
 (Though this module does not import agents — it handles infrastructure only.)
 """
@@ -12,12 +15,17 @@ import json
 import logging
 from datetime import UTC, datetime
 from typing import Any
+from urllib.request import urlopen
 
 import boto3
+from jose import JWTError, jwt
 
-from src.config import AWS_REGION, CONNECTIONS_TABLE
+from src.config import AWS_REGION, COGNITO_CLIENT_ID, COGNITO_USER_POOL_ID, CONNECTIONS_TABLE
 
 logger = logging.getLogger(__name__)
+
+# Cache JWKS keys at module level (Lambda warm start reuse)
+_jwks_cache: dict[str, Any] | None = None
 
 
 def _now_iso() -> str:
@@ -36,6 +44,51 @@ def _ttl_2h() -> int:
     return int(datetime.now(UTC).timestamp()) + 7200
 
 
+def _get_jwks() -> dict[str, Any]:
+    """Fetch and cache the Cognito JWKS (JSON Web Key Set).
+
+    The JWKS is cached at module level so subsequent Lambda invocations
+    on a warm container skip the HTTP call.
+    """
+    global _jwks_cache
+    if _jwks_cache is not None:
+        return _jwks_cache
+
+    issuer = f"https://cognito-idp.{AWS_REGION}.amazonaws.com/{COGNITO_USER_POOL_ID}"
+    jwks_url = f"{issuer}/.well-known/jwks.json"
+    with urlopen(jwks_url) as response:  # noqa: S310 — trusted AWS endpoint
+        _jwks_cache = json.loads(response.read())
+    return _jwks_cache
+
+
+def _validate_token(token: str) -> bool:
+    """Validate a Cognito JWT ID token.
+
+    Checks signature, expiry, issuer, and audience (client_id).
+
+    Args:
+        token: Raw JWT string from query parameter.
+
+    Returns:
+        True if the token is valid, False otherwise.
+    """
+    try:
+        jwks = _get_jwks()
+        issuer = f"https://cognito-idp.{AWS_REGION}.amazonaws.com/{COGNITO_USER_POOL_ID}"
+        jwt.decode(
+            token,
+            jwks,
+            algorithms=["RS256"],
+            audience=COGNITO_CLIENT_ID,
+            issuer=issuer,
+        )
+    except (JWTError, Exception):  # catch network/parse errors too
+        logger.warning("JWT validation failed", exc_info=True)
+        return False
+    else:
+        return True
+
+
 def connect_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
     """Handle WebSocket $connect route.
 
@@ -45,12 +98,15 @@ def connect_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
     The project_id is passed as a query string parameter:
     ``wss://...?projectId=<uuid>``
 
+    When Cognito auth is enabled, validates the JWT token passed as
+    ``&token=<jwt>`` in the query string.
+
     Args:
         event: API Gateway WebSocket event.
         context: Lambda context (unused).
 
     Returns:
-        HTTP 200 response.
+        HTTP 200 response on success, 401 if auth fails.
     """
     connection_id = event["requestContext"]["connectionId"]
     query_params = event.get("queryStringParameters") or {}
@@ -59,6 +115,13 @@ def connect_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
     if not project_id:
         logger.warning("WebSocket connect without projectId, connectionId=%s", connection_id)
         return {"statusCode": 400, "body": "Missing projectId query parameter"}
+
+    # Validate JWT when Cognito is configured
+    if COGNITO_USER_POOL_ID and COGNITO_CLIENT_ID:
+        token = query_params.get("token", "")
+        if not token or not _validate_token(token):
+            logger.warning("WebSocket auth failed, connectionId=%s", connection_id)
+            return {"statusCode": 401, "body": "Unauthorized"}
 
     if not CONNECTIONS_TABLE:
         logger.warning("CONNECTIONS_TABLE not configured, skipping connection storage")

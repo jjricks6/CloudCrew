@@ -68,3 +68,19 @@ variable "lambda_pm_chat_timeout" {
   type        = number
   default     = 120
 }
+
+# --- Auth ---
+
+variable "enable_auth" {
+  description = "Enable Cognito authorizer on API Gateway methods"
+  type        = bool
+  default     = false
+}
+
+# --- Dashboard ---
+
+variable "dashboard_origin" {
+  description = "Allowed CORS origin for the dashboard (CloudFront domain or * for dev)"
+  type        = string
+  default     = "*"
+}

@@ -1,0 +1,80 @@
+name: Deploy Dashboard to AWS Production
+
+on:
+  # Manual trigger only — per CLAUDE.md deployment rules
+  workflow_dispatch:
+    inputs:
+      api_url:
+        description: "REST API URL (from Terraform output api_gateway_url)"
+        required: true
+        type: string
+      ws_url:
+        description: "WebSocket URL (from Terraform output websocket_url)"
+        required: true
+        type: string
+      cognito_user_pool_id:
+        description: "Cognito User Pool ID (from Terraform output cognito_user_pool_id)"
+        required: true
+        type: string
+      cognito_client_id:
+        description: "Cognito Client ID (from Terraform output cognito_client_id)"
+        required: true
+        type: string
+      s3_bucket:
+        description: "Dashboard S3 bucket name (from Terraform output dashboard_bucket)"
+        required: true
+        type: string
+      cloudfront_distribution_id:
+        description: "CloudFront distribution ID (from Terraform output cloudfront_distribution_id)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: "production-deploy"
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: dashboard/package-lock.json
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: dashboard
+
+      - name: Build for production
+        run: npx vite build
+        working-directory: dashboard
+        env:
+          VITE_API_URL: ${{ inputs.api_url }}
+          VITE_WS_URL: ${{ inputs.ws_url }}
+          VITE_COGNITO_USER_POOL_ID: ${{ inputs.cognito_user_pool_id }}
+          VITE_COGNITO_CLIENT_ID: ${{ inputs.cognito_client_id }}
+
+      - name: Deploy to S3
+        run: aws s3 sync dist/ "s3://${{ inputs.s3_bucket }}" --delete
+        working-directory: dashboard
+
+      - name: Invalidate CloudFront cache
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id "${{ inputs.cloudfront_distribution_id }}" \
+            --paths "/*"

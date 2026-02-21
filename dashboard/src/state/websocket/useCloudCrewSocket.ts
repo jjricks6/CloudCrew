@@ -5,9 +5,10 @@
  * and dispatches incoming events to the Zustand agent store.
  */
 
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import useWebSocket, { ReadyState } from "react-use-websocket";
 import { useAgentStore } from "@/state/stores/agentStore";
+import { getIdToken, isAuthEnabled } from "@/lib/auth";
 import type { WebSocketEvent, WsStatus } from "@/lib/types";
 
 const WS_URL = import.meta.env.VITE_WS_URL ?? "";
@@ -21,14 +22,33 @@ const READY_STATE_MAP: Record<ReadyState, WsStatus> = {
   [ReadyState.UNINSTANTIATED]: "disconnected",
 };
 
+/**
+ * Build the WebSocket URL, appending auth token when Cognito is enabled.
+ * Returns a Promise so react-use-websocket resolves it before connecting.
+ */
+async function buildSocketUrl(projectId: string): Promise<string> {
+  let url = `${WS_URL}?projectId=${projectId}`;
+  if (isAuthEnabled()) {
+    const token = await getIdToken();
+    if (token) {
+      url += `&token=${encodeURIComponent(token)}`;
+    }
+  }
+  return url;
+}
+
 export function useCloudCrewSocket(projectId: string | undefined) {
   const setWsStatus = useAgentStore((s) => s.setWsStatus);
   const addEvent = useAgentStore((s) => s.addEvent);
   const heartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const socketUrl = projectId && WS_URL ? `${WS_URL}?projectId=${projectId}` : null;
+  // react-use-websocket accepts a callback that returns a Promise<string>
+  const getSocketUrl = useMemo(() => {
+    if (!projectId || !WS_URL) return null;
+    return () => buildSocketUrl(projectId);
+  }, [projectId]);
 
-  const { readyState, sendJsonMessage } = useWebSocket(socketUrl, {
+  const { readyState, sendJsonMessage } = useWebSocket(getSocketUrl, {
     shouldReconnect: () => true,
     reconnectAttempts: 20,
     reconnectInterval: (attemptNumber) =>

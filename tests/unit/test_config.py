@@ -118,6 +118,16 @@ class TestConfigDefaults:
             assert src.config.CONNECTIONS_TABLE == ""
             assert src.config.WEBSOCKET_API_ENDPOINT == ""
 
+    def test_cognito_defaults(self) -> None:
+        with patch.dict(os.environ, {}, clear=True):
+            import importlib
+
+            import src.config
+
+            importlib.reload(src.config)
+            assert src.config.COGNITO_USER_POOL_ID == ""
+            assert src.config.COGNITO_CLIENT_ID == ""
+
 
 @pytest.mark.unit
 class TestConfigOverrides:

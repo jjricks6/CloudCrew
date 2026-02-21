@@ -40,8 +40,10 @@ resource "aws_lambda_function" "ws_handlers" {
 
   environment {
     variables = {
-      AWS_DEFAULT_REGION = var.aws_region
-      CONNECTIONS_TABLE  = aws_dynamodb_table.connections.name
+      AWS_DEFAULT_REGION   = var.aws_region
+      CONNECTIONS_TABLE    = aws_dynamodb_table.connections.name
+      COGNITO_USER_POOL_ID = aws_cognito_user_pool.main.id
+      COGNITO_CLIENT_ID    = aws_cognito_user_pool_client.dashboard.id
     }
   }
 
