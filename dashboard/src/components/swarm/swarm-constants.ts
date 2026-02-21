@@ -72,9 +72,9 @@ export function getAgentConfig(name: string): AgentConfig {
 
 export const PHASE_AGENTS: Partial<Record<Phase, string[]>> = {
   DISCOVERY: ["Project Manager", "Solutions Architect"],
-  ARCHITECTURE: ["Solutions Architect", "Infrastructure", "Security Engineer"],
-  POC: ["Developer", "Infrastructure", "Data Engineer", "Security Engineer", "Solutions Architect"],
-  PRODUCTION: ["Developer", "Infrastructure", "Data Engineer", "Security Engineer", "QA Engineer"],
+  ARCHITECTURE: ["Project Manager", "Solutions Architect", "Infrastructure", "Security Engineer"],
+  POC: ["Project Manager", "Developer", "Infrastructure", "Data Engineer", "Security Engineer", "Solutions Architect"],
+  PRODUCTION: ["Project Manager", "Developer", "Infrastructure", "Data Engineer", "Security Engineer", "QA Engineer"],
   HANDOFF: ["Project Manager", "Solutions Architect"],
 };
 

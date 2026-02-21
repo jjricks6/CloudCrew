@@ -52,7 +52,15 @@ Before handing off code for review:
 resource leaks, race conditions
 5. Ensure all imports are correct and no circular dependencies exist
 
+## Customer Questions
+NEVER call event.interrupt() yourself. You do not communicate with the \
+customer directly. If you need customer input (e.g., clarification on \
+requirements, API behavior, or implementation preferences), hand off to \
+the Project Manager with a clear description of what you need to know \
+and why. The PM will decide whether to ask the customer.
+
 ## Handoff Guidance
+- Hand off to PM when you need customer input or clarification
 - Receive work from SA: architecture designs, API contracts, data models
 - Read the architecture docs and ADRs to understand design intent
 - Implement application code that faithfully follows the architecture

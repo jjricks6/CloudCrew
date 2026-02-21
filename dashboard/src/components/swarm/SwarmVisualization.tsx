@@ -20,11 +20,19 @@ import {
 import { AgentNode } from "./AgentNode";
 import { HandoffArc, HandoffGlowFilter } from "./HandoffArc";
 
+interface CenterNotification {
+  type: "interrupt" | "approval";
+  message: string;
+  buttonLabel: string;
+  onAction: () => void;
+}
+
 interface SwarmVisualizationProps {
   agents: AgentActivity[];
   phase?: Phase;
   activeHandoff: { from: string; to: string; id: string } | null;
   onAgentClick: (agent: AgentActivity) => void;
+  notification?: CenterNotification | null;
 }
 
 export function SwarmVisualization({
@@ -32,6 +40,7 @@ export function SwarmVisualization({
   phase,
   activeHandoff,
   onAgentClick,
+  notification,
 }: SwarmVisualizationProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
@@ -185,19 +194,46 @@ export function SwarmVisualization({
             </AnimatePresence>
           </svg>
 
-          {/* Center: active agent's current work */}
+          {/* Center: notification or active agent's current work */}
           <div
-            className="pointer-events-none absolute flex items-center justify-center"
+            className="absolute flex items-center justify-center"
             style={{
               left: cx,
               top: cy,
               transform: "translate(-50%, -50%)",
               width: orbitRadius * 1.3,
               height: orbitRadius * 1.3,
+              pointerEvents: notification ? "auto" : "none",
             }}
           >
             <AnimatePresence mode="wait">
-              {activeDetail && activeConfig && (
+              {notification ? (
+                <motion.div
+                  key={`notification-${notification.type}`}
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  transition={{ duration: 0.4, ease: "easeInOut" }}
+                  className="flex flex-col items-center gap-1.5 text-center"
+                >
+                  <span
+                    className="text-xs font-semibold uppercase tracking-wider"
+                    style={{ color: "#3b82f6" }}
+                  >
+                    Project Manager
+                  </span>
+                  <span className="max-w-[260px] text-sm leading-relaxed text-muted-foreground">
+                    {notification.message}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={notification.onAction}
+                    className="mt-1 rounded-md bg-primary px-4 py-1.5 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+                  >
+                    {notification.buttonLabel}
+                  </button>
+                </motion.div>
+              ) : activeDetail && activeConfig ? (
                 <motion.div
                   key={`${activeDetail.agentName}-${activeDetail.detail}`}
                   initial={{ opacity: 0, y: 6 }}
@@ -216,7 +252,7 @@ export function SwarmVisualization({
                     {activeDetail.detail}
                   </span>
                 </motion.div>
-              )}
+              ) : null}
             </AnimatePresence>
           </div>
 

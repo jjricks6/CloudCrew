@@ -4,14 +4,16 @@
  * The engine is a generic segment player: it reads pure data arrays from
  * `demoTimeline.ts` and schedules them through `agentStore.addEvent()`.
  * Editing the demo sequence means editing `demoTimeline.ts` — this file
- * only handles scheduling, pausing, and reacting to user actions.
+ * only handles scheduling and reacting to user actions.
+ *
+ * No timers control the flow — interrupts and approvals emerge naturally
+ * from the agent handoff sequence, just like the real backend. The only
+ * pauses are when the engine waits for user input.
  *
  * Flow:
- *   mount → SEED → WORK_LOOP (repeating)
- *   at ~30s → pause work → INTERRUPT
- *   user answers interrupt → RESUME → WORK_LOOP
- *   at ~15s after resume → pause work → APPROVAL
- *   user approves → NEXT_PHASE_SEED → stop (demo complete)
+ *   mount → SEED → WORK_BEFORE_INTERRUPT → [wait for user response]
+ *   → RESUME_AND_WORK → [wait for user approval]
+ *   → NEXT_PHASE_SEED → done
  */
 
 import { useEffect, useRef } from "react";
@@ -20,10 +22,8 @@ import { useAgentStore } from "@/state/stores/agentStore";
 import type { TimelineStep } from "@/lib/demoTimeline";
 import {
   SEED_SEGMENT,
-  WORK_LOOP_SEGMENT,
-  INTERRUPT_SEGMENT,
-  APPROVAL_SEGMENT,
-  RESUME_SEGMENT,
+  WORK_BEFORE_INTERRUPT,
+  RESUME_AND_WORK,
   NEXT_PHASE_SEED,
 } from "@/lib/demoTimeline";
 
@@ -39,7 +39,6 @@ type EnginePhase =
 export function useDemoEngine(projectId: string | undefined) {
   const timeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const enginePhaseRef = useRef<EnginePhase>("seed");
-  const workStartRef = useRef(0);
 
   useEffect(() => {
     if (!isDemoMode(projectId)) return;
@@ -77,86 +76,45 @@ export function useDemoEngine(projectId: string | undefined) {
       return cumulative;
     }
 
-    /** Play the work loop, repeating until cancelled. */
-    function startWorkLoop() {
-      enginePhaseRef.current = "working";
-      workStartRef.current = Date.now();
-
-      function runCycle() {
-        const duration = playSegment(WORK_LOOP_SEGMENT, () => {
-          // Small pause between cycles
-          schedule(runCycle, 2000);
-        });
-        // This is just for the recursive call — duration isn't used here
-        void duration;
-      }
-
-      runCycle();
-    }
-
-    /** Fire interrupt: pause work, idle all agents, fire interrupt event. */
-    function fireInterrupt() {
-      cancelAll();
-      enginePhaseRef.current = "interrupt_pending";
-      playSegment(INTERRUPT_SEGMENT);
-    }
-
-    /** Resume after interrupt: re-activate agents, restart work loop. */
-    function resumeAfterInterrupt() {
-      cancelAll();
-      enginePhaseRef.current = "resuming";
-      const duration = playSegment(RESUME_SEGMENT, () => {
-        startWorkLoop();
-        // Schedule approval 15s after resume
-        schedule(fireApproval, 15_000);
-      });
-      void duration;
-    }
-
-    /** Fire approval: pause work, idle all agents, fire approval event. */
-    function fireApproval() {
-      cancelAll();
-      enginePhaseRef.current = "approval_pending";
-      playSegment(APPROVAL_SEGMENT);
-    }
-
-    /** Advance to next phase after approval. */
-    function advancePhase() {
-      cancelAll();
-      enginePhaseRef.current = "next_phase";
-      playSegment(NEXT_PHASE_SEED, () => {
-        enginePhaseRef.current = "done";
-      });
-    }
-
     // --- Boot sequence ---
-    // 1. Seed agents
-    const seedDuration = playSegment(SEED_SEGMENT, () => {
-      // 2. Start work loop
-      startWorkLoop();
-      // 3. Schedule interrupt at 30s from now
-      schedule(fireInterrupt, 30_000);
+    // 1. Seed agents (if any)
+    // 2. Play work → naturally ends with interrupt
+    playSegment(SEED_SEGMENT, () => {
+      enginePhaseRef.current = "working";
+      playSegment(WORK_BEFORE_INTERRUPT, () => {
+        enginePhaseRef.current = "interrupt_pending";
+        // Now we wait for the user to respond to the interrupt.
+        // The store subscription below handles the transition.
+      });
     });
-    void seedDuration;
 
     // --- React to user actions via store subscriptions ---
     const unsubscribe = useAgentStore.subscribe((state, prevState) => {
-      // User answered interrupt → resume work
+      // User answered interrupt → play resume + more work → ends with approval
       if (
         prevState.pendingInterrupt !== null &&
         state.pendingInterrupt === null &&
         enginePhaseRef.current === "interrupt_pending"
       ) {
-        resumeAfterInterrupt();
+        cancelAll();
+        enginePhaseRef.current = "resuming";
+        playSegment(RESUME_AND_WORK, () => {
+          enginePhaseRef.current = "approval_pending";
+          // Now we wait for the user to approve/revise.
+        });
       }
 
-      // User dismissed approval → advance phase
+      // User dismissed approval → advance to next phase
       if (
         prevState.pendingApproval !== null &&
         state.pendingApproval === null &&
         enginePhaseRef.current === "approval_pending"
       ) {
-        advancePhase();
+        cancelAll();
+        enginePhaseRef.current = "next_phase";
+        playSegment(NEXT_PHASE_SEED, () => {
+          enginePhaseRef.current = "done";
+        });
       }
     });
 

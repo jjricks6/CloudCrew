@@ -67,7 +67,7 @@ export function AgentDetailPanel({
           <div className="flex-1">
             <h3 className="font-semibold text-foreground">{config.label}</h3>
             <Badge
-              variant={agent.status === "active" ? "default" : "secondary"}
+              variant={agent.status === "idle" ? "secondary" : "default"}
               className="mt-0.5 text-[10px]"
             >
               {agent.status}

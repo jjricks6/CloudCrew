@@ -155,20 +155,52 @@ export const useAgentStore = create<AgentState>((set, get) => ({
       }
 
       if (event.event === "handoff") {
-        // Handoff events drive the arc animation only — no timeline entry.
-        // Parse "Handoff from {src} to {dest}"
+        // A handoff means: source agent finishes → work transfers to target.
+        // This idles the source and puts the target into "thinking" (lit up,
+        // pulsing, not yet spinning). The target transitions to "active"
+        // once it calls report_activity (fires an agent_active event).
         const match = event.detail.match(/Handoff from (.+) to (.+)/);
         const fromAgent = match?.[1] ?? "unknown";
+        const toAgent = event.agent_name;
 
         const handoffId = crypto.randomUUID();
 
-        // Auto-clear handoff after 2 seconds
+        // Auto-clear handoff arc after 2 seconds
         setTimeout(() => {
           get().clearHandoff(handoffId);
         }, 2000);
 
+        const targetExists = state.agents.some(
+          (a) => a.agent_name === toAgent,
+        );
+
+        let updatedAgents = state.agents.map((a) => {
+          if (a.agent_name === fromAgent) {
+            return { ...a, status: "idle" as const, timestamp: now };
+          }
+          if (a.agent_name === toAgent) {
+            return { ...a, status: "thinking" as const, timestamp: now };
+          }
+          return a;
+        });
+
+        // If the target agent hasn't appeared yet, add it
+        if (!targetExists) {
+          updatedAgents = [
+            ...updatedAgents,
+            {
+              agent_name: toAgent,
+              status: "thinking" as const,
+              phase: event.phase,
+              detail: "",
+              timestamp: now,
+            },
+          ];
+        }
+
         return {
-          activeHandoff: { from: fromAgent, to: event.agent_name, id: handoffId },
+          activeHandoff: { from: fromAgent, to: toAgent, id: handoffId },
+          agents: updatedAgents,
         };
       }
 

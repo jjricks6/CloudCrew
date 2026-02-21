@@ -1,12 +1,10 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { AnimatePresence } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PhaseTimeline } from "@/components/PhaseTimeline";
-import { ApprovalBanner } from "@/components/approval/ApprovalBanner";
 import { SwarmVisualization } from "@/components/swarm/SwarmVisualization";
 import { ActivityTimeline } from "@/components/swarm/ActivityTimeline";
 import { AgentDetailPanel } from "@/components/swarm/AgentDetailPanel";
@@ -27,6 +25,27 @@ export function DashboardPage() {
   const { data: project, isLoading: projectLoading } =
     useProjectStatus(projectId);
 
+  // Build center notification for the swarm circle
+  const centerNotification = useMemo(() => {
+    if (interrupt) {
+      return {
+        type: "interrupt" as const,
+        message: "I have a question that needs your input.",
+        buttonLabel: "Respond in Chat",
+        onAction: () => navigate("chat"),
+      };
+    }
+    if (project?.phase_status === "AWAITING_APPROVAL" && project.current_phase) {
+      return {
+        type: "approval" as const,
+        message: `The ${project.current_phase} phase is ready for your review.`,
+        buttonLabel: "Review",
+        onAction: () => navigate("chat"),
+      };
+    }
+    return null;
+  }, [interrupt, project?.phase_status, project?.current_phase, navigate]);
+
   return (
     <div className="space-y-4">
       {/* Header row */}
@@ -35,30 +54,6 @@ export function DashboardPage() {
         <Badge variant={wsStatus === "connected" ? "default" : "outline"}>
           {wsStatus === "connected" ? "Live" : "Offline"}
         </Badge>
-      </div>
-
-      {/* Notifications */}
-      {interrupt && (
-        <div className="flex items-center justify-between rounded-lg border border-yellow-500/30 bg-yellow-50 px-4 py-3 dark:bg-yellow-950/20">
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-medium text-yellow-800 dark:text-yellow-300">
-              The agent has a question about the {interrupt.phase} phase.
-            </span>
-            <Badge variant="secondary" className="text-xs">
-              Input Needed
-            </Badge>
-          </div>
-          <Button size="sm" onClick={() => navigate("chat")}>
-            Respond in Chat
-          </Button>
-        </div>
-      )}
-
-      <div>
-        <ApprovalBanner
-          currentPhase={project?.current_phase}
-          phaseStatus={project?.phase_status}
-        />
       </div>
 
       {/* Phase Progress */}
@@ -87,6 +82,7 @@ export function DashboardPage() {
             phase={project?.current_phase}
             activeHandoff={activeHandoff}
             onAgentClick={setSelectedAgent}
+            notification={centerNotification}
           />
         </div>
 

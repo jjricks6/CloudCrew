@@ -1,7 +1,8 @@
 /**
  * Animated agent circle for the swarm visualization.
  *
- * - Active: pulsing glow, full opacity
+ * - Active (working): full opacity, spinning 3D shape
+ * - Thinking: full opacity, pulsing 3D shape (no spin)
  * - Idle: muted, smaller
  * - Smooth transitions between states (0.5s)
  * - Draggable with spring-back to original position
@@ -28,7 +29,7 @@ function nameHash(name: string): number {
 
 interface AgentNodeProps {
   name: string;
-  status: "active" | "idle";
+  status: "active" | "idle" | "thinking";
   x: number;
   y: number;
   /** Dynamic sizes based on container. Falls back to hardcoded constants. */
@@ -51,7 +52,8 @@ export function AgentNode({
       window.matchMedia("(prefers-color-scheme: dark)").matches);
 
   const config = getAgentConfig(name);
-  const isActive = status === "active";
+  // Both "active" and "thinking" are visually lit up (not dimmed)
+  const isLit = status !== "idle";
   const activeSize = nodeSizes?.active ?? NODE_SIZE_ACTIVE;
   const fontSize = nodeSizes?.fontSize ?? 14;
   const labelSize = nodeSizes?.labelSize ?? 10;
@@ -108,7 +110,7 @@ export function AgentNode({
       }}
       initial={{ opacity: 0, scale: 0.8 }}
       animate={{
-        opacity: isActive ? 1 : 0.5,
+        opacity: isLit ? 1 : 0.5,
         scale: 1,
       }}
       exit={{ opacity: 0, scale: 0.8 }}
@@ -139,7 +141,7 @@ export function AgentNode({
         <AgentPolyhedron
           shape={config.shape}
           color={config.color}
-          isActive={isActive}
+          status={status}
         />
 
         {/* Abbreviation overlay centered on top of the 3D scene */}
@@ -163,15 +165,15 @@ export function AgentNode({
         style={{
           top: "100%",
           marginTop: 6,
-          color: isActive ? config.color : undefined,
-          opacity: isActive ? 1 : 0.5,
+          color: isLit ? config.color : undefined,
+          opacity: isLit ? 1 : 0.5,
           fontSize: labelSize,
         }}
       >
-        {!isActive && (
+        {!isLit && (
           <span className="text-muted-foreground">{config.label}</span>
         )}
-        {isActive && config.label}
+        {isLit && config.label}
       </span>
     </motion.div>
   );

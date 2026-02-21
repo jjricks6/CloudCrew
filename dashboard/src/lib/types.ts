@@ -230,7 +230,7 @@ export interface ChatMessage {
 
 export interface AgentActivity {
   agent_name: string;
-  status: "active" | "idle";
+  status: "active" | "idle" | "thinking";
   phase: string;
   detail: string;
   timestamp: number;

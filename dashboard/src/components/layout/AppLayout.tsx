@@ -13,7 +13,6 @@ function getPageTitle(pathname: string): string {
   const titles: Record<string, string> = {
     chat: "Project Manager Chat",
     board: "Task Board",
-    swarm: "Swarm Visualization",
     artifacts: "Artifacts",
   };
   return titles[segment] ?? "Dashboard";

@@ -9,7 +9,6 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { DashboardPage } from "@/pages/DashboardPage";
 import { ChatPage } from "@/pages/ChatPage";
 import { BoardPage } from "@/pages/BoardPage";
-import { SwarmPage } from "@/pages/SwarmPage";
 import { ArtifactsPage } from "@/pages/ArtifactsPage";
 import { LoginPage } from "@/pages/LoginPage";
 import { NotFoundPage } from "@/pages/NotFoundPage";
@@ -47,7 +46,6 @@ function AppRoutes() {
         <Route index element={<DashboardPage />} />
         <Route path="chat" element={<ChatPage />} />
         <Route path="board" element={<BoardPage />} />
-        <Route path="swarm" element={<SwarmPage />} />
         <Route path="artifacts" element={<ArtifactsPage />} />
       </Route>
       <Route path="*" element={<NotFoundPage />} />

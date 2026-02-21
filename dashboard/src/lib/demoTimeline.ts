@@ -7,6 +7,19 @@
  *
  * All events match the WebSocketEvent union so they flow through
  * `agentStore.addEvent()` identically to real backend events.
+ *
+ * The demo is structured as sequential segments that mirror real backend
+ * behavior — no timers. The engine plays each segment in order, pausing
+ * only when waiting for user input (interrupt response or approval).
+ *
+ * Handoff events set the target agent to "thinking" (lit up, pulsing, no
+ * spin). The agent transitions to "active" (spinning) when it reports
+ * activity via an agent_active event — typically ~2s after the handoff,
+ * simulating the agent figuring out what to work on.
+ *
+ * Flow:
+ *   SEED → WORK_BEFORE_INTERRUPT → [wait for user] → RESUME_AND_WORK
+ *   → [wait for user] → NEXT_PHASE_SEED → done
  */
 
 import type { WebSocketEvent } from "./types";
@@ -25,19 +38,6 @@ function active(agent: string, detail: string, delayMs = 0): TimelineStep {
     delayMs,
     event: {
       event: "agent_active",
-      project_id: "demo",
-      phase: "ARCHITECTURE",
-      agent_name: agent,
-      detail,
-    },
-  };
-}
-
-function idle(agent: string, detail: string, delayMs = 0): TimelineStep {
-  return {
-    delayMs,
-    event: {
-      event: "agent_idle",
       project_id: "demo",
       phase: "ARCHITECTURE",
       agent_name: agent,
@@ -87,83 +87,42 @@ function taskUpdate(
 export const SEED_SEGMENT: TimelineStep[] = [];
 
 // ---------------------------------------------------------------------------
-// WORK_LOOP — repeating swarm collaboration cycle (~82s)
+// WORK_BEFORE_INTERRUPT — agents collaborate, then SA needs customer input
 //
-// Event ordering for each transition:
-//   1. agent_idle   (source finishes)
-//   2. handoff      (arc fires 200ms later)
-//   3. agent_active (destination starts 500ms later)
-// ---------------------------------------------------------------------------
-
-export const WORK_LOOP_SEGMENT: TimelineStep[] = [
-  // ── SA kicks off architecture design ────────────────────────────────
-  active("Solutions Architect", "Designing API Gateway integration patterns", 0),
-
-  // ── SA finishes → handoff → Infrastructure ──────────────────────────
-  idle("Solutions Architect", "API Gateway design complete", 8000),
-  handoff("Solutions Architect", "Infrastructure"),
-  active("Infrastructure", "Provisioning VPC subnets and security groups", 500),
-
-  // ── Infrastructure does a SECOND task (no handoff — same agent) ─────
-  active("Infrastructure", "Configuring NAT gateways and route tables", 8000),
-  // Move a board task to in_progress
-  taskUpdate("demo-t7", { status: "in_progress" }, 500),
-
-  // ── Infrastructure finishes → handoff → Security ────────────────────
-  idle("Infrastructure", "VPC and routing provisioned", 8000),
-  handoff("Infrastructure", "Security Engineer"),
-  active("Security Engineer", "Reviewing network ACL and IAM policies", 500),
-  // Move security review task to in_progress
-  taskUpdate("demo-t6", { status: "in_progress" }, 500),
-
-  // ── Security finishes → handoff → Infrastructure ────────────────────
-  idle("Security Engineer", "Security review passed — no critical findings", 10000),
-  // Move security review task to review
-  taskUpdate("demo-t6", { status: "review" }, 0),
-  handoff("Security Engineer", "Infrastructure"),
-  active("Infrastructure", "Applying security-recommended NACL rules", 500),
-
-  // ── Infrastructure finishes → handoff → SA ──────────────────────────
-  idle("Infrastructure", "NACL rules applied", 8000),
-  handoff("Infrastructure", "Solutions Architect"),
-  active("Solutions Architect", "Updating architecture decision records", 500),
-
-  // ── SA finishes → handoff → Infrastructure ──────────────────────────
-  idle("Solutions Architect", "ADR-003 documented", 8000),
-  handoff("Solutions Architect", "Infrastructure"),
-  active("Infrastructure", "Configuring DynamoDB tables and access patterns", 500),
-
-  // ── Infrastructure finishes → handoff → Security (final review) ─────
-  idle("Infrastructure", "DynamoDB table configuration complete", 8000),
-  // Move CI/CD task to review
-  taskUpdate("demo-t7", { status: "review" }, 0),
-  handoff("Infrastructure", "Security Engineer"),
-  active("Security Engineer", "Auditing DynamoDB encryption and backup policies", 500),
-
-  // ── Security finishes — cycle ends ──────────────────────────────────
-  idle("Security Engineer", "Audit complete — all checks passed", 8000),
-  // Move security review task to done
-  taskUpdate("demo-t6", { status: "done" }, 0),
-];
-
-// ---------------------------------------------------------------------------
-// INTERRUPT — all agents go idle, interrupt fires
+// Handoffs set the target to "thinking" (pulsing). An active() event ~2s
+// later transitions them to "active" (spinning) with detail text.
+// Ends with: SA → PM handoff → PM raises interrupt → PM stays active
 // ---------------------------------------------------------------------------
 
 const INTERRUPT_QUESTION =
   "The architecture uses a single DynamoDB table. Should we add a dedicated search index (OpenSearch) for full-text search, or is DynamoDB + GSIs sufficient for the MVP?";
 
-export const INTERRUPT_SEGMENT: TimelineStep[] = [
-  // PM announces the pause (shows in activity timeline + center text)
-  active("Project Manager", "Pausing work — awaiting customer input", 0),
-  // All agents go idle (visual state only — no timeline entries)
-  idle("Project Manager", "", 500),
-  idle("Solutions Architect", "", 100),
-  idle("Infrastructure", "", 100),
-  idle("Data Engineer", "", 100),
-  idle("Security Engineer", "", 100),
+export const WORK_BEFORE_INTERRUPT: TimelineStep[] = [
+  // ── SA kicks off architecture design ────────────────────────────────
+  active("Solutions Architect", "Designing API Gateway integration patterns", 0),
+
+  // ── SA → Infrastructure ─────────────────────────────────────────────
+  handoff("Solutions Architect", "Infrastructure", 8000),
+  active("Infrastructure", "Provisioning VPC and subnet resources", 2000),
+  taskUpdate("demo-t7", { status: "in_progress" }, 500),
+  active("Infrastructure", "Configuring NAT gateways and route tables", 5500),
+
+  // ── Infrastructure → Security ───────────────────────────────────────
+  handoff("Infrastructure", "Security Engineer", 8000),
+  active("Security Engineer", "Reviewing IAM policies and security groups", 2000),
+  taskUpdate("demo-t6", { status: "in_progress" }, 500),
+
+  // ── Security → SA (architecture decision needed) ────────────────────
+  handoff("Security Engineer", "Solutions Architect", 8000),
+  active("Solutions Architect", "Evaluating search requirements for data model", 2000),
+  taskUpdate("demo-t6", { status: "review" }, 0),
+
+  // ── SA needs customer input → SA → PM ───────────────────────────────
+  handoff("Solutions Architect", "Project Manager", 5000),
+  active("Project Manager", "Preparing question for customer", 2000),
+  // PM raises the interrupt — stays active while waiting
   {
-    delayMs: 500,
+    delayMs: 1500,
     event: {
       event: "interrupt_raised",
       project_id: "demo",
@@ -172,7 +131,7 @@ export const INTERRUPT_SEGMENT: TimelineStep[] = [
       question: INTERRUPT_QUESTION,
     },
   },
-  // Inject the question as a PM chat message so it appears in the chat
+  active("Project Manager", "Waiting for customer response", 200),
   {
     delayMs: 100,
     event: {
@@ -187,28 +146,51 @@ export const INTERRUPT_SEGMENT: TimelineStep[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// APPROVAL — all agents go idle, approval gate fires
+// RESUME_AND_WORK — PM relays answer, work continues, then PM requests
+// approval at the end
+//
+// Ends with: Security → PM handoff → PM raises approval → PM stays active
 // ---------------------------------------------------------------------------
 
 const APPROVAL_QUESTION =
   "The **Architecture** phase is complete. All deliverables have been drafted and reviewed by the team. Please review the artifacts and let us know if you'd like to approve and move to the next phase, or if you have feedback.";
 
-export const APPROVAL_SEGMENT: TimelineStep[] = [
-  // PM announces completion (shows in activity timeline + center text)
-  active("Project Manager", "Architecture phase complete — preparing for review", 0),
-  // All agents go idle (visual state only — no timeline entries)
-  idle("Project Manager", "", 500),
-  idle("Solutions Architect", "", 100),
-  idle("Infrastructure", "", 100),
-  idle("Data Engineer", "", 100),
-  idle("Security Engineer", "", 100),
-  // Move remaining in_progress tasks to done
-  taskUpdate("demo-t3", { status: "done" }, 0),
-  taskUpdate("demo-t4", { status: "done" }, 0),
-  taskUpdate("demo-t5", { status: "done" }, 0),
-  taskUpdate("demo-t7", { status: "done" }, 0),
+export const RESUME_AND_WORK: TimelineStep[] = [
+  // ── PM relays customer answer → PM → SA ─────────────────────────────
+  active("Project Manager", "Relaying customer response to the team", 0),
+  handoff("Project Manager", "Solutions Architect", 1000),
+  active("Solutions Architect", "Incorporating customer feedback into architecture", 2000),
+
+  // ── SA resumes → SA → Infrastructure ────────────────────────────────
+  handoff("Solutions Architect", "Infrastructure", 6000),
+  active("Infrastructure", "Updating VPC configuration per architecture changes", 2000),
+
+  // ── Infrastructure → SA (final docs) ────────────────────────────────
+  handoff("Infrastructure", "Solutions Architect", 6000),
+  active("Solutions Architect", "Reviewing infrastructure deliverables", 2000),
+  taskUpdate("demo-t7", { status: "review" }, 0),
+
+  // ── SA → Infrastructure (DynamoDB) ──────────────────────────────────
+  handoff("Solutions Architect", "Infrastructure", 6000),
+  active("Infrastructure", "Configuring DynamoDB tables and GSIs", 2000),
+
+  // ── Infrastructure → Security (final review) ────────────────────────
+  handoff("Infrastructure", "Security Engineer", 6000),
+  active("Security Engineer", "Final security audit of all resources", 2000),
+
+  // ── Security → PM (final review) ───────────────────────────────────
+  handoff("Security Engineer", "Project Manager", 6000),
+  active("Project Manager", "Reviewing all phase deliverables", 2000),
+  taskUpdate("demo-t6", { status: "done" }, 0),
+
+  // ── PM reviews deliverables → moves tasks to done → requests approval
+  taskUpdate("demo-t3", { status: "done" }, 2000),
+  taskUpdate("demo-t4", { status: "done" }, 500),
+  taskUpdate("demo-t5", { status: "done" }, 500),
+  taskUpdate("demo-t7", { status: "done" }, 500),
+  active("Project Manager", "All deliverables validated — requesting customer approval", 2000),
   {
-    delayMs: 500,
+    delayMs: 1500,
     event: {
       event: "awaiting_approval",
       project_id: "demo",
@@ -216,7 +198,7 @@ export const APPROVAL_SEGMENT: TimelineStep[] = [
       detail: "Architecture phase ready for review",
     },
   },
-  // Inject the approval request as a PM chat message
+  active("Project Manager", "Waiting for customer to review deliverables", 200),
   {
     delayMs: 100,
     event: {
@@ -228,16 +210,6 @@ export const APPROVAL_SEGMENT: TimelineStep[] = [
       content: APPROVAL_QUESTION,
     },
   },
-];
-
-// ---------------------------------------------------------------------------
-// RESUME_AFTER_INTERRUPT — agents wake back up
-// ---------------------------------------------------------------------------
-
-export const RESUME_SEGMENT: TimelineStep[] = [
-  active("Project Manager", "Resuming — customer input received", 0),
-  active("Solutions Architect", "Resuming architecture design work", 300),
-  active("Data Engineer", "Resuming DynamoDB schema design", 300),
 ];
 
 // ---------------------------------------------------------------------------

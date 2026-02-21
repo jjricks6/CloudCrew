@@ -137,3 +137,12 @@
 .animate-interrupt-glow {
   animation: interrupt-glow 3s ease-in-out infinite;
 }
+
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 8px 0 oklch(0.85 0.15 85 / 0.25);
+  }
+  50% {
+    box-shadow: 0 0 20px 4px oklch(0.85 0.15 85 / 0.45);
+  }
+}
