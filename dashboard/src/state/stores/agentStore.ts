@@ -165,7 +165,9 @@ export const useAgentStore = create<AgentState>((set, get) => ({
 
         const handoffId = crypto.randomUUID();
 
-        // Auto-clear handoff arc after 2 seconds
+        // Auto-clear handoff arc after 2 seconds. The clearHandoff action
+        // checks the ID matches before clearing, so a stale timeout firing
+        // after a store reset or new handoff is harmless (no-op).
         setTimeout(() => {
           get().clearHandoff(handoffId);
         }, 2000);

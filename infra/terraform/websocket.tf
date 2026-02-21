@@ -1,6 +1,11 @@
 # WebSocket API Gateway for real-time dashboard communication.
 # Routes: $connect, $disconnect, $default
 # All routes integrated with a single Lambda function (ws_handlers.route).
+#
+# AUTH NOTE: The $connect route has no API Gateway authorizer. When
+# enable_auth is true, the ws_handlers Lambda validates the JWT token
+# from the query string (COGNITO_USER_POOL_ID / COGNITO_CLIENT_ID env vars).
+# In dev (enable_auth=false), connections are unauthenticated.
 
 # =============================================================================
 # WebSocket API

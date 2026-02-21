@@ -50,6 +50,10 @@ def report_activity(
 
     display = AGENT_DISPLAY_NAMES.get(agent_name, agent_name)
 
+    # Cap detail length to prevent oversized DynamoDB items and WS payloads
+    max_detail = 500
+    detail = detail[:max_detail]
+
     try:
         store_activity_event(
             table_name=activity_table,

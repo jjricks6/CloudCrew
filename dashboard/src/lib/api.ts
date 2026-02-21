@@ -32,7 +32,11 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   if (!res.ok) {
     throw new Error(`API error: ${res.status} ${res.statusText}`);
   }
-  return res.json() as Promise<T>;
+  try {
+    return (await res.json()) as T;
+  } catch {
+    throw new Error(`API error: invalid JSON response from ${path}`);
+  }
 }
 
 export function get<T>(path: string): Promise<T> {

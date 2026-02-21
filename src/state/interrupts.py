@@ -137,3 +137,13 @@ def store_interrupt_response(
         },
     )
     logger.info("Stored response for interrupt %s, project %s", interrupt_id, project_id)
+
+    # Broadcast interrupt_answered event so the dashboard knows to resume
+    broadcast_to_project(
+        project_id,
+        {
+            "event": "interrupt_answered",
+            "project_id": project_id,
+            "interrupt_id": interrupt_id,
+        },
+    )

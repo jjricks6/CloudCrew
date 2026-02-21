@@ -133,6 +133,11 @@ export interface InterruptRaisedEvent extends BaseEvent {
   question: string;
 }
 
+export interface InterruptAnsweredEvent extends BaseEvent {
+  event: "interrupt_answered";
+  interrupt_id: string;
+}
+
 export interface ChatMessageEvent extends BaseEvent {
   event: "chat_message";
   message_id: string;
@@ -161,6 +166,7 @@ export type WebSocketEvent =
   | PhaseStartedEvent
   | AwaitingApprovalEvent
   | InterruptRaisedEvent
+  | InterruptAnsweredEvent
   | ChatMessageEvent
   | ChatThinkingEvent
   | ChatChunkEvent
@@ -211,10 +217,18 @@ export interface TaskCreatedEvent extends BaseEvent {
   assigned_to: string;
 }
 
+export interface TaskUpdateFields {
+  status?: KanbanColumn;
+  assigned_to?: string;
+  artifact_path?: string;
+  title?: string;
+  description?: string;
+}
+
 export interface TaskUpdatedEvent extends BaseEvent {
   event: "task_updated";
   task_id: string;
-  updates: Record<string, unknown>;
+  updates: TaskUpdateFields;
 }
 
 // --- Chat Message (REST + Zustand store) ---

@@ -3,7 +3,7 @@
  * deployed infrastructure.  Activated when the projectId is "demo".
  */
 
-import type { BoardTask, ChatMessage, Phase, ProjectStatus, WebSocketEvent } from "./types";
+import type { BoardTask, ChatMessage, Phase, ProjectStatus, TaskUpdateFields, WebSocketEvent } from "./types";
 import { PHASE_ORDER } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -436,15 +436,15 @@ export function clearDemoAwaitingApproval(): void {
 /** Mutate a demo board task in place (for task_updated events). */
 export function updateDemoBoardTask(
   taskId: string,
-  updates: Record<string, unknown>,
+  updates: TaskUpdateFields,
 ): void {
   const task = DEMO_BOARD_TASKS.find((t) => t.task_id === taskId);
   if (!task) return;
-  if (typeof updates.status === "string") {
-    task.status = updates.status as BoardTask["status"];
+  if (updates.status) {
+    task.status = updates.status;
     task.updated_at = new Date().toISOString();
   }
-  if (typeof updates.assigned_to === "string") {
+  if (updates.assigned_to) {
     task.assigned_to = updates.assigned_to;
   }
 }

@@ -18,7 +18,7 @@ export function useBoardTasks(projectId: string | undefined) {
   return useQuery<BoardTask[]>({
     queryKey: ["board-tasks", projectId],
     queryFn: async () => {
-      if (isDemoMode(projectId)) return [...DEMO_BOARD_TASKS];
+      if (isDemoMode(projectId)) return structuredClone(DEMO_BOARD_TASKS);
       const res = await get<BoardTasksResponse>(
         `/projects/${projectId}/tasks`,
       );

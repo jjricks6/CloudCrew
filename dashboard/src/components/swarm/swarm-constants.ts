@@ -67,7 +67,9 @@ export function getAgentConfig(name: string): AgentConfig {
 }
 
 // ---------------------------------------------------------------------------
-// Phase → agents mapping (matches backend swarm composition)
+// Phase → agents mapping (matches backend swarm composition).
+// RETROSPECTIVE is intentionally omitted (deferred to M6). If the phase is
+// reached, SwarmVisualization falls back to showing all agents in the store.
 // ---------------------------------------------------------------------------
 
 export const PHASE_AGENTS: Partial<Record<Phase, string[]>> = {

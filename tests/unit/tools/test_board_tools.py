@@ -133,6 +133,36 @@ class TestUpdateBoardTask:
         assert "Error" in result
         assert "Invalid JSON" in result
 
+    def test_rejects_invalid_keys(self) -> None:
+        from src.tools.board_tools import update_board_task
+
+        mock_context = MagicMock()
+        mock_context.invocation_state = {
+            "project_id": "proj-001",
+            "board_tasks_table": "test-table",
+            "phase": "DISCOVERY",
+        }
+
+        result = update_board_task("t-001", '{"bad_field": "value"}', mock_context)
+
+        assert "Error" in result
+        assert "Invalid update fields" in result
+
+    def test_rejects_invalid_status(self) -> None:
+        from src.tools.board_tools import update_board_task
+
+        mock_context = MagicMock()
+        mock_context.invocation_state = {
+            "project_id": "proj-001",
+            "board_tasks_table": "test-table",
+            "phase": "DISCOVERY",
+        }
+
+        result = update_board_task("t-001", '{"status": "invalid"}', mock_context)
+
+        assert "Error" in result
+        assert "Invalid status" in result
+
     @patch("src.tools.board_tools.update_task")
     def test_handles_exception(self, mock_update: MagicMock) -> None:
         from src.tools.board_tools import update_board_task

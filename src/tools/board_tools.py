@@ -92,6 +92,16 @@ def update_board_task(
     except json.JSONDecodeError as e:
         return f"Error: Invalid JSON in updates_json: {e}"
 
+    # Validate allowed keys and status values at the tool boundary
+    allowed_keys = {"status", "assigned_to", "artifact_path", "title", "description"}
+    invalid_keys = set(updates.keys()) - allowed_keys
+    if invalid_keys:
+        return f"Error: Invalid update fields: {invalid_keys}. Allowed: {allowed_keys}"
+
+    valid_statuses = {"backlog", "in_progress", "review", "done"}
+    if "status" in updates and updates["status"] not in valid_statuses:
+        return f"Error: Invalid status '{updates['status']}'. Allowed: {valid_statuses}"
+
     try:
         update_task(
             table_name=table_name,

@@ -93,6 +93,11 @@ output "dynamodb_activity_table" {
   value       = aws_dynamodb_table.activity.name
 }
 
+output "dynamodb_board_tasks_table" {
+  description = "DynamoDB board tasks table name"
+  value       = aws_dynamodb_table.board_tasks.name
+}
+
 # --- S3 ---
 output "sow_bucket" {
   description = "SOW uploads S3 bucket name"

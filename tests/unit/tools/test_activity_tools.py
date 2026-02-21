@@ -141,3 +141,24 @@ class TestReportActivity:
 
         # Should return success since store worked
         assert "Activity reported" in result
+
+    @patch("src.tools.activity_tools.broadcast_to_project")
+    @patch("src.tools.activity_tools.store_activity_event")
+    def test_truncates_long_detail(self, mock_store: MagicMock, mock_broadcast: MagicMock) -> None:
+        from src.tools.activity_tools import report_activity
+
+        ctx = MagicMock()
+        ctx.invocation_state = {
+            "project_id": "proj-1",
+            "phase": "ARCHITECTURE",
+            "activity_table": "cloudcrew-activity",
+        }
+
+        long_detail = "x" * 1000
+        report_activity("sa", long_detail, ctx)
+
+        stored_detail = mock_store.call_args.kwargs["detail"]
+        assert len(stored_detail) == 500
+
+        broadcast_detail = mock_broadcast.call_args.args[1]["detail"]
+        assert len(broadcast_detail) == 500

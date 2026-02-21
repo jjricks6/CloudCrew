@@ -121,6 +121,7 @@ export function useDemoEngine(projectId: string | undefined) {
     return () => {
       cancelAll();
       unsubscribe();
+      enginePhaseRef.current = "seed";
     };
   }, [projectId]);
 }

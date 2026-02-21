@@ -80,7 +80,7 @@ variable "enable_auth" {
 # --- Dashboard ---
 
 variable "dashboard_origin" {
-  description = "Allowed CORS origin for the dashboard (CloudFront domain or * for dev)"
+  description = "Allowed CORS origin for the dashboard (CloudFront domain or * for dev). Use * only in dev — set to the CloudFront domain in staging/prod."
   type        = string
   default     = "*"
 }

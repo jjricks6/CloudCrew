@@ -74,8 +74,9 @@ class TestGetInterruptResponse:
 class TestStoreInterruptResponse:
     """Verify store_interrupt_response behavior."""
 
+    @patch("src.state.interrupts.broadcast_to_project")
     @patch("src.state.interrupts.boto3")
-    def test_store_response(self, mock_boto3: MagicMock) -> None:
+    def test_store_response(self, mock_boto3: MagicMock, mock_broadcast: MagicMock) -> None:
         from src.state.interrupts import store_interrupt_response
 
         mock_table = MagicMock()
@@ -89,3 +90,10 @@ class TestStoreInterruptResponse:
         assert call_kwargs["Key"]["SK"] == "INTERRUPT#int-001"
         assert call_kwargs["ExpressionAttributeValues"][":resp"] == "Blue"
         assert call_kwargs["ExpressionAttributeValues"][":status"] == "ANSWERED"
+
+        # Verify interrupt_answered event is broadcast
+        mock_broadcast.assert_called_once()
+        broadcast_msg = mock_broadcast.call_args.args[1]
+        assert broadcast_msg["event"] == "interrupt_answered"
+        assert broadcast_msg["project_id"] == "proj-1"
+        assert broadcast_msg["interrupt_id"] == "int-001"

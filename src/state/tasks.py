@@ -3,6 +3,10 @@
 Agents create and update tasks during phase execution. Each write
 broadcasts a WebSocket event so the dashboard updates in real-time.
 
+Unlike activity events (24h TTL), board tasks are retained permanently
+as project history. Cleanup should be handled at the project level
+(delete all items for a project) rather than via DynamoDB TTL.
+
 This module imports from config and state.broadcast — NEVER from agents/,
 tools/, or phases/.
 """

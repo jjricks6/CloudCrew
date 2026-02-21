@@ -23,9 +23,14 @@ class Phase(StrEnum):
 
 
 class PhaseStatus(StrEnum):
-    """Status of the current phase."""
+    """Status of the current phase.
+
+    Lifecycle: IN_PROGRESS → (optionally AWAITING_INPUT when an interrupt
+    fires) → AWAITING_APPROVAL → APPROVED | REVISION_REQUESTED.
+    """
 
     IN_PROGRESS = "IN_PROGRESS"
+    AWAITING_INPUT = "AWAITING_INPUT"
     AWAITING_APPROVAL = "AWAITING_APPROVAL"
     APPROVED = "APPROVED"
     REVISION_REQUESTED = "REVISION_REQUESTED"
