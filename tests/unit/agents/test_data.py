@@ -26,8 +26,8 @@ class TestDataAgent:
         assert call_kwargs.kwargs["name"] == "data"
         assert call_kwargs.kwargs["model"] is mock_sonnet
         assert call_kwargs.kwargs["system_prompt"] == DATA_SYSTEM_PROMPT
-        # 9 tools: original 5 + create_board_task, update_board_task, add_task_comment, report_activity
-        assert len(call_kwargs.kwargs["tools"]) == 9
+        # 10 tools: original 5 + create_board_task, update_board_task, add_task_comment, report_activity, web_search
+        assert len(call_kwargs.kwargs["tools"]) == 10
         assert agent is mock_agent_cls.return_value
 
     def test_system_prompt_has_key_sections(self) -> None:

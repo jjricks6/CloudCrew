@@ -79,7 +79,8 @@ class DeliverableItem(BaseModel):
 
     name: str
     git_path: str
-    status: str = Field(description="IN_PROGRESS, COMPLETE, or NEEDS_REVISION")
+    version: str = "v1.0"
+    created_at: str = ""
 
 
 # --- Task Ledger ---

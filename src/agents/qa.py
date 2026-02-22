@@ -14,6 +14,7 @@ from src.tools.activity_tools import report_activity
 from src.tools.board_tools import add_task_comment, create_board_task, update_board_task
 from src.tools.git_tools import git_list, git_read, git_write_tests, git_write_tests_batch
 from src.tools.ledger_tools import read_task_ledger
+from src.tools.web_search import web_search
 
 QA_SYSTEM_PROMPT = """\
 You are the Quality Assurance Engineer for a CloudCrew engagement — an AI-powered \
@@ -136,5 +137,6 @@ def create_qa_agent() -> Agent:
             update_board_task,
             add_task_comment,
             report_activity,
+            web_search,
         ],
     )

@@ -131,7 +131,14 @@ class TestUpdateDeliverables:
 
         mock_read.return_value = TaskLedger(project_id="proj-001")
 
-        items = [{"name": "ADR-001", "git_path": "docs/architecture/decisions/0001.md", "status": "COMPLETE"}]
+        items = [
+            {
+                "name": "ADR-001",
+                "git_path": "docs/architecture/decisions/0001.md",
+                "version": "v1.0",
+                "created_at": "2026-01-01T10:00:00Z",
+            }
+        ]
         result = update_deliverables("test-table", "proj-001", "ARCHITECTURE", items)
 
         assert "ARCHITECTURE" in result.deliverables

@@ -15,6 +15,7 @@ from src.tools.git_tools import git_list, git_read, git_write_infra, git_write_i
 from src.tools.ledger_tools import read_task_ledger
 from src.tools.security_tools import checkov_scan
 from src.tools.terraform_tools import terraform_validate
+from src.tools.web_search import web_search
 
 INFRA_SYSTEM_PROMPT = """\
 You are the Cloud Infrastructure Engineer for a CloudCrew engagement — an AI-powered \
@@ -156,5 +157,6 @@ def create_infra_agent() -> Agent:
             update_board_task,
             add_task_comment,
             report_activity,
+            web_search,
         ],
     )

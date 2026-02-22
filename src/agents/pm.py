@@ -12,6 +12,7 @@ from src.tools.board_tools import add_task_comment, create_board_task, update_bo
 from src.tools.git_tools import git_list, git_read, git_write_project_plan
 from src.tools.ledger_tools import read_task_ledger, update_task_ledger
 from src.tools.sow_parser import parse_sow
+from src.tools.web_search import web_search
 
 PM_SYSTEM_PROMPT = """\
 You are the Project Manager for a CloudCrew engagement — an AI-powered \
@@ -32,7 +33,7 @@ significant action:
 - Record new facts (verified information) with source
 - Record assumptions (unverified) with confidence level
 - Record decisions with rationale
-- Update deliverable status
+- Record deliverables with version and timestamp
 - Note any blockers
 
 ## Decision Framework
@@ -140,5 +141,6 @@ def create_pm_agent() -> Agent:
             update_board_task,
             add_task_comment,
             report_activity,
+            web_search,
         ],
     )

@@ -14,7 +14,6 @@ import {
   getAgentConfig,
   getAgentPositions,
   getNodeSizes,
-  PHASE_AGENTS,
   type AgentPosition,
 } from "./swarm-constants";
 import { AgentNode } from "./AgentNode";
@@ -63,11 +62,9 @@ export function SwarmVisualization({
     };
   }, []);
 
-  // Which agents are part of the current phase's swarm (used for active styling)
-  const phaseAgentNames = useMemo(
-    () => (phase ? (PHASE_AGENTS[phase] ?? []) : []),
-    [phase],
-  );
+  // All agents are eligible in every phase — the agent store (driven by
+  // timeline events) determines who is actually active vs idle.
+  const phaseAgentNames = ALL_AGENTS;
 
   // All 7 agents are always positioned in the ring
   const positions = useMemo(

@@ -25,6 +25,7 @@ interface SidebarProps {
   projectName: string;
   currentPhase?: Phase;
   phaseStatus?: PhaseStatus;
+  isOnboarding?: boolean;
 }
 
 function getDotColor(
@@ -85,6 +86,7 @@ export function Sidebar({
   projectName,
   currentPhase,
   phaseStatus,
+  isOnboarding,
 }: SidebarProps) {
   const hasNotification = useAgentStore(
     (s) => s.pendingInterrupt !== null || s.pendingApproval !== null,
@@ -92,58 +94,76 @@ export function Sidebar({
 
   return (
     <aside className="flex h-screen w-64 flex-col border-r bg-sidebar text-sidebar-foreground">
-      {/* Project header */}
+      {/* Brand header */}
       <div className="border-b p-4">
-        <h2 className="truncate text-sm font-semibold">{projectName || "CloudCrew"}</h2>
-        {currentPhase && (
-          <Badge variant="secondary" className="mt-1 text-xs">
-            {currentPhase}
-            {phaseStatus === "AWAITING_APPROVAL" && " — Review"}
-            {phaseStatus === "AWAITING_INPUT" && " — Input Needed"}
-          </Badge>
-        )}
+        <h2 className="text-lg font-bold tracking-tight">CloudCrew</h2>
       </div>
 
-      {/* Phase progress */}
-      <div className="border-b p-4">
-        <PhaseIndicator currentPhase={currentPhase} phaseStatus={phaseStatus} />
+      {/* Project + phase progress */}
+      <div className="border-b p-4 space-y-3">
+        <div>
+          <p className="truncate text-sm font-medium">{projectName}</p>
+          {currentPhase && (
+            <Badge variant="secondary" className="mt-1 text-xs">
+              {currentPhase}
+              {phaseStatus === "AWAITING_APPROVAL" && " — Review"}
+              {phaseStatus === "AWAITING_INPUT" && " — Input Needed"}
+            </Badge>
+          )}
+        </div>
+        {isOnboarding ? (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>Project Setup</span>
+            </div>
+            <Progress value={0} className="h-1.5" />
+          </div>
+        ) : (
+          <PhaseIndicator currentPhase={currentPhase} phaseStatus={phaseStatus} />
+        )}
       </div>
 
       {/* Navigation */}
       <nav className="flex-1 space-y-1 p-3">
-        {NAV_ITEMS.map(({ to, label, icon }) => (
-          <NavLink
-            key={to}
-            to={to}
-            end={to === "."}
-            className={({ isActive }) =>
-              `flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors ${
-                isActive
-                  ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
-                  : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
-              }`
-            }
-          >
-            <svg
-              className="h-4 w-4 shrink-0"
-              viewBox="0 0 24 24"
-              fill="currentColor"
+        {NAV_ITEMS.map(({ to, label, icon }) => {
+          const disabled = isOnboarding && to !== ".";
+          return (
+            <NavLink
+              key={to}
+              to={to}
+              end={to === "."}
+              tabIndex={disabled ? -1 : undefined}
+              className={({ isActive }) =>
+                `flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors ${
+                  disabled
+                    ? "pointer-events-none cursor-default opacity-40"
+                    : isActive
+                      ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                      : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
+                }`
+              }
             >
-              <path d={ICON_MAP[icon]} />
-            </svg>
-            <span className="relative">
-              {label}
-              {label === "Chat" && hasNotification && (
-                <span className="absolute -top-1 -right-2.5 h-2 w-2 rounded-full bg-red-500" />
-              )}
-            </span>
-          </NavLink>
-        ))}
+              <svg
+                className="h-4 w-4 shrink-0"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+              >
+                <path d={ICON_MAP[icon]} />
+              </svg>
+              <span className="relative">
+                {label}
+                {label === "Chat" && hasNotification && (
+                  <span className="absolute -top-1 -right-2.5 h-2 w-2 rounded-full bg-red-500" />
+                )}
+              </span>
+            </NavLink>
+          );
+        })}
       </nav>
 
       {/* Footer */}
       <div className="border-t p-4 text-xs text-muted-foreground">
-        CloudCrew Dashboard
+        CloudCrew
       </div>
     </aside>
   );

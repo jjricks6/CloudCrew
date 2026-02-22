@@ -6,11 +6,11 @@ runs all 5 delivery phases sequentially through their Swarms with a
 sample SOW, then tears down all resources.
 
 Phases executed in order:
-    1. DISCOVERY — PM + SA: Parse SOW, create project plan
-    2. ARCHITECTURE — SA + Infra + Security: Design target architecture
-    3. POC — Dev + Infra + Data + Security + SA: Proof of concept
-    4. PRODUCTION — Dev + Infra + Data + Security + QA: Production hardening
-    5. HANDOFF — PM + SA: Deliverable packaging and handoff docs
+    1. DISCOVERY — PM (entry) + all specialists: Parse SOW, create project plan
+    2. ARCHITECTURE — SA (entry) + all specialists: Design target architecture
+    3. POC — Dev (entry) + all specialists: Proof of concept
+    4. PRODUCTION — Dev (entry) + all specialists: Production hardening
+    5. HANDOFF — PM (entry) + all specialists: Deliverable packaging and handoff docs
 
 Run directly for live output (all phases):
     source .venv/bin/activate
@@ -272,7 +272,7 @@ PHASE_TASKS: dict[str, str] = {
         "all infrastructure is production-ready with security review.\n\n"
         "BEFORE creating any files, check what already exists:\n"
         "- Use git_list to see all project deliverables\n"
-        "- Use read_task_ledger to see deliverable status\n\n"
+        "- Use read_task_ledger to see deliverable versions\n\n"
         "Your tasks:\n"
         "1. PM: Read the task ledger and all project deliverables\n"
         "2. PM: Create an operations runbook at docs/handoff/runbook.md\n"
@@ -280,7 +280,7 @@ PHASE_TASKS: dict[str, str] = {
         "docs/handoff/knowledge-transfer.md\n"
         "4. PM: Compile a final deliverables summary at "
         "docs/handoff/deliverables-summary.md\n"
-        "5. PM: Update the task ledger with final deliverable status\n"
+        "5. PM: Update the task ledger with final deliverable versions\n"
         "6. PM: Hand off to SA for a final architecture sign-off statement"
     ),
 }
@@ -836,11 +836,11 @@ def run_test(phases: list[str] | None = None, *, keep_artifacts: bool = False) -
 def _phase_agents(phase: str) -> str:
     """Return a human-readable agent list for a phase."""
     agents = {
-        "DISCOVERY": "PM (entry) + SA",
-        "ARCHITECTURE": "SA (entry) + Infra + Security",
-        "POC": "Dev (entry) + Infra + Data + Security + SA",
-        "PRODUCTION": "Dev (entry) + Infra + Data + Security + QA",
-        "HANDOFF": "PM (entry) + SA",
+        "DISCOVERY": "PM (entry) + SA + Dev + Infra + Data + Security + QA",
+        "ARCHITECTURE": "SA (entry) + Dev + Infra + Data + Security + QA",
+        "POC": "Dev (entry) + Infra + Data + Security + SA + QA",
+        "PRODUCTION": "Dev (entry) + Infra + Data + Security + SA + QA",
+        "HANDOFF": "PM (entry) + SA + Dev + Infra + Data + Security + QA",
     }
     return agents.get(phase, "unknown")
 

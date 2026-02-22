@@ -20,6 +20,7 @@ import {
   clearDemoAwaitingInput,
   clearDemoAwaitingApproval,
   updateDemoBoardTask,
+  addDemoDeliverable,
 } from "@/lib/demo";
 
 interface ActiveHandoff {
@@ -244,6 +245,20 @@ export const useAgentStore = create<AgentState>((set, get) => ({
       }
       if (event.event === "task_created") {
         void queryClient.invalidateQueries({ queryKey: ["board-tasks"] });
+        return {};
+      }
+
+      // Deliverable events → mutate demo data + invalidate deliverables query
+      if (event.event === "deliverable_created") {
+        if (isDemoMode(event.project_id)) {
+          addDemoDeliverable(event.phase, {
+            name: event.name,
+            git_path: event.git_path,
+            version: event.version,
+            created_at: new Date().toISOString(),
+          });
+        }
+        void queryClient.invalidateQueries({ queryKey: ["deliverables"] });
         return {};
       }
 

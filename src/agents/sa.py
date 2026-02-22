@@ -15,6 +15,7 @@ from src.tools.adr_writer import write_adr
 from src.tools.board_tools import add_task_comment, create_board_task, update_board_task
 from src.tools.git_tools import git_list, git_read, git_write_architecture
 from src.tools.ledger_tools import read_task_ledger
+from src.tools.web_search import web_search
 
 SA_SYSTEM_PROMPT = """\
 You are the Solutions Architect for a CloudCrew engagement — an AI-powered \
@@ -125,5 +126,6 @@ def create_sa_agent() -> Agent:
             update_board_task,
             add_task_comment,
             report_activity,
+            web_search,
         ],
     )

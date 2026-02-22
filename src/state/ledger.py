@@ -199,7 +199,7 @@ def format_ledger(ledger: TaskLedger) -> str:
         for phase, items in ledger.deliverables.items():
             lines.append(f"### {phase}")
             for item in items:
-                lines.append(f"- [{item.status}] {item.name} ({item.git_path})")
+                lines.append(f"- {item.name} {item.version} ({item.git_path}) — {item.created_at}")
         lines.append("")
 
     if not any([ledger.facts, ledger.assumptions, ledger.decisions, ledger.blockers]):

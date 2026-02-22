@@ -67,3 +67,6 @@ COGNITO_CLIENT_ID: str = os.environ.get("COGNITO_CLIENT_ID", "")
 
 # --- PM Chat ---
 PM_CHAT_LAMBDA_NAME: str = os.environ.get("PM_CHAT_LAMBDA_NAME", "")
+
+# --- External APIs ---
+TAVILY_API_KEY: str = os.environ.get("TAVILY_API_KEY", "")
