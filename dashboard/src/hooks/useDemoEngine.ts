@@ -20,6 +20,7 @@ import { useEffect, useRef } from "react";
 import { chunkText, isDemoMode, advanceDemoPhase, DEMO_PROJECT_STATUS } from "@/lib/demo";
 import { useAgentStore } from "@/state/stores/agentStore";
 import { useOnboardingStore } from "@/state/stores/onboardingStore";
+import { usePhaseReviewStore } from "@/state/stores/phaseReviewStore";
 import {
   useDemoControlStore,
   type DemoPhase,
@@ -190,6 +191,48 @@ export function useDemoEngine(projectId: string | undefined) {
             if (onComplete) onComplete();
           }
         }, 20 + Math.random() * 30);
+        intervalsRef.current.push(interval);
+      }, thinkingDelay);
+    }
+
+    /**
+     * Stream phase review steps one at a time.
+     * User is guided through each step and can add comments before proceeding.
+     */
+    function streamPhaseReviewSteps(phaseName: string, steps: ReturnType<typeof usePhaseReviewStore.getState>["steps"]) {
+      usePhaseReviewStore.getState().beginReview(phaseName, steps);
+      // Start streaming the first step's content
+      streamCurrentReviewStep();
+    }
+
+    /**
+     * Stream the content of the current review step.
+     * Called when the step is first displayed and when user clicks Continue.
+     */
+    function streamCurrentReviewStep() {
+      const store = usePhaseReviewStore.getState();
+      const currentStep = store.steps[store.currentStepIndex];
+
+      if (!currentStep) return;
+
+      // Reset content and set PM to active
+      usePhaseReviewStore.getState().setFullStepContent("");
+      usePhaseReviewStore.getState().setPmState("active");
+
+      const thinkingDelay = 300 + Math.random() * 300;
+      schedule(() => {
+        const chunks = chunkText(currentStep.content);
+        let i = 0;
+
+        const interval = setInterval(() => {
+          if (i < chunks.length) {
+            usePhaseReviewStore.getState().appendStepChunk(chunks[i]);
+            i++;
+          } else {
+            clearInterval(interval);
+            usePhaseReviewStore.getState().setPmState("thinking");
+          }
+        }, 20 + Math.random() * 25);
         intervalsRef.current.push(interval);
       }, thinkingDelay);
     }
@@ -375,7 +418,10 @@ export function useDemoEngine(projectId: string | undefined) {
             detail: "Waiting for customer to review deliverables",
           });
 
+          // Stream phase review steps to the phase review store
           schedule(() => {
+            streamPhaseReviewSteps(playbook.phase, playbook.reviewSteps);
+            // After review is set up, add the approval question to chat
             addEvent({
               event: "chat_message",
               project_id: "demo",
@@ -628,11 +674,34 @@ export function useDemoEngine(projectId: string | undefined) {
       },
     );
 
+    // Subscribe to phase review store to stream content when steps change
+    const unsubPhaseReview = usePhaseReviewStore.subscribe((state, prevState) => {
+      // When review starts (status changes to reviewing), stream first step
+      if (
+        (prevState.status === "not_started" || prevState.status === "waiting_to_start") &&
+        state.status === "reviewing"
+      ) {
+        cancelAll();
+        streamCurrentReviewStep();
+        return;
+      }
+
+      // When user advances to next step, stream the new step's content
+      if (
+        state.status === "reviewing" &&
+        state.currentStepIndex > prevState.currentStepIndex
+      ) {
+        cancelAll();
+        streamCurrentReviewStep();
+      }
+    });
+
     return () => {
       cancelAll();
       unsubOnboarding();
       unsubAgent();
       unsubControl();
+      unsubPhaseReview();
       enginePhaseRef.current = "onboarding";
     };
   }, [projectId]);
