@@ -54,6 +54,7 @@ dashboard/.vite/
 !.env.example
 
 # Claude Code (local only)
+.claude/
 CLAUDE.local.md
 
 # Secrets

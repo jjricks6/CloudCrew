@@ -79,7 +79,8 @@ class DeliverableItem(BaseModel):
 
     name: str
     git_path: str
-    status: str = Field(description="IN_PROGRESS, COMPLETE, or NEEDS_REVISION")
+    version: str = "v1.0"
+    created_at: str = ""
 
 
 # --- Task Ledger ---
@@ -95,6 +96,7 @@ class TaskLedger(BaseModel):
     project_id: str
     project_name: str = ""
     customer: str = ""
+    owner_id: str = ""  # Cognito user ID of project creator
     current_phase: Phase = Phase.DISCOVERY
     phase_status: PhaseStatus = PhaseStatus.IN_PROGRESS
     facts: list[Fact] = Field(default_factory=list)

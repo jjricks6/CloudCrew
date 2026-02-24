@@ -1,6 +1,5 @@
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -14,14 +13,6 @@ import type { DeliverableItem } from "@/lib/types";
 import { isDemoMode, getArtifactContent } from "@/lib/demo";
 import { useProjectId } from "@/lib/useProjectId";
 import { downloadArtifact } from "./downloadArtifact";
-
-function statusVariant(
-  status: DeliverableItem["status"],
-): "default" | "secondary" | "destructive" {
-  if (status === "COMPLETE") return "default";
-  if (status === "IN_PROGRESS") return "secondary";
-  return "destructive";
-}
 
 interface ArtifactPreviewDialogProps {
   artifact: DeliverableItem | null;
@@ -48,12 +39,15 @@ export function ArtifactPreviewDialog({
             <DialogHeader>
               <div className="flex items-center gap-2">
                 <DialogTitle>{artifact.name}</DialogTitle>
-                <Badge variant={statusVariant(artifact.status)}>
-                  {artifact.status.replace("_", " ")}
-                </Badge>
+                <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">
+                  {artifact.version}
+                </span>
               </div>
               <DialogDescription className="font-mono text-xs">
                 {artifact.git_path}
+                {artifact.created_at && (
+                  <> &middot; {new Date(artifact.created_at).toLocaleString()}</>
+                )}
               </DialogDescription>
             </DialogHeader>
             <div className="prose dark:prose-invert max-w-none text-sm">

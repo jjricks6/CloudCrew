@@ -26,7 +26,7 @@ class TestPMAgent:
         assert call_kwargs.kwargs["name"] == "pm"
         assert call_kwargs.kwargs["model"] is mock_opus
         assert call_kwargs.kwargs["system_prompt"] == PM_SYSTEM_PROMPT
-        assert len(call_kwargs.kwargs["tools"]) == 10
+        assert len(call_kwargs.kwargs["tools"]) == 12
         assert agent is mock_agent_cls.return_value
 
     def test_system_prompt_has_key_sections(self) -> None:

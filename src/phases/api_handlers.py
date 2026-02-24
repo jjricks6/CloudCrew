@@ -1,11 +1,8 @@
 """API Gateway Lambda handlers for customer-facing endpoints.
 
-Provides project creation, status, deliverables, approval, revision,
-and interrupt response endpoints. All handlers share a single Lambda
-function with routing based on HTTP method and path.
-
-This module is in phases/ — the ONLY package allowed to import from agents/.
-"""
+Routes to handlers for project creation, status, deliverables, approval,
+revision, and interrupt responses. All handlers share a single Lambda
+function with routing based on HTTP method and path."""
 
 import json
 import logging
@@ -16,35 +13,29 @@ import boto3
 
 from src.config import (
     AWS_REGION,
-    BOARD_TASKS_TABLE,
     PM_CHAT_LAMBDA_NAME,
     SOW_BUCKET,
     STATE_MACHINE_ARN,
     TASK_LEDGER_TABLE,
 )
+from src.phases.artifact_handlers import artifact_content_handler
+from src.phases.auth_utils import (
+    api_response,
+    get_user_id_from_event,
+    handle_cors_preflight,
+    verify_project_access,
+)
+from src.phases.middleware import apply_middleware
+from src.phases.review_utils import build_review_context
+from src.phases.task_handlers import board_tasks_handler
 from src.state.approval import delete_token, get_token
 from src.state.broadcast import broadcast_to_project
 from src.state.chat import get_chat_history, new_message_id, store_chat_message
 from src.state.interrupts import store_interrupt_response
 from src.state.ledger import format_ledger, read_ledger, write_ledger
 from src.state.models import TaskLedger
-from src.state.tasks import list_tasks
 
 logger = logging.getLogger(__name__)
-
-
-def _response(status_code: int, body: Any) -> dict[str, Any]:
-    """Build an API Gateway proxy response with CORS headers."""
-    return {
-        "statusCode": status_code,
-        "headers": {
-            "Content-Type": "application/json",
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Headers": "Content-Type,Authorization",
-            "Access-Control-Allow-Methods": "GET,POST,PUT,OPTIONS",
-        },
-        "body": json.dumps(body) if not isinstance(body, str) else body,
-    }
 
 
 def create_project_handler(event: dict[str, Any]) -> dict[str, Any]:
@@ -62,15 +53,22 @@ def create_project_handler(event: dict[str, Any]) -> dict[str, Any]:
     sow_text: str = body.get("sow_text", "")
 
     if not project_name or not sow_text:
-        return _response(400, {"error": "project_name and sow_text are required"})
+        return api_response(400, {"error": "project_name and sow_text are required"})
+
+    # Verify user is authenticated
+    user_id = get_user_id_from_event(event)
+    if not user_id:
+        logger.warning("Unauthenticated project creation attempt")
+        return api_response(401, {"error": "Authentication required"})
 
     project_id = str(uuid.uuid4())
 
-    # Create initial task ledger
+    # Create initial task ledger with owner set to authenticated user
     ledger = TaskLedger(
         project_id=project_id,
         project_name=project_name,
         customer=customer,
+        owner_id=user_id,
     )
     write_ledger(TASK_LEDGER_TABLE, project_id, ledger)
 
@@ -100,7 +98,7 @@ def create_project_handler(event: dict[str, Any]) -> dict[str, Any]:
         )
         logger.info("Started Step Functions execution for project %s", project_id)
 
-    return _response(
+    return api_response(
         201,
         {
             "project_id": project_id,
@@ -117,18 +115,30 @@ def project_status_handler(event: dict[str, Any]) -> dict[str, Any]:
     """
     project_id = event.get("pathParameters", {}).get("id", "")
     if not project_id:
-        return _response(400, {"error": "project_id is required"})
+        return api_response(400, {"error": "project_id is required"})
+
+    # Verify user has access to this project
+    is_authorized, _ = verify_project_access(event, project_id)
+    if not is_authorized:
+        logger.warning("Unauthorized status access for project=%s", project_id)
+        return api_response(403, {"error": "Forbidden"})
 
     ledger = read_ledger(TASK_LEDGER_TABLE, project_id)
-    return _response(
-        200,
-        {
-            "project_id": project_id,
-            "project_name": ledger.project_name,
-            "current_phase": ledger.current_phase.value,
-            "phase_status": ledger.phase_status.value,
-        },
-    )
+    current_phase = ledger.current_phase.value
+
+    # Build response with review context if awaiting approval
+    response_data: dict[str, Any] = {
+        "project_id": project_id,
+        "project_name": ledger.project_name,
+        "current_phase": current_phase,
+        "phase_status": ledger.phase_status.value,
+    }
+
+    # Add review context when phase is awaiting approval
+    if ledger.phase_status.value == "AWAITING_APPROVAL":
+        response_data["review_context"] = build_review_context(current_phase)
+
+    return api_response(200, response_data)
 
 
 def project_deliverables_handler(event: dict[str, Any]) -> dict[str, Any]:
@@ -138,11 +148,17 @@ def project_deliverables_handler(event: dict[str, Any]) -> dict[str, Any]:
     """
     project_id = event.get("pathParameters", {}).get("id", "")
     if not project_id:
-        return _response(400, {"error": "project_id is required"})
+        return api_response(400, {"error": "project_id is required"})
+
+    # Verify user has access to this project
+    is_authorized, _ = verify_project_access(event, project_id)
+    if not is_authorized:
+        logger.warning("Unauthorized deliverables access for project=%s", project_id)
+        return api_response(403, {"error": "Forbidden"})
 
     ledger = read_ledger(TASK_LEDGER_TABLE, project_id)
     deliverables = {phase: [d.model_dump() for d in items] for phase, items in ledger.deliverables.items()}
-    return _response(
+    return api_response(
         200,
         {
             "project_id": project_id,
@@ -160,14 +176,20 @@ def approve_handler(event: dict[str, Any]) -> dict[str, Any]:
     """
     project_id = event.get("pathParameters", {}).get("id", "")
     if not project_id:
-        return _response(400, {"error": "project_id is required"})
+        return api_response(400, {"error": "project_id is required"})
+
+    # Verify user has access to this project
+    is_authorized, _ = verify_project_access(event, project_id)
+    if not is_authorized:
+        logger.warning("Unauthorized approval attempt for project=%s", project_id)
+        return api_response(403, {"error": "Forbidden"})
 
     ledger = read_ledger(TASK_LEDGER_TABLE, project_id)
     phase = ledger.current_phase.value
 
     task_token = get_token(TASK_LEDGER_TABLE, project_id, phase)
     if not task_token:
-        return _response(404, {"error": f"No pending approval for phase {phase}"})
+        return api_response(404, {"error": f"No pending approval for phase {phase}"})
 
     sfn = boto3.client("stepfunctions", region_name=AWS_REGION)
     sfn.send_task_success(
@@ -177,7 +199,7 @@ def approve_handler(event: dict[str, Any]) -> dict[str, Any]:
 
     delete_token(TASK_LEDGER_TABLE, project_id, phase)
 
-    return _response(200, {"project_id": project_id, "phase": phase, "decision": "APPROVED"})
+    return api_response(200, {"project_id": project_id, "phase": phase, "decision": "APPROVED"})
 
 
 def revise_handler(event: dict[str, Any]) -> dict[str, Any]:
@@ -188,19 +210,25 @@ def revise_handler(event: dict[str, Any]) -> dict[str, Any]:
     """
     project_id = event.get("pathParameters", {}).get("id", "")
     if not project_id:
-        return _response(400, {"error": "project_id is required"})
+        return api_response(400, {"error": "project_id is required"})
+
+    # Verify user has access to this project
+    is_authorized, _ = verify_project_access(event, project_id)
+    if not is_authorized:
+        logger.warning("Unauthorized revision attempt for project=%s", project_id)
+        return api_response(403, {"error": "Forbidden"})
 
     body = json.loads(event.get("body", "{}"))
     feedback: str = body.get("feedback", "")
     if not feedback:
-        return _response(400, {"error": "feedback is required"})
+        return api_response(400, {"error": "feedback is required"})
 
     ledger = read_ledger(TASK_LEDGER_TABLE, project_id)
     phase = ledger.current_phase.value
 
     task_token = get_token(TASK_LEDGER_TABLE, project_id, phase)
     if not task_token:
-        return _response(404, {"error": f"No pending approval for phase {phase}"})
+        return api_response(404, {"error": f"No pending approval for phase {phase}"})
 
     sfn = boto3.client("stepfunctions", region_name=AWS_REGION)
     sfn.send_task_success(
@@ -217,7 +245,7 @@ def revise_handler(event: dict[str, Any]) -> dict[str, Any]:
 
     delete_token(TASK_LEDGER_TABLE, project_id, phase)
 
-    return _response(
+    return api_response(
         200,
         {
             "project_id": project_id,
@@ -236,16 +264,22 @@ def interrupt_respond_handler(event: dict[str, Any]) -> dict[str, Any]:
     project_id = event.get("pathParameters", {}).get("id", "")
     interrupt_id = event.get("pathParameters", {}).get("interruptId", "")
     if not project_id or not interrupt_id:
-        return _response(400, {"error": "project_id and interruptId are required"})
+        return api_response(400, {"error": "project_id and interruptId are required"})
+
+    # Verify user has access to this project
+    is_authorized, _ = verify_project_access(event, project_id)
+    if not is_authorized:
+        logger.warning("Unauthorized interrupt response for project=%s", project_id)
+        return api_response(403, {"error": "Forbidden"})
 
     body = json.loads(event.get("body", "{}"))
     response_text: str = body.get("response", "")
     if not response_text:
-        return _response(400, {"error": "response is required"})
+        return api_response(400, {"error": "response is required"})
 
     store_interrupt_response(TASK_LEDGER_TABLE, project_id, interrupt_id, response_text)
 
-    return _response(
+    return api_response(
         200,
         {
             "project_id": project_id,
@@ -267,12 +301,18 @@ def pm_chat_post_handler(event: dict[str, Any]) -> dict[str, Any]:
     """
     project_id = event.get("pathParameters", {}).get("id", "")
     if not project_id:
-        return _response(400, {"error": "project_id is required"})
+        return api_response(400, {"error": "project_id is required"})
+
+    # Verify user has access to this project
+    is_authorized, _ = verify_project_access(event, project_id)
+    if not is_authorized:
+        logger.warning("Unauthorized chat attempt for project=%s", project_id)
+        return api_response(403, {"error": "Forbidden"})
 
     body = json.loads(event.get("body", "{}"))
     message: str = body.get("message", "")
     if not message:
-        return _response(400, {"error": "message is required"})
+        return api_response(400, {"error": "message is required"})
 
     message_id = new_message_id()
 
@@ -318,7 +358,7 @@ def pm_chat_post_handler(event: dict[str, Any]) -> dict[str, Any]:
         )
         logger.info("Async invoked PM chat Lambda for project %s", project_id)
 
-    return _response(202, {"message_id": message_id})
+    return api_response(202, {"message_id": message_id})
 
 
 def pm_chat_get_handler(event: dict[str, Any]) -> dict[str, Any]:
@@ -328,7 +368,13 @@ def pm_chat_get_handler(event: dict[str, Any]) -> dict[str, Any]:
     """
     project_id = event.get("pathParameters", {}).get("id", "")
     if not project_id:
-        return _response(400, {"error": "project_id is required"})
+        return api_response(400, {"error": "project_id is required"})
+
+    # Verify user has access to this project
+    is_authorized, _ = verify_project_access(event, project_id)
+    if not is_authorized:
+        logger.warning("Unauthorized chat history access for project=%s", project_id)
+        return api_response(403, {"error": "Forbidden"})
 
     params = event.get("queryStringParameters") or {}
     try:
@@ -337,7 +383,7 @@ def pm_chat_get_handler(event: dict[str, Any]) -> dict[str, Any]:
         limit = 50
 
     messages = get_chat_history(TASK_LEDGER_TABLE, project_id, limit=limit)
-    return _response(
+    return api_response(
         200,
         {
             "project_id": project_id,
@@ -365,16 +411,16 @@ def upload_url_handler(event: dict[str, Any]) -> dict[str, Any]:
     """
     project_id = event.get("pathParameters", {}).get("id", "")
     if not project_id:
-        return _response(400, {"error": "project_id is required"})
+        return api_response(400, {"error": "project_id is required"})
 
     body = json.loads(event.get("body", "{}"))
     filename: str = body.get("filename", "")
     content_type: str = body.get("content_type", "application/octet-stream")
     if not filename:
-        return _response(400, {"error": "filename is required"})
+        return api_response(400, {"error": "filename is required"})
 
     if not SOW_BUCKET:
-        return _response(503, {"error": "Upload storage not configured"})
+        return api_response(503, {"error": "Upload storage not configured"})
 
     file_id = str(uuid.uuid4())
     s3_key = f"projects/{project_id}/uploads/{file_id}_{filename}"
@@ -390,7 +436,7 @@ def upload_url_handler(event: dict[str, Any]) -> dict[str, Any]:
         ExpiresIn=300,
     )
 
-    return _response(
+    return api_response(
         200,
         {
             "upload_url": upload_url,
@@ -398,22 +444,6 @@ def upload_url_handler(event: dict[str, Any]) -> dict[str, Any]:
             "filename": filename,
         },
     )
-
-
-def board_tasks_handler(event: dict[str, Any]) -> dict[str, Any]:
-    """Get board tasks for a project, optionally filtered by phase.
-
-    GET /projects/{id}/tasks?phase=ARCHITECTURE
-    """
-    project_id = event.get("pathParameters", {}).get("id", "")
-    if not project_id:
-        return _response(400, {"error": "project_id is required"})
-
-    params = event.get("queryStringParameters") or {}
-    phase_filter: str = params.get("phase", "")
-
-    tasks = list_tasks(BOARD_TASKS_TABLE, project_id, phase=phase_filter)
-    return _response(200, {"project_id": project_id, "tasks": tasks})
 
 
 def route(event: dict[str, Any], context: Any) -> dict[str, Any]:
@@ -434,6 +464,14 @@ def route(event: dict[str, Any], context: Any) -> dict[str, Any]:
     logger.info("API request: %s %s", method, resource)
 
     try:
+        if method == "OPTIONS":
+            return handle_cors_preflight()
+
+        # Apply middleware (rate limiting, etc.)
+        should_continue, error_response = apply_middleware(event)
+        if not should_continue:
+            return error_response  # type: ignore[return-value]
+
         if method == "POST" and resource == "/projects":
             return create_project_handler(event)
         if method == "GET" and resource == "/projects/{id}/status":
@@ -454,7 +492,9 @@ def route(event: dict[str, Any], context: Any) -> dict[str, Any]:
             return upload_url_handler(event)
         if method == "GET" and resource == "/projects/{id}/tasks":
             return board_tasks_handler(event)
-        return _response(404, {"error": f"Not found: {method} {resource}"})
-    except Exception:
-        logger.exception("Handler error: %s %s", method, resource)
-        return _response(500, {"error": "Internal server error"})
+        if method == "GET" and resource == "/projects/{id}/artifacts":
+            return artifact_content_handler(event)
+        return api_response(404, {"error": f"Not found: {method} {resource}"})
+    except Exception as exc:
+        logger.exception("Handler error for %s %s: %s", method, resource, type(exc).__name__)
+        return api_response(500, {"error": "Internal server error"})

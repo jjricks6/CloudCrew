@@ -80,7 +80,9 @@ class TestPMReviewHandler:
             project_id="proj-1",
             deliverables={
                 "DISCOVERY": [
-                    DeliverableItem(name="SOW Analysis", git_path="docs/sow.md", status="COMPLETE"),
+                    DeliverableItem(
+                        name="SOW Analysis", git_path="docs/sow.md", version="v1.0", created_at="2025-06-01T10:00:00Z"
+                    ),
                 ],
             },
         )

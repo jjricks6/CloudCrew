@@ -108,8 +108,12 @@ class TestDeliverableItemModel:
     """Verify DeliverableItem model."""
 
     def test_valid_construction(self) -> None:
-        item = DeliverableItem(name="VPC module", git_path="infra/modules/vpc", status="IN_PROGRESS")
+        item = DeliverableItem(
+            name="VPC module", git_path="infra/modules/vpc", version="v1.0", created_at="2025-06-01T10:00:00Z"
+        )
         assert item.name == "VPC module"
+        assert item.version == "v1.0"
+        assert item.created_at == "2025-06-01T10:00:00Z"
 
 
 @pytest.mark.unit
@@ -135,7 +139,11 @@ class TestTaskLedger:
             current_phase=Phase.ARCHITECTURE,
             phase_status=PhaseStatus.APPROVED,
             facts=[Fact(description="d", source="s", timestamp="t")],
-            deliverables={"ARCHITECTURE": [DeliverableItem(name="n", git_path="p", status="COMPLETE")]},
+            deliverables={
+                "ARCHITECTURE": [
+                    DeliverableItem(name="n", git_path="p", version="v1.0", created_at="2025-06-02T14:00:00Z")
+                ]
+            },
         )
         assert ledger.current_phase == Phase.ARCHITECTURE
         assert len(ledger.facts) == 1

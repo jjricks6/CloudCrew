@@ -65,5 +65,17 @@ BOARD_TASKS_TABLE: str = os.environ.get("BOARD_TASKS_TABLE", "cloudcrew-board-ta
 COGNITO_USER_POOL_ID: str = os.environ.get("COGNITO_USER_POOL_ID", "")
 COGNITO_CLIENT_ID: str = os.environ.get("COGNITO_CLIENT_ID", "")
 
+# --- CORS Configuration ---
+CORS_ALLOWED_ORIGINS: str = os.environ.get("CORS_ALLOWED_ORIGINS", "*")  # comma-separated origins
+CORS_MAX_AGE: str = os.environ.get("CORS_MAX_AGE", "86400")  # 24 hours
+
+# --- Rate Limiting ---
+RATE_LIMIT_TABLE: str = os.environ.get("RATE_LIMIT_TABLE", "cloudcrew-rate-limits")
+RATE_LIMIT_REQUESTS_PER_MINUTE: int = int(os.environ.get("RATE_LIMIT_REQUESTS_PER_MINUTE", "100"))
+RATE_LIMIT_ENABLED: bool = os.environ.get("RATE_LIMIT_ENABLED", "true").lower() == "true"
+
 # --- PM Chat ---
 PM_CHAT_LAMBDA_NAME: str = os.environ.get("PM_CHAT_LAMBDA_NAME", "")
+
+# --- External APIs ---
+TAVILY_API_KEY: str = os.environ.get("TAVILY_API_KEY", "")

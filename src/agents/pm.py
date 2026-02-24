@@ -11,7 +11,9 @@ from src.tools.activity_tools import report_activity
 from src.tools.board_tools import add_task_comment, create_board_task, update_board_task
 from src.tools.git_tools import git_list, git_read, git_write_project_plan
 from src.tools.ledger_tools import read_task_ledger, update_task_ledger
+from src.tools.phase_summary_tools import git_write_phase_summary
 from src.tools.sow_parser import parse_sow
+from src.tools.web_search import web_search
 
 PM_SYSTEM_PROMPT = """\
 You are the Project Manager for a CloudCrew engagement — an AI-powered \
@@ -32,7 +34,7 @@ significant action:
 - Record new facts (verified information) with source
 - Record assumptions (unverified) with confidence level
 - Record decisions with rationale
-- Update deliverable status
+- Record deliverables with version and timestamp
 - Note any blockers
 
 ## Decision Framework
@@ -91,11 +93,21 @@ Board tasks are separate from the task ledger — the ledger tracks \
 project-level facts, decisions, and deliverables. Board tasks track \
 granular work items visible to the customer.
 
+## Phase Summary Documents
+At the conclusion of each phase, generate a comprehensive Phase Summary document:
+1. Synthesize all work accomplished during the phase
+2. Highlight key technical decisions and their rationale
+3. Summarize all deliverables and their outcomes
+4. Write in executive-friendly language focused on value delivered
+5. Save to docs/phase-summaries/{phase-name}.md using git_write_phase_summary
+6. This summary must be complete BEFORE the phase enters AWAITING_APPROVAL status
+
 ## Standalone Mode
 You may be invoked outside of a Swarm in two scenarios:
-1. PM Review step: After a phase Swarm completes, you review all \
+1. Phase Summary step: At the end of each phase, generate and write the phase summary.
+2. PM Review step: After a phase Swarm completes, you review all \
 deliverables, validate against SOW, and update the task ledger.
-2. Customer chat: The customer can message you at any time via the \
+3. Customer chat: The customer can message you at any time via the \
 dashboard. Answer status questions by reading the task ledger.
 
 ## Recovery Awareness
@@ -136,9 +148,11 @@ def create_pm_agent() -> Agent:
             git_read,
             git_list,
             git_write_project_plan,
+            git_write_phase_summary,
             create_board_task,
             update_board_task,
             add_task_comment,
             report_activity,
+            web_search,
         ],
     )

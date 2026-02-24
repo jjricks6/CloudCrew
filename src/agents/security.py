@@ -16,6 +16,7 @@ from src.tools.git_tools import git_list, git_read, git_write_security
 from src.tools.ledger_tools import read_task_ledger
 from src.tools.security_review import write_security_review
 from src.tools.security_tools import checkov_scan
+from src.tools.web_search import web_search
 
 SECURITY_SYSTEM_PROMPT = """\
 You are the Security Engineer for a CloudCrew engagement — an AI-powered \
@@ -150,5 +151,6 @@ def create_security_agent() -> Agent:
             update_board_task,
             add_task_comment,
             report_activity,
+            web_search,
         ],
     )

@@ -40,7 +40,8 @@ export type PhaseStatus = (typeof PhaseStatus)[keyof typeof PhaseStatus];
 export interface DeliverableItem {
   name: string;
   git_path: string;
-  status: "IN_PROGRESS" | "COMPLETE" | "NEEDS_REVISION";
+  version: string;
+  created_at: string;
 }
 
 export interface Fact {
@@ -159,6 +160,13 @@ export interface ChatDoneEvent extends BaseEvent {
   message_id: string;
 }
 
+export interface DeliverableCreatedEvent extends BaseEvent {
+  event: "deliverable_created";
+  name: string;
+  git_path: string;
+  version: string;
+}
+
 export type WebSocketEvent =
   | AgentActiveEvent
   | AgentIdleEvent
@@ -172,7 +180,8 @@ export type WebSocketEvent =
   | ChatChunkEvent
   | ChatDoneEvent
   | TaskCreatedEvent
-  | TaskUpdatedEvent;
+  | TaskUpdatedEvent
+  | DeliverableCreatedEvent;
 
 // --- Board Tasks (Kanban) ---
 

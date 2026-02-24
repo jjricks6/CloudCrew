@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ArtifactPreviewDialog } from "@/components/artifacts/ArtifactPreviewDialog";
@@ -9,14 +8,6 @@ import { useProjectDeliverables } from "@/state/queries/useProjectQueries";
 import { useProjectId } from "@/lib/useProjectId";
 import { isDemoMode, getArtifactContent } from "@/lib/demo";
 import { PHASE_ORDER, type DeliverableItem } from "@/lib/types";
-
-function statusVariant(
-  status: DeliverableItem["status"],
-): "default" | "secondary" | "destructive" {
-  if (status === "COMPLETE") return "default";
-  if (status === "IN_PROGRESS") return "secondary";
-  return "destructive";
-}
 
 export function ArtifactsPage() {
   const projectId = useProjectId();
@@ -93,9 +84,14 @@ export function ArtifactsPage() {
                   <span className="hidden font-mono text-xs text-muted-foreground sm:inline">
                     {item.git_path}
                   </span>
-                  <Badge variant={statusVariant(item.status)}>
-                    {item.status.replace("_", " ")}
-                  </Badge>
+                  <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">
+                    {item.version}
+                  </span>
+                  {item.created_at && (
+                    <span className="text-xs text-muted-foreground">
+                      {new Date(item.created_at).toLocaleString()}
+                    </span>
+                  )}
                 </button>
                 <Button
                   variant="ghost"

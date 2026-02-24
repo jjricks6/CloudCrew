@@ -67,20 +67,6 @@ export function getAgentConfig(name: string): AgentConfig {
 }
 
 // ---------------------------------------------------------------------------
-// Phase → agents mapping (matches backend swarm composition).
-// RETROSPECTIVE is intentionally omitted (deferred to M6). If the phase is
-// reached, SwarmVisualization falls back to showing all agents in the store.
-// ---------------------------------------------------------------------------
-
-export const PHASE_AGENTS: Partial<Record<Phase, string[]>> = {
-  DISCOVERY: ["Project Manager", "Solutions Architect"],
-  ARCHITECTURE: ["Project Manager", "Solutions Architect", "Infrastructure", "Security Engineer"],
-  POC: ["Project Manager", "Developer", "Infrastructure", "Data Engineer", "Security Engineer", "Solutions Architect"],
-  PRODUCTION: ["Project Manager", "Developer", "Infrastructure", "Data Engineer", "Security Engineer", "QA Engineer"],
-  HANDOFF: ["Project Manager", "Solutions Architect"],
-};
-
-// ---------------------------------------------------------------------------
 // Radial positioning
 // ---------------------------------------------------------------------------
 

@@ -7,6 +7,7 @@
  * - Future phases: gray circle
  */
 
+import { motion, AnimatePresence } from "framer-motion";
 import { PHASE_ORDER, type Phase, type PhaseStatus } from "@/lib/types";
 import { PHASE_LABELS } from "@/components/swarm/swarm-constants";
 
@@ -52,7 +53,11 @@ function PhaseIcon({
   }
 
   // future
-  return <div className="h-4 w-4 rounded-full bg-muted" />;
+  return (
+    <div className="flex h-8 w-8 items-center justify-center">
+      <div className="h-4 w-4 rounded-full bg-muted" />
+    </div>
+  );
 }
 
 function getPhaseState(
@@ -79,15 +84,29 @@ export function PhaseTimeline({
     : -1;
 
   return (
-    <div className="flex items-center">
+    <div className="flex items-start">
       {PHASE_ORDER.map((phase, i) => {
         const state = getPhaseState(i, currentIndex, phaseStatus);
         const isLast = i === PHASE_ORDER.length - 1;
 
         return (
-          <div key={phase} className="flex items-center" style={isLast ? undefined : { flex: 1 }}>
+          <div key={phase} className="flex items-start" style={isLast ? undefined : { flex: 1 }}>
             <div className="flex flex-col items-center gap-1.5">
-              <PhaseIcon state={state} />
+              {/* Fixed-size wrapper keeps layout stable during animation */}
+              <div className="flex h-8 w-8 items-center justify-center">
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    key={state}
+                    initial={{ opacity: 0, scale: 0.5 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.5 }}
+                    transition={{ duration: 0.35, ease: "easeInOut" }}
+                    className="flex items-center justify-center"
+                  >
+                    <PhaseIcon state={state} />
+                  </motion.div>
+                </AnimatePresence>
+              </div>
               <span
                 className={`text-xs font-medium whitespace-nowrap ${
                   state === "future"
@@ -98,12 +117,12 @@ export function PhaseTimeline({
                 {PHASE_LABELS[phase]}
               </span>
             </div>
+            {/* Line aligned to icon center: (32px icon - 2px line) / 2 = 15px */}
             {!isLast && (
-              <div className="mx-2 h-0.5 flex-1">
+              <div className="mx-2 mt-[15px] h-0.5 flex-1 overflow-hidden rounded-full bg-muted">
                 <div
-                  className={`h-full ${
-                    i < currentIndex ? "bg-green-500" : "bg-muted"
-                  }`}
+                  className="h-full origin-left bg-green-500 transition-transform duration-700 ease-in-out"
+                  style={{ transform: `scaleX(${i < currentIndex ? 1 : 0})` }}
                 />
               </div>
             )}

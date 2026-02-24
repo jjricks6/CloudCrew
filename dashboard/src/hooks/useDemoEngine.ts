@@ -1,49 +1,128 @@
 /**
- * Consolidated demo engine — runs in AppLayout, drives ALL demo events.
+ * Unified demo engine — runs in AppLayout, drives the full demo lifecycle
+ * from onboarding through all project phases to engagement completion.
  *
- * The engine is a generic segment player: it reads pure data arrays from
+ * The engine is a generic playbook player: it reads PhasePlaybook arrays from
  * `demoTimeline.ts` and schedules them through `agentStore.addEvent()`.
- * Editing the demo sequence means editing `demoTimeline.ts` — this file
- * only handles scheduling and reacting to user actions.
- *
- * No timers control the flow — interrupts and approvals emerge naturally
- * from the agent handoff sequence, just like the real backend. The only
- * pauses are when the engine waits for user input.
+ * Onboarding questions are streamed through `onboardingStore`.
  *
  * Flow:
- *   mount → SEED → WORK_BEFORE_INTERRUPT → [wait for user response]
- *   → RESUME_AND_WORK → [wait for user approval]
- *   → NEXT_PHASE_SEED → done
+ *   mount → ONBOARDING (stream questions, SOW review, wrapup)
+ *   → for each PhasePlaybook:
+ *       workSegment → [interrupt if defined] → resumeSegment → approval
+ *   → ENGAGEMENT COMPLETE (PM streams closing message)
+ *
+ * Phase-jump controls (Restart / Rewind / Fast Forward) are handled via
+ * `demoControlStore`. The engine subscribes and applies checkpoints.
  */
 
 import { useEffect, useRef } from "react";
-import { isDemoMode } from "@/lib/demo";
+import { chunkText, isDemoMode, DEMO_PROJECT_STATUS } from "@/lib/demo";
 import { useAgentStore } from "@/state/stores/agentStore";
-import type { TimelineStep } from "@/lib/demoTimeline";
+import { useOnboardingStore } from "@/state/stores/onboardingStore";
+import { usePhaseReviewStore } from "@/state/stores/phaseReviewStore";
 import {
-  SEED_SEGMENT,
-  WORK_BEFORE_INTERRUPT,
-  RESUME_AND_WORK,
-  NEXT_PHASE_SEED,
-} from "@/lib/demoTimeline";
+  useDemoControlStore,
+  type DemoPhase,
+} from "@/state/stores/demoControlStore";
+import { applyCheckpoint } from "@/lib/demoCheckpoints";
+import { PHASE_PLAYBOOKS, type PhasePlaybook, type TimelineStep } from "@/lib/demoTimeline";
+import {
+  ONBOARDING_STEPS,
+  REVISION_STEP,
+  WRAPUP_MESSAGE,
+  DEMO_SOW_CONTENT,
+} from "@/lib/onboardingDemoTimeline";
+import { queryClient } from "@/state/queryClient";
+
+// ---------------------------------------------------------------------------
+// Engine phase → demo phase mapping
+// ---------------------------------------------------------------------------
 
 type EnginePhase =
-  | "seed"
-  | "working"
-  | "interrupt_pending"
-  | "resuming"
-  | "approval_pending"
-  | "next_phase"
+  | "onboarding"
+  | "onboarding_sow"
+  | "onboarding_wrapup"
+  | "phase_work"
+  | "phase_interrupt"
+  | "phase_resume"
+  | "phase_approval"
+  | "complete"
   | "done";
+
+/** Map playbook phase name to DemoPhase for control store. */
+function playbookToDemoPhase(playbookPhase: string): DemoPhase {
+  switch (playbookPhase) {
+    case "ARCHITECTURE": return "architecture";
+    case "POC": return "poc";
+    case "PRODUCTION": return "production";
+    case "HANDOFF": return "handoff";
+    default: return "architecture";
+  }
+}
+
+/** Find the first agent with an agent_active event in a timeline segment. */
+function firstActiveAgent(steps: TimelineStep[]): string {
+  for (const step of steps) {
+    if (step.event.event === "agent_active") return step.event.agent_name;
+  }
+  return "Solutions Architect";
+}
+
+/** Find the last agent with an agent_active event in a timeline segment. */
+function lastActiveAgent(steps: TimelineStep[]): string {
+  for (let i = steps.length - 1; i >= 0; i--) {
+    const evt = steps[i].event;
+    if (evt.event === "agent_active") return evt.agent_name;
+  }
+  return "Solutions Architect";
+}
+
+/** Get the agent that should hand off to PM before an interrupt or approval. */
+function handoffAgent(playbook: PhasePlaybook, segment: "work" | "resume"): string {
+  const steps = segment === "work" ? playbook.workSegment : playbook.resumeSegment;
+  return lastActiveAgent(steps.length > 0 ? steps : playbook.workSegment);
+}
+
+/** Closing PM message streamed after all phases are done. */
+const COMPLETION_MESSAGE =
+  "Congratulations — the **E-Commerce Platform Migration** engagement is officially complete! 🎉\n\n" +
+  "Here's a summary of what your CloudCrew team delivered:\n\n" +
+  "**Architecture** — Serverless design with API Gateway, Lambda, and DynamoDB. " +
+  "Full ADR documentation and security review.\n\n" +
+  "**Proof of Concept** — Working auth integration, load-tested at 2x expected traffic, " +
+  "security-scanned with zero critical findings.\n\n" +
+  "**Production** — Blue-green deployment live, 2.8M records migrated with zero data loss, " +
+  "all 287 regression tests passing.\n\n" +
+  "**Handoff** — Operations runbook, API documentation, training materials, and PCI-DSS " +
+  "compliance report all delivered. Three knowledge transfer sessions completed.\n\n" +
+  "All artifacts are available in the **Artifacts** tab. If you need anything " +
+  "in the future, your team's knowledge base is preserved and searchable.\n\n" +
+  "It's been a pleasure working with you. How did we do? I'd love your feedback " +
+  "on the engagement — what went well and what could we improve for next time?";
 
 export function useDemoEngine(projectId: string | undefined) {
   const timeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
-  const enginePhaseRef = useRef<EnginePhase>("seed");
+  const intervalsRef = useRef<ReturnType<typeof setInterval>[]>([]);
+  const enginePhaseRef = useRef<EnginePhase>("onboarding");
+  /** Which playbook in PHASE_PLAYBOOKS we're currently executing. */
+  const playbookIndexRef = useRef(0);
 
   useEffect(() => {
     if (!isDemoMode(projectId)) return;
 
     const addEvent = useAgentStore.getState().addEvent;
+
+    // ── Scheduling helpers ────────────────────────────────────────────
+
+    function setEnginePhase(phase: EnginePhase) {
+      enginePhaseRef.current = phase;
+    }
+
+    /** Sync the user-facing demo phase indicator. */
+    function syncDemoPhase(dp: DemoPhase) {
+      useDemoControlStore.getState().setCurrentPhase(dp);
+    }
 
     function schedule(fn: () => void, ms: number) {
       const t = setTimeout(fn, ms);
@@ -54,74 +133,629 @@ export function useDemoEngine(projectId: string | undefined) {
     function cancelAll() {
       for (const t of timeoutsRef.current) clearTimeout(t);
       timeoutsRef.current = [];
+      for (const i of intervalsRef.current) clearInterval(i);
+      intervalsRef.current = [];
     }
 
-    /**
-     * Play a segment: schedule each step with cumulative delay.
-     * Returns the total duration so callers can schedule follow-ups.
-     */
-    function playSegment(
-      steps: TimelineStep[],
-      onComplete?: () => void,
-    ): number {
+    function playSegment(steps: TimelineStep[], onComplete?: () => void): number {
       let cumulative = 0;
       for (const step of steps) {
         cumulative += step.delayMs;
         const event = step.event;
         schedule(() => addEvent(event), cumulative);
       }
-      if (onComplete) {
-        schedule(onComplete, cumulative + 100);
-      }
+      if (onComplete) schedule(onComplete, cumulative + 100);
       return cumulative;
     }
 
-    // --- Boot sequence ---
-    // 1. Seed agents (if any)
-    // 2. Play work → naturally ends with interrupt
-    playSegment(SEED_SEGMENT, () => {
-      enginePhaseRef.current = "working";
-      playSegment(WORK_BEFORE_INTERRUPT, () => {
-        enginePhaseRef.current = "interrupt_pending";
-        // Now we wait for the user to respond to the interrupt.
-        // The store subscription below handles the transition.
-      });
-    });
+    function streamQuestion(questionText: string, onComplete: () => void) {
+      useOnboardingStore.getState().setPmState("active");
+      const thinkingDelay = 500 + Math.random() * 500;
+      schedule(() => {
+        const chunks = chunkText(questionText);
+        let i = 0;
+        const interval = setInterval(() => {
+          if (i < chunks.length) {
+            useOnboardingStore.getState().appendQuestionChunk(chunks[i]);
+            i++;
+          } else {
+            clearInterval(interval);
+            useOnboardingStore.getState().setPmState("thinking");
+            onComplete();
+          }
+        }, 20 + Math.random() * 25);
+        intervalsRef.current.push(interval);
+      }, thinkingDelay);
+    }
 
-    // --- React to user actions via store subscriptions ---
-    const unsubscribe = useAgentStore.subscribe((state, prevState) => {
-      // User answered interrupt → play resume + more work → ends with approval
-      if (
-        prevState.pendingInterrupt !== null &&
-        state.pendingInterrupt === null &&
-        enginePhaseRef.current === "interrupt_pending"
-      ) {
-        cancelAll();
-        enginePhaseRef.current = "resuming";
-        playSegment(RESUME_AND_WORK, () => {
-          enginePhaseRef.current = "approval_pending";
-          // Now we wait for the user to approve/revise.
+    /**
+     * Stream a PM chat message using the chat_thinking → chat_chunk → chat_done
+     * event sequence (same path as real WebSocket messages).
+     */
+    function streamChatMessage(text: string, onComplete?: () => void) {
+      const phase = DEMO_PROJECT_STATUS.current_phase;
+      addEvent({ event: "chat_thinking", project_id: "demo", phase });
+
+      const thinkingDelay = 800 + Math.random() * 700;
+      schedule(() => {
+        const chunks = chunkText(text);
+        let i = 0;
+        const interval = setInterval(() => {
+          if (i < chunks.length) {
+            addEvent({ event: "chat_chunk", project_id: "demo", phase, content: chunks[i] });
+            i++;
+          } else {
+            clearInterval(interval);
+            const messageId = `demo-${crypto.randomUUID()}`;
+            addEvent({ event: "chat_done", project_id: "demo", phase, message_id: messageId });
+            if (onComplete) onComplete();
+          }
+        }, 20 + Math.random() * 30);
+        intervalsRef.current.push(interval);
+      }, thinkingDelay);
+    }
+
+    /**
+     * Stream a review message (opening, closing, or chat) to the phase review store.
+     * Messages are streamed character-by-character for natural effect.
+     */
+    function streamReviewMessage(text: string, type: "opening" | "closing" | "chat") {
+      const chunks = chunkText(text);
+      let i = 0;
+
+      const thinkingDelay = 300 + Math.random() * 300;
+      schedule(() => {
+        usePhaseReviewStore.getState().setPmState("active");
+
+        const interval = setInterval(() => {
+          if (i < chunks.length) {
+            if (type === "opening") {
+              usePhaseReviewStore.getState().setOpeningContent(
+                usePhaseReviewStore.getState().openingContent + chunks[i]
+              );
+            } else if (type === "closing") {
+              usePhaseReviewStore.getState().setClosingContent(
+                usePhaseReviewStore.getState().closingContent + chunks[i]
+              );
+            } else if (type === "chat") {
+              usePhaseReviewStore.getState().appendChatChunk(chunks[i]);
+            }
+            i++;
+          } else {
+            clearInterval(interval);
+            usePhaseReviewStore.getState().setPmState("thinking");
+          }
+        }, 30 + Math.random() * 20);
+        intervalsRef.current.push(interval);
+      }, thinkingDelay);
+    }
+
+    /**
+     * Generate a canned PM response to a user question during artifact review.
+     * Matches common question patterns and returns relevant responses.
+     */
+    function generateDemoChatResponse(userMessage: string): string {
+      const lower = userMessage.toLowerCase();
+
+      if (lower.includes("summary") || lower.includes("overview")) {
+        return "The Phase Summary document provides a comprehensive overview of all work completed, key decisions made, and their rationale. It's designed to be executive-friendly and outcome-focused.";
+      }
+
+      if (lower.includes("artifact") || lower.includes("document")) {
+        return "All artifacts are available for review in the document browser. You can select any document to preview its full content, and download it if needed.";
+      }
+
+      if (lower.includes("next") || lower.includes("after")) {
+        return "Once you approve this phase, the team will immediately begin work on the next phase. I'll keep you updated on progress and raise any questions that need your input.";
+      }
+
+      if (lower.includes("question") || lower.includes("issue") || lower.includes("concern")) {
+        return "Great question! All deliverables have been reviewed by the team and validated against the SOW requirements. Feel free to review any documents and let me know if you'd like more details.";
+      }
+
+      // Default response
+      return "That's a great point. All the information you need is in the Phase Summary and supporting documents. Please let me know if you have any other questions!";
+    }
+
+    // ── Playbook execution ────────────────────────────────────────────
+
+    /**
+     * Start executing a playbook's work segment. When complete, if the
+     * playbook has an interrupt it fires it; otherwise goes straight to
+     * resume + approval.
+     */
+    function startPlaybook(index: number) {
+      playbookIndexRef.current = index;
+      const playbook = PHASE_PLAYBOOKS[index];
+      if (!playbook) {
+        startCompletion();
+        return;
+      }
+
+      const dp = playbookToDemoPhase(playbook.phase);
+      syncDemoPhase(dp);
+
+      // Set project to this phase
+      DEMO_PROJECT_STATUS.current_phase = playbook.phase as typeof DEMO_PROJECT_STATUS.current_phase;
+      DEMO_PROJECT_STATUS.phase_status = "IN_PROGRESS";
+      void queryClient.invalidateQueries({ queryKey: ["project"] });
+
+      setEnginePhase("phase_work");
+
+      const leadAgent = firstActiveAgent(playbook.workSegment);
+
+      // Every phase starts with PM kicking off, then handing off to the
+      // first specialist — matching real Swarm behavior (one agent at a time).
+      addEvent({
+        event: "agent_active",
+        project_id: "demo",
+        phase: playbook.phase,
+        agent_name: "Project Manager",
+        detail: `Kicking off the ${playbook.phase} phase`,
+      });
+
+      if (index > 0) {
+        addEvent({
+          event: "phase_started",
+          project_id: "demo",
+          phase: playbook.phase,
+          detail: `${playbook.phase} phase started`,
         });
       }
 
-      // User dismissed approval → advance to next phase
+      schedule(() => {
+        addEvent({
+          event: "handoff",
+          project_id: "demo",
+          phase: playbook.phase,
+          agent_name: leadAgent,
+          detail: `Handoff from Project Manager to ${leadAgent}`,
+        });
+        schedule(() => {
+          playWorkSegment(index);
+        }, 2000);
+      }, 2000);
+    }
+
+    function playWorkSegment(index: number) {
+      const playbook = PHASE_PLAYBOOKS[index];
+      if (!playbook) return;
+
+      playSegment(playbook.workSegment, () => {
+        if (playbook.interrupt) {
+          fireInterrupt(index);
+        } else {
+          // No interrupt — go straight to approval
+          startApproval(index);
+        }
+      });
+    }
+
+    function fireInterrupt(index: number) {
+      const playbook = PHASE_PLAYBOOKS[index];
+      if (!playbook?.interrupt) return;
+
+      setEnginePhase("phase_interrupt");
+      const { id, question } = playbook.interrupt;
+      const fromAgent = handoffAgent(playbook, "work");
+
+      // Last active agent → PM handoff → PM raises interrupt
+      addEvent({
+        event: "handoff",
+        project_id: "demo",
+        phase: playbook.phase,
+        agent_name: "Project Manager",
+        detail: `Handoff from ${fromAgent} to Project Manager`,
+      });
+
+      schedule(() => {
+        addEvent({
+          event: "agent_active",
+          project_id: "demo",
+          phase: playbook.phase,
+          agent_name: "Project Manager",
+          detail: "Preparing question for customer",
+        });
+
+        schedule(() => {
+          addEvent({
+            event: "interrupt_raised",
+            project_id: "demo",
+            phase: playbook.phase,
+            interrupt_id: id,
+            question,
+          });
+          addEvent({
+            event: "agent_active",
+            project_id: "demo",
+            phase: playbook.phase,
+            agent_name: "Project Manager",
+            detail: "Waiting for customer response",
+          });
+
+          // Also post the question as a chat message so it appears in chat
+          schedule(() => {
+            addEvent({
+              event: "chat_message",
+              project_id: "demo",
+              phase: playbook.phase,
+              message_id: `interrupt-${id}`,
+              role: "pm",
+              content: question,
+            });
+          }, 100);
+        }, 1500);
+      }, 2000);
+    }
+
+    function startResume(index: number) {
+      const playbook = PHASE_PLAYBOOKS[index];
+      if (!playbook) return;
+
+      setEnginePhase("phase_resume");
+      playSegment(playbook.resumeSegment, () => {
+        startApproval(index);
+      });
+    }
+
+    function startApproval(index: number) {
+      const playbook = PHASE_PLAYBOOKS[index];
+      if (!playbook) return;
+
+      setEnginePhase("phase_approval");
+      const fromAgent = handoffAgent(playbook, "resume");
+
+      // Last active agent → PM handoff → PM requests approval
+      addEvent({
+        event: "handoff",
+        project_id: "demo",
+        phase: playbook.phase,
+        agent_name: "Project Manager",
+        detail: `Handoff from ${fromAgent} to Project Manager`,
+      });
+
+      schedule(() => {
+        addEvent({
+          event: "agent_active",
+          project_id: "demo",
+          phase: playbook.phase,
+          agent_name: "Project Manager",
+          detail: "All deliverables validated — requesting customer approval",
+        });
+
+        schedule(() => {
+          addEvent({
+            event: "awaiting_approval",
+            project_id: "demo",
+            phase: playbook.phase,
+            detail: `${playbook.phase} phase ready for review`,
+          });
+          addEvent({
+            event: "agent_active",
+            project_id: "demo",
+            phase: playbook.phase,
+            agent_name: "Project Manager",
+            detail: "Waiting for customer to review deliverables",
+          });
+
+          // Add approval question to chat for dashboard to show Review button
+          schedule(() => {
+            addEvent({
+              event: "chat_message",
+              project_id: "demo",
+              phase: playbook.phase,
+              message_id: `approval-${playbook.phase}`,
+              role: "pm",
+              content: playbook.approvalQuestion,
+            });
+          }, 100);
+        }, 1500);
+      }, 2000);
+    }
+
+    /** Advance to next playbook or start completion with smooth transition. */
+    function advanceToNextPlaybook() {
+      // Use playbookIndexRef.current which tracks the playbook that was JUST completed.
+      // Note: advanceDemoPhase() has already been called by useApprovePhase mutation,
+      // so DEMO_PROJECT_STATUS.current_phase has already moved to the next phase.
+      // We calculate nextIndex relative to the playbook we just finished, not the new phase.
+      const currentPlaybookIndex = playbookIndexRef.current;
+      const nextIndex = currentPlaybookIndex >= 0 ? currentPlaybookIndex + 1 : 0;
+
+      // 1. Fade all agents to idle — Framer Motion spring animation (~500ms)
+      useAgentStore.setState({
+        agents: useAgentStore.getState().agents.map((a) => ({
+          ...a,
+          status: "idle" as const,
+          detail: "",
+        })),
+      });
+
+      // 2. After agents fade, start the next playbook (progress bar fills)
+      // Note: phase advancement was already done in approvePhase.mutate()
+      schedule(() => {
+        void queryClient.invalidateQueries({ queryKey: ["project"] });
+
+        // 3. After progress bar fills, start the next playbook (or completion)
+        schedule(() => {
+          if (nextIndex < PHASE_PLAYBOOKS.length) {
+            startPlaybook(nextIndex);
+          } else {
+            startCompletion();
+          }
+        }, 800);
+      }, 800);
+    }
+
+    /** Engagement complete — PM streams closing message. */
+    function startCompletion() {
+      setEnginePhase("complete");
+      syncDemoPhase("complete");
+
+      // Set all agents to idle except PM
+      useAgentStore.getState().reset();
+      useAgentStore.setState({
+        agents: [{
+          agent_name: "Project Manager",
+          status: "active",
+          phase: "HANDOFF",
+          detail: "Presenting final engagement summary",
+          timestamp: Date.now(),
+        }],
+        wsStatus: "connected",
+      });
+
+      streamChatMessage(COMPLETION_MESSAGE, () => {
+        setEnginePhase("done");
+        useAgentStore.setState({
+          agents: [{
+            agent_name: "Project Manager",
+            status: "idle",
+            phase: "HANDOFF",
+            detail: "Engagement complete",
+            timestamp: Date.now(),
+          }],
+        });
+      });
+    }
+
+    // ── Start the project phase demo (all playbooks) ──────────────────
+
+    function startProjectDemo() {
+      startPlaybook(0);
+    }
+
+    // ── Onboarding ────────────────────────────────────────────────────
+
+    function startOnboarding() {
+      setEnginePhase("onboarding");
+      syncDemoPhase("onboarding");
+      const status = useOnboardingStore.getState().status;
+      if (status === "not_started") {
+        useOnboardingStore.getState().start();
+      }
+      const currentStep = useOnboardingStore.getState().currentStep;
+      const firstStep = ONBOARDING_STEPS[currentStep];
+      if (firstStep) {
+        streamQuestion(firstStep.question, () => {
+          // Ready for user input
+        });
+      }
+    }
+
+    // ── Determine starting point ──────────────────────────────────────
+
+    const initialStatus = useOnboardingStore.getState().status;
+    if (initialStatus === "completed") {
+      startProjectDemo();
+    } else {
+      startOnboarding();
+    }
+
+    // ── Subscriptions ─────────────────────────────────────────────────
+
+    // Onboarding store: react to user answers and SOW acceptance
+    const unsubOnboarding = useOnboardingStore.subscribe(
+      (state, prevState) => {
+        // User answered a step → stream next question (or generate SOW)
+        if (
+          enginePhaseRef.current === "onboarding" &&
+          state.currentStep > prevState.currentStep
+        ) {
+          cancelAll();
+
+          // Revision answer → go straight back to SOW review
+          if (state.isRevision) {
+            schedule(() => {
+              setEnginePhase("onboarding_sow");
+              useOnboardingStore.getState().enterSowReview(DEMO_SOW_CONTENT);
+            }, 800);
+            return;
+          }
+
+          const nextStep = state.currentStep;
+          const nextQuestion = ONBOARDING_STEPS[nextStep];
+          if (!nextQuestion) return;
+          const isLastStep = nextStep >= ONBOARDING_STEPS.length - 1;
+
+          if (isLastStep) {
+            streamQuestion(nextQuestion.question, () => {
+              schedule(() => {
+                setEnginePhase("onboarding_sow");
+                useOnboardingStore.getState().enterSowReview(DEMO_SOW_CONTENT);
+              }, 1500);
+            });
+          } else {
+            streamQuestion(nextQuestion.question, () => {
+              // Ready for next user input
+            });
+          }
+        }
+
+        // User accepted SOW → stream wrap-up message
+        if (
+          prevState.status === "sow_review" &&
+          state.status === "wrapup" &&
+          enginePhaseRef.current === "onboarding_sow"
+        ) {
+          cancelAll();
+          setEnginePhase("onboarding_wrapup");
+          streamQuestion(WRAPUP_MESSAGE, () => {
+            // Waiting for user to click "Continue to Dashboard"
+          });
+        }
+
+        // User clicked "Continue to Dashboard" → start project demo.
+        // Guard on engine phase so checkpoint resets (which call .complete()
+        // programmatically) don't accidentally trigger startProjectDemo().
+        if (
+          prevState.status !== "completed" &&
+          state.status === "completed" &&
+          enginePhaseRef.current.startsWith("onboarding")
+        ) {
+          cancelAll();
+          schedule(() => startProjectDemo(), 800);
+        }
+
+        // User requested SOW revision → ask what they want changed
+        if (
+          prevState.status === "sow_review" &&
+          state.status === "in_progress" &&
+          state.isRevision &&
+          enginePhaseRef.current === "onboarding_sow"
+        ) {
+          cancelAll();
+          setEnginePhase("onboarding");
+          streamQuestion(REVISION_STEP.question, () => {
+            // Ready for user input
+          });
+        }
+      },
+    );
+
+    // Agent store: react to interrupt/approval dismissals
+    const unsubAgent = useAgentStore.subscribe((state, prevState) => {
+      // User answered interrupt → play resume segment
+      if (
+        prevState.pendingInterrupt !== null &&
+        state.pendingInterrupt === null &&
+        enginePhaseRef.current === "phase_interrupt"
+      ) {
+        cancelAll();
+        startResume(playbookIndexRef.current);
+      }
+
+      // User approved phase → advance to next playbook
       if (
         prevState.pendingApproval !== null &&
         state.pendingApproval === null &&
-        enginePhaseRef.current === "approval_pending"
+        enginePhaseRef.current === "phase_approval"
       ) {
         cancelAll();
-        enginePhaseRef.current = "next_phase";
-        playSegment(NEXT_PHASE_SEED, () => {
-          enginePhaseRef.current = "done";
-        });
+        advanceToNextPlaybook();
+      }
+    });
+
+    // Demo control store: react to phase-jump requests
+    const unsubControl = useDemoControlStore.subscribe(
+      (state, prevState) => {
+        if (
+          state.jumpTarget !== null &&
+          state.jumpTarget !== prevState.jumpTarget
+        ) {
+          const target = state.jumpTarget;
+          useDemoControlStore.getState().clearJump();
+          cancelAll();
+          // Neutralize engine phase BEFORE resetting stores. Otherwise the
+          // agent-store subscription sees pendingInterrupt/pendingApproval go
+          // null and interprets it as "user answered" — triggering a stale
+          // startResume() or advanceToNextPlaybook() for the old playbook.
+          setEnginePhase("done");
+          applyCheckpoint(target);
+
+          switch (target) {
+            case "onboarding":
+              startOnboarding();
+              break;
+            case "architecture":
+              startPlaybook(0);
+              break;
+            case "poc":
+              startPlaybook(1);
+              break;
+            case "production":
+              startPlaybook(2);
+              break;
+            case "handoff":
+              startPlaybook(3);
+              break;
+            case "complete":
+              startCompletion();
+              break;
+          }
+        }
+      },
+    );
+
+    // Subscribe to phase review store to stream content when steps change
+    const unsubPhaseReview = usePhaseReviewStore.subscribe((state, prevState) => {
+      // When user clicks "Begin Review" button, opening message starts streaming
+      if (
+        prevState.status !== "opening_message" &&
+        state.status === "opening_message"
+      ) {
+        cancelAll();
+        streamReviewMessage(state.openingMessage, "opening");
+        return;
+      }
+
+      // When opening message starts, stream it
+      if (
+        prevState.status !== "opening_message" &&
+        state.status === "opening_message"
+      ) {
+        cancelAll();
+        streamReviewMessage(state.openingMessage, "opening");
+        return;
+      }
+
+      // When user sends a chat message during artifact review, stream PM response
+      if (
+        state.status === "artifact_review" &&
+        state.chatHistory.length > prevState.chatHistory.length
+      ) {
+        const lastMsg = state.chatHistory[state.chatHistory.length - 1];
+        if (lastMsg.role === "user") {
+          cancelAll();
+
+          // Generate canned PM response
+          const response = generateDemoChatResponse(lastMsg.content);
+
+          // Schedule streaming response with delay
+          schedule(() => {
+            usePhaseReviewStore.getState().setPmState("active");
+            streamReviewMessage(response, "chat");
+          }, 800);
+        }
+      }
+
+      // When closing message starts, stream it
+      if (
+        prevState.status !== "closing_message" &&
+        state.status === "closing_message"
+      ) {
+        cancelAll();
+        streamReviewMessage(state.closingMessage, "closing");
       }
     });
 
     return () => {
       cancelAll();
-      unsubscribe();
-      enginePhaseRef.current = "seed";
+      unsubOnboarding();
+      unsubAgent();
+      unsubControl();
+      unsubPhaseReview();
+      enginePhaseRef.current = "onboarding";
     };
   }, [projectId]);
 }

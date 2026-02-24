@@ -1,8 +1,9 @@
 """Architecture phase Swarm assembly.
 
-Wires together the SA, Infra, and Security agents into a Swarm for the
-Architecture phase. SA is the entry point; agents hand off work using
-the auto-generated transfer_to_{name} tools.
+Wires together all specialist agents into a Swarm for the Architecture phase.
+SA is the entry point and hub — it consults specialists as needed (Data
+Engineer for data model, Security for auth review, Developer for API
+contracts, QA for test strategy, Infra for infrastructure design).
 
 This module is in phases/ — the ONLY package allowed to import from agents/.
 """
@@ -12,7 +13,10 @@ import logging
 from strands.hooks import HookProvider
 from strands.multiagent.swarm import Swarm
 
+from src.agents.data import create_data_agent
+from src.agents.dev import create_dev_agent
 from src.agents.infra import create_infra_agent
+from src.agents.qa import create_qa_agent
 from src.agents.sa import create_sa_agent
 from src.agents.security import create_security_agent
 from src.config import EXECUTION_TIMEOUT_ARCHITECTURE, NODE_TIMEOUT
@@ -29,13 +33,13 @@ def create_architecture_swarm(
 ) -> Swarm:
     """Create the Architecture phase Swarm.
 
-    Assembles SA (entry point) -> Infra -> Security with review cycle support.
-    The Swarm auto-creates handoff tools so agents can transfer work to each
-    other using transfer_to_sa, transfer_to_infra, transfer_to_security.
+    All specialist agents are available so SA can consult any expert as
+    needed. The Swarm auto-creates handoff tools (transfer_to_{name})
+    so agents can transfer work to each other organically.
 
     Configuration:
-        - max_handoffs=15: Conservative limit to catch runaway loops
-        - max_iterations=15: Matches handoff limit
+        - max_handoffs=20: Room for SA to consult multiple specialists
+        - max_iterations=20: Matches handoff limit
         - execution_timeout: From config (default 2400s / 40 minutes)
         - node_timeout: From config (default 1800s / 30 minutes)
         - repetitive_handoff_detection_window=8: Catches ping-pong patterns
@@ -45,10 +49,13 @@ def create_architecture_swarm(
         Configured Swarm ready for invocation with invocation_state.
     """
     sa = create_sa_agent()
+    dev = create_dev_agent()
     infra = create_infra_agent()
+    data = create_data_agent()
     security = create_security_agent()
+    qa = create_qa_agent()
 
-    logger.info("Creating architecture swarm with agents: sa, infra, security")
+    logger.info("Creating architecture swarm with agents: sa, dev, infra, data, security, qa")
 
     hooks: list[HookProvider] = [
         ResilienceHook(),
@@ -57,10 +64,10 @@ def create_architecture_swarm(
     ]
 
     return Swarm(
-        nodes=[sa, infra, security],
+        nodes=[sa, dev, infra, data, security, qa],
         entry_point=sa,
-        max_handoffs=15,
-        max_iterations=15,
+        max_handoffs=20,
+        max_iterations=20,
         execution_timeout=EXECUTION_TIMEOUT_ARCHITECTURE,
         node_timeout=NODE_TIMEOUT,
         hooks=hooks,

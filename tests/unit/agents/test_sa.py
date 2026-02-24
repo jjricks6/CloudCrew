@@ -28,9 +28,9 @@ class TestSAAgent:
         assert call_kwargs.kwargs["name"] == "sa"
         assert call_kwargs.kwargs["model"] is mock_opus
         assert call_kwargs.kwargs["system_prompt"] == SA_SYSTEM_PROMPT
-        # 9 tools: git_read, git_list, git_write_architecture, write_adr, read_task_ledger,
-        # create_board_task, update_board_task, add_task_comment, report_activity
-        assert len(call_kwargs.kwargs["tools"]) == 9
+        # 10 tools: git_read, git_list, git_write_architecture, write_adr, read_task_ledger,
+        # create_board_task, update_board_task, add_task_comment, report_activity, web_search
+        assert len(call_kwargs.kwargs["tools"]) == 10
         assert agent is mock_agent_cls.return_value
 
     def test_system_prompt_has_key_sections(self) -> None:
