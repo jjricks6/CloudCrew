@@ -111,13 +111,36 @@ Agents run as a Swarm, enabling emergent collaboration. Agents hand off work bas
 
 ### Cost & Operations
 
-| Aspect | Details |
-|--------|---------|
-| **Monthly baseline** | ~$50 (dev environment) with on-demand DynamoDB, no NAT Gateways, public subnets |
-| **Per-project cost** | ~$10-30 depending on phase complexity and execution time |
-| **Deployment** | Manual (Terraform) — CI never applies infrastructure. See [Deployment Guide](docs/architecture/implementation-guide.md#deployment). |
-| **Scaling** | Step Functions handles project queuing; Fargate scales task count; DynamoDB on-demand pricing scales usage |
-| **Observability** | CloudWatch Logs, X-Ray traces, custom metrics dashboard |
+**Monthly Baseline:** ~$50 (dev environment)
+
+**AWS Resources Deployed:**
+
+| Resource | Quantity | Monthly Cost | Notes |
+|----------|----------|--------------|-------|
+| **Step Functions** | 1 state machine | ~$2-5 | $0.000025 per state transition; typical project ~200-400 transitions |
+| **ECS Fargate** | On-demand tasks | ~$15-25 | 2 vCPU × 4GB RAM × 20 min/phase × 5 phases; scales with project complexity |
+| **DynamoDB** | 2 tables (task ledger, rate limits) | ~$5-10 | On-demand pricing; no provisioned capacity; TTL auto-cleanup |
+| **ECR** | 1 repository | <$1 | Private container registry for phase runner image |
+| **S3** | 1 Terraform state bucket | <$1 | Remote state storage; minimal size |
+| **CloudWatch Logs** | 50-200 GB/month | ~$15-25 | Logs from ECS tasks, Lambda, Step Functions; 30-day retention |
+| **X-Ray** | 1-10M traces/month | ~$5-10 | Distributed tracing for agent execution and handoffs |
+| **VPC / Networking** | 1 VPC, public subnets | Free | No NAT Gateways (dev cost optimization); public subnets acceptable for dev |
+| **RDS (optional)** | None by default | $0 | Project uses DynamoDB; RDS available if needed |
+
+**Per-Project Cost:** ~$10-30 depending on phase complexity and execution time.
+
+**Cost Optimization (Built-in):**
+- On-demand DynamoDB (not provisioned capacity) scales automatically
+- Public subnets eliminate NAT Gateway costs ($32-48/month each)
+- ECS Fargate on-demand (no always-on container services)
+- Step Functions task token approach eliminates Lambda duration overruns
+- Automatic CloudWatch Logs TTL and S3 lifecycle policies
+
+**Deployment:** Manual (Terraform) — CI never applies infrastructure. See [Deployment Guide](docs/architecture/implementation-guide.md#deployment).
+
+**Scaling:** Step Functions handles project queuing; Fargate scales task count; DynamoDB on-demand pricing scales usage.
+
+**Observability:** CloudWatch Logs, X-Ray traces, custom metrics dashboard.
 
 ---
 
@@ -389,30 +412,6 @@ lsof -i :8000
 ---
 
 ## Contributing
-
-### Adding a New Agent
-
-See [Agent Development Guide](docs/architecture/agent-specifications.md#adding-new-agents).
-
-```python
-# agents/my_agent.py
-from strands import Agent
-
-class MyAgent(Agent):
-    """Agent that does X."""
-
-    def __init__(self):
-        super().__init__(
-            name="MyAgent",
-            model_id="claude-opus-4-6",
-            system_prompt="You are an expert in X...",
-            tools=[tool1, tool2],
-        )
-```
-
-### Adding a New Tool
-
-See [Tool Development Guide](docs/architecture/implementation-guide.md#adding-tools).
 
 ### Reporting Bugs
 
