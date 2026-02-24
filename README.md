@@ -52,14 +52,6 @@ Watch a full engagement unfold in your browser:
 - PM chat during review phases
 - Zero backend required
 
-### Real Mode (With Backend Deployment)
-
-Want to run real agents with an actual AWS backend? See the [Deployment Guide](docs/architecture/implementation-guide.md#deployment) for complete instructions including:
-- Infrastructure setup with Terraform
-- Docker image build and push to ECR
-- Agent server deployment to ECS Fargate
-- Cost breakdown and tear-down procedures
-
 ---
 
 ## Getting Started
