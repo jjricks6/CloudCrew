@@ -26,6 +26,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { AgentPolyhedron } from "@/components/swarm/AgentPolyhedron";
 import { AGENT_CONFIG } from "@/components/swarm/swarm-constants";
 import { Button } from "@/components/ui/button";
+import { Confetti } from "@/components/ui/Confetti";
 import { PhaseReviewMessageCard } from "./PhaseReviewMessageCard";
 import { PhaseReviewArtifactView } from "./PhaseReviewArtifactView";
 import { usePhaseReviewStore } from "@/state/stores/phaseReviewStore";
@@ -34,11 +35,13 @@ import { useProjectId } from "@/lib/useProjectId";
 import { useProjectDeliverables } from "@/state/queries/useProjectQueries";
 import { useChatStore } from "@/state/stores/chatStore";
 import { useAgentStore } from "@/state/stores/agentStore";
+import { useNavigate } from "react-router-dom";
 
 const PM_CONFIG = AGENT_CONFIG["Project Manager"];
 
 export function PhaseReviewView() {
   const projectId = useProjectId();
+  const navigate = useNavigate();
   const { data: deliverables } = useProjectDeliverables(projectId);
 
   const status = usePhaseReviewStore((s) => s.status);
@@ -102,6 +105,11 @@ export function PhaseReviewView() {
         usePhaseReviewStore.getState().completeReview();
       },
     });
+  };
+
+  const handleReturnToDashboard = () => {
+    usePhaseReviewStore.getState().completeReview();
+    navigate(`/project/${projectId}`, { replace: true });
   };
 
 
@@ -171,7 +179,36 @@ export function PhaseReviewView() {
               </motion.div>
             )}
 
-            {status === "closing_complete" && (
+            {status === "closing_complete" && currentPhase === "HANDOFF" && (
+              <motion.div
+                key="engagement-complete"
+                className="flex flex-col min-h-0 flex-1 justify-center"
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.6 }}
+              >
+                <Confetti />
+                <div className="flex flex-col gap-4 items-center text-center">
+                  <div className="mb-6">
+                    <h2 className="text-4xl font-bold bg-gradient-to-r from-yellow-400 via-pink-400 to-blue-400 bg-clip-text text-transparent mb-2">
+                      Engagement Complete! 🎉
+                    </h2>
+                  </div>
+                  <p className="text-lg text-muted-foreground max-w-md">
+                    Your team is now fully equipped and confident to operate the system independently. Thank you for partnering with us on this journey!
+                  </p>
+                  <Button
+                    onClick={handleReturnToDashboard}
+                    size="lg"
+                    className="mt-8"
+                  >
+                    Return to Dashboard
+                  </Button>
+                </div>
+              </motion.div>
+            )}
+
+            {status === "closing_complete" && currentPhase !== "HANDOFF" && (
               <motion.div key="closing-continue" className="flex flex-col min-h-0 flex-1 justify-center">
                 <div className="flex flex-col gap-4 items-center text-center">
                   <h2 className="text-2xl font-bold">Begin Next Phase</h2>

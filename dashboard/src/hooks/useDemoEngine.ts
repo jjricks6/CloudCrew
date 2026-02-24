@@ -455,11 +455,12 @@ export function useDemoEngine(projectId: string | undefined) {
 
     /** Advance to next playbook or start completion with smooth transition. */
     function advanceToNextPlaybook() {
-      // Calculate nextIndex from current phase instead of relying on playbookIndexRef,
-      // since the ref might be stale if user jumped directly to review via debug button
-      const currentPhase = DEMO_PROJECT_STATUS.current_phase;
-      const currentIndex = PHASE_PLAYBOOKS.findIndex((p) => p.phase === currentPhase);
-      const nextIndex = currentIndex >= 0 ? currentIndex + 1 : playbookIndexRef.current + 1;
+      // Use playbookIndexRef.current which tracks the playbook that was JUST completed.
+      // Note: advanceDemoPhase() has already been called by useApprovePhase mutation,
+      // so DEMO_PROJECT_STATUS.current_phase has already moved to the next phase.
+      // We calculate nextIndex relative to the playbook we just finished, not the new phase.
+      const currentPlaybookIndex = playbookIndexRef.current;
+      const nextIndex = currentPlaybookIndex >= 0 ? currentPlaybookIndex + 1 : 0;
 
       // 1. Fade all agents to idle — Framer Motion spring animation (~500ms)
       useAgentStore.setState({

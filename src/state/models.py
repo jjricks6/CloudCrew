@@ -96,6 +96,7 @@ class TaskLedger(BaseModel):
     project_id: str
     project_name: str = ""
     customer: str = ""
+    owner_id: str = ""  # Cognito user ID of project creator
     current_phase: Phase = Phase.DISCOVERY
     phase_status: PhaseStatus = PhaseStatus.IN_PROGRESS
     facts: list[Fact] = Field(default_factory=list)
