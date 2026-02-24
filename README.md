@@ -54,19 +54,11 @@ Watch a full engagement unfold in your browser:
 
 ### Real Mode (With Backend Deployment)
 
-```bash
-# Deploy AWS infrastructure (one-time)
-make tf-init
-make tf-plan
-make tf-apply
-
-# Run backend agent server
-python -m src.phases.runner \
-  --project-id my-project \
-  --sow-file sow.md
-
-# Access dashboard at http://localhost:5173
-```
+Want to run real agents with an actual AWS backend? See the [Deployment Guide](docs/architecture/implementation-guide.md#deployment) for complete instructions including:
+- Infrastructure setup with Terraform
+- Docker image build and push to ECR
+- Agent server deployment to ECS Fargate
+- Cost breakdown and tear-down procedures
 
 ---
 
