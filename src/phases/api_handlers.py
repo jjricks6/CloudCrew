@@ -22,6 +22,7 @@ from src.config import (
     STATE_MACHINE_ARN,
     TASK_LEDGER_TABLE,
 )
+from src.phases.artifact_handlers import artifact_content_handler
 from src.state.approval import delete_token, get_token
 from src.state.broadcast import broadcast_to_project
 from src.state.chat import get_chat_history, new_message_id, store_chat_message
@@ -454,6 +455,8 @@ def route(event: dict[str, Any], context: Any) -> dict[str, Any]:
             return upload_url_handler(event)
         if method == "GET" and resource == "/projects/{id}/tasks":
             return board_tasks_handler(event)
+        if method == "GET" and resource == "/projects/{id}/artifacts":
+            return artifact_content_handler(event)
         return _response(404, {"error": f"Not found: {method} {resource}"})
     except Exception:
         logger.exception("Handler error: %s %s", method, resource)

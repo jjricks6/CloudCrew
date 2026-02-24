@@ -46,16 +46,26 @@ export function DashboardPage() {
     if (
       project?.phase_status === "AWAITING_APPROVAL" &&
       project.current_phase &&
-      phaseReviewStatus === "not_started"
+      (phaseReviewStatus === "not_started" || phaseReviewStatus === "completed")
     ) {
       return {
         type: "approval" as const,
         message: `The ${project.current_phase} phase is ready for your review.`,
         buttonLabel: "Review",
         onAction: () => {
-          usePhaseReviewStore
-            .getState()
-            .startWaitingForReview(project.current_phase);
+          const playbook = PHASE_PLAYBOOKS.find(
+            (p) => p.phase === project.current_phase
+          );
+          if (playbook && project.current_phase) {
+            usePhaseReviewStore
+              .getState()
+              .beginReview(
+                project.current_phase,
+                playbook.reviewMessages.opening,
+                playbook.reviewMessages.closing,
+                playbook.phaseSummaryPath
+              );
+          }
         },
       };
     }
@@ -96,7 +106,12 @@ export function DashboardPage() {
               const phase = project.current_phase;
               const playbook = PHASE_PLAYBOOKS.find((p) => p.phase === phase);
               if (playbook) {
-                usePhaseReviewStore.getState().beginReview(phase, playbook.reviewSteps);
+                usePhaseReviewStore.getState().startOpeningMessage(
+                  phase,
+                  playbook.reviewMessages.opening,
+                  playbook.reviewMessages.closing,
+                  playbook.phaseSummaryPath
+                );
               }
             }}
             variant="outline"

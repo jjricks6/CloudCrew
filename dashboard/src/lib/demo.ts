@@ -831,6 +831,249 @@ Authorization: Bearer <id_token>
 All evidence artifacts stored in S3 bucket \`compliance-evidence-{account-id}\`
 with versioning enabled and cross-region replication.
 `,
+  "docs/phase-summaries/architecture.md": `# Architecture Phase Summary
+
+## Overview
+The Architecture phase established the foundational design for a serverless, multi-tenant SaaS platform on AWS, prioritizing operational efficiency and scalability.
+
+## What We Accomplished
+
+### 1. System Architecture Design
+- Designed serverless-first architecture using API Gateway, Lambda, DynamoDB, and S3
+- Established multi-tenant isolation patterns at database and storage layers
+- Created high-availability design with cross-region failover capabilities
+- Documented all architectural decisions with trade-off analysis
+
+### 2. Technology Selection
+- **Compute**: Lambda for API and async workloads (no operational overhead)
+- **Data**: DynamoDB for operational data, S3 for artifacts
+- **Authentication**: Cognito user pools with MFA support
+- **Monitoring**: CloudWatch Logs + X-Ray for distributed tracing
+- **Infrastructure**: Terraform for IaC, GitHub Actions for CI/CD
+
+### 3. API Contract Definition
+- RESTful API with OpenAPI 3.0 specification
+- 25+ endpoints covering authentication, data management, and webhooks
+- Request/response schemas validated against specification
+- Rate limiting and retry policies documented
+
+## Key Decisions & Rationale
+
+| Decision | Rationale | Alternative Considered |
+|----------|-----------|------------------------|
+| Serverless over containers | Zero operational overhead, scales automatically to 0 in off-hours | ECS Fargate (higher baseline cost) |
+| Single-tenant DynamoDB tables | Simplifies data isolation and compliance auditing | Multi-tenant with row-level security |
+| API Gateway caching | Reduces DynamoDB calls for read-heavy endpoints by 60% | Direct Lambda-to-DynamoDB calls |
+| S3 + CloudFront | Cost-effective content delivery with global footprint | Application-managed CDN |
+
+## Deliverables
+
+1. ✅ **System Architecture Document** - 15 pages, 20+ diagrams
+2. ✅ **API Contracts** - OpenAPI specification for all endpoints
+3. ✅ **Data Models** - DynamoDB schemas with GSI strategy
+4. ✅ **Security Architecture** - Encryption, IAM policies, network isolation
+5. ✅ **Cost Model** - Projected spend by service with scaling scenarios
+6. ✅ **Deployment Topology** - VPC layout, subnet strategy, cross-region setup
+
+## Next Steps
+The team is ready to proceed to the Proof of Concept phase to validate these architectural decisions through implementation and load testing.
+`,
+  "docs/phase-summaries/poc.md": `# Proof of Concept Phase Summary
+
+## Overview
+The PoC phase successfully validated core architectural components through working code and demonstrated end-to-end functionality, confirming the viability of the proposed design.
+
+## What We Accomplished
+
+### 1. Core API Implementation
+- Implemented 8 critical API endpoints covering authentication, user management, and data retrieval
+- Lambda functions tested and deployed to AWS
+- API Gateway integrations working with proper request/response validation
+- Performance verified: API responses averaging 120ms (well below 200ms SLA)
+
+### 2. Multi-Tenant Data Model
+- DynamoDB tables provisioned with proper partition key strategy
+- Tenant isolation verified through integration tests
+- Query performance tested at scale (1M+ items)
+- Global Secondary Indexes performing efficiently
+
+### 3. Authentication & Authorization
+- Cognito integration complete with user pool configuration
+- Custom authorizer Lambda validating JWT tokens
+- Role-based access control (RBAC) implemented and tested
+- MFA setup validated for admin accounts
+
+### 4. Infrastructure & Deployment
+- Terraform modules created for all AWS resources
+- GitHub Actions pipeline deploying changes to dev environment
+- Infrastructure-as-Code versioned and reviewed
+- Automated testing integrated into deployment pipeline
+
+## Key Decisions & Rationale
+
+| Decision | Rationale |
+|----------|-----------|
+| Lambda for all compute | Simplified deployment, automatic scaling, reduced operational burden |
+| DynamoDB on-demand pricing | Cost-effective for variable load during PoC phase |
+| Single region deployment | Simplified validation; multi-region added in Production phase |
+| GitHub Actions for CI/CD | Integrated with existing workflow, fast iteration |
+
+## Deliverables
+
+1. ✅ **Working API** - All endpoints deployed and tested
+2. ✅ **Terraform Modules** - Reusable infrastructure code
+3. ✅ **Automated Tests** - 45+ integration tests, 92% code coverage
+4. ✅ **Load Test Report** - Verified performance under 2x expected load
+5. ✅ **Security Scan Report** - Zero critical/high findings
+6. ✅ **Runbooks** - Deployment and incident response procedures
+
+## Validation Results
+
+- ✅ API latency meets SLA targets
+- ✅ Multi-tenant isolation confirmed via integration tests
+- ✅ Infrastructure cost within budget ($2.3k/month projected)
+- ✅ All security requirements satisfied
+
+## Next Steps
+Proceed to Production phase for hardening, monitoring setup, and multi-region deployment.
+`,
+  "docs/phase-summaries/production.md": `# Production Phase Summary
+
+## Overview
+The Production phase hardened the system, implemented comprehensive monitoring, enabled multi-region failover, and prepared the platform for customer launch.
+
+## What We Accomplished
+
+### 1. System Hardening
+- Added DynamoDB backup and point-in-time recovery
+- Enabled CloudTrail for audit logging
+- Implemented VPC Flow Logs for network monitoring
+- Configured WAF rules on API Gateway
+- Enabled S3 versioning and cross-region replication
+
+### 2. Monitoring & Observability
+- CloudWatch dashboards for operations team
+- Automated alerts for SLA violations (latency, error rates)
+- X-Ray tracing for distributed transaction visibility
+- Custom metrics for business KPIs (sign-ups, API calls, tenant activity)
+- Log aggregation with structured logging format
+
+### 3. Multi-Region Deployment
+- Secondary region (eu-west-1) configured as active-active
+- Route 53 health checks for automatic failover
+- DynamoDB Global Tables enabled for replication
+- S3 Cross-Region Replication configured
+- DNS failover tested and verified
+
+### 4. Performance Optimization
+- API response times optimized: avg 85ms, p99 <200ms
+- DynamoDB queries tuned through GSI strategy
+- Lambda provisioned concurrency for critical endpoints
+- CloudFront caching configured for S3 content
+
+## Key Decisions & Rationale
+
+| Decision | Rationale |
+|----------|-----------|
+| Active-active multi-region | True resilience; RTO/RPO measured in seconds |
+| DynamoDB provisioned capacity (prod) | Predictable costs, guaranteed performance |
+| CloudWatch + X-Ray | Vendor-agnostic observability, SOC 2 compliant |
+| WAF at API Gateway | Protection without additional infrastructure |
+
+## Deliverables
+
+1. ✅ **Production Deployment** - Multi-region active-active setup
+2. ✅ **Monitoring & Alerting** - 50+ dashboards and alert policies
+3. ✅ **Disaster Recovery Plan** - RTO: 5 minutes, RPO: 1 minute
+4. ✅ **Security Hardening Report** - All OWASP Top 10 mitigated
+5. ✅ **Runbooks** - Incident response procedures for operations team
+6. ✅ **Capacity Planning** - Cost projections for 12-month horizon
+7. ✅ **Compliance Evidence** - SOC 2 audit ready
+
+## Performance Metrics
+
+- **Uptime**: 99.95% in first month
+- **API Latency**: p50: 45ms, p95: 120ms, p99: 195ms
+- **Error Rate**: 0.02% (well below 0.1% SLA)
+- **Cost**: $3.8k/month (within budget)
+- **Scaling**: Successfully handled 1.5x peak load
+
+## Next Steps
+Proceed to Handoff phase for customer training and operational transition to customer's DevOps team.
+`,
+  "docs/phase-summaries/handoff.md": `# Handoff Phase Summary
+
+## Overview
+The Handoff phase transferred operational responsibility to the customer's team through comprehensive training, documentation, and operational readiness validation.
+
+## What We Accomplished
+
+### 1. Documentation Delivery
+- Complete System Architecture guide with runbooks
+- Operations manual with troubleshooting procedures
+- API documentation with SDKs and code examples
+- Infrastructure-as-Code repository transferred to customer
+- Security and compliance documentation package
+
+### 2. Operations Team Training
+- 3-day hands-on training for DevOps and SRE team
+- Session 1: Architecture overview and system components
+- Session 2: Deployment, scaling, and infrastructure management
+- Session 3: Monitoring, alerting, and incident response
+- Training materials provided (videos, slide decks, labs)
+
+### 3. Runbooks & Procedures
+- Common operational tasks (deployments, rollbacks, updates)
+- Incident response procedures for critical scenarios
+- Monitoring and alerting configuration guide
+- Backup and disaster recovery procedures
+- Performance tuning and optimization guide
+
+### 4. Operational Readiness
+- Customer's team performed 50+ manual scenarios
+- Simulated failures (region outage, database failure) with successful recovery
+- Escalation procedures tested and validated
+- On-call rotation established with escalation chain
+- Change management process documented and agreed
+
+## Knowledge Transfer Results
+
+| Area | Coverage | Status |
+|------|----------|--------|
+| System Architecture | 100% | ✅ Complete |
+| Deployment & Infrastructure | 100% | ✅ Complete |
+| Monitoring & Alerting | 95% | ✅ Complete |
+| Incident Response | 90% | ✅ Complete |
+| Cost Optimization | 85% | ✅ Complete |
+
+## Deliverables
+
+1. ✅ **Architecture Documentation** - Complete system overview with diagrams
+2. ✅ **Operations Manual** - 200+ pages of procedures and troubleshooting
+3. ✅ **Training Materials** - Videos, labs, and reference guides
+4. ✅ **Runbooks** - Automated and manual procedures for all scenarios
+5. ✅ **Code Repository** - Source and infrastructure-as-code with CI/CD
+6. ✅ **Monitoring Setup** - Dashboards and alerts configured in customer's AWS account
+7. ✅ **Support Agreement** - 30-day extended support with escalation procedures
+
+## Post-Launch Support
+
+- Customer's team confident and capable of operating the system independently
+- All critical personnel trained and certified
+- Escalation contacts established for complex issues
+- Weekly check-ins scheduled for first 30 days post-launch
+
+## Project Completion
+
+The platform is now fully operational under customer control:
+- ✅ All deliverables accepted by customer
+- ✅ Compliance and security requirements satisfied
+- ✅ Performance targets met across all regions
+- ✅ Cost within budget and projections
+- ✅ Operations team ready for independent operation
+
+**Project Status: COMPLETE AND HANDED OFF** 🎉
+`,
 };
 
 /** Get mock markdown content for an artifact, or a placeholder for unknown paths. */
@@ -1051,8 +1294,8 @@ export function chunkText(text: string): string[] {
   const chunks: string[] = [];
   let i = 0;
   while (i < text.length) {
-    // Variable chunk size: 1-6 characters
-    const size = 1 + Math.floor(Math.random() * 5);
+    // 2-3 character chunks with consistent timing for natural LLM-like streaming
+    const size = 2 + Math.floor(Math.random() * 2);
     chunks.push(text.slice(i, i + size));
     i += size;
   }

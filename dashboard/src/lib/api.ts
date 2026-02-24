@@ -49,3 +49,13 @@ export function post<T>(path: string, body: unknown): Promise<T> {
     body: JSON.stringify(body),
   });
 }
+
+export interface ArtifactContentResponse {
+  path: string;
+  content: string;
+  exists: boolean;
+}
+
+export function fetchArtifactContent(projectId: string, filePath: string): Promise<ArtifactContentResponse> {
+  return get<ArtifactContentResponse>(`/projects/${projectId}/artifacts?path=${encodeURIComponent(filePath)}`);
+}

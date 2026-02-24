@@ -7,7 +7,6 @@
  */
 
 import type { KanbanColumn, WebSocketEvent } from "./types";
-import type { ReviewStep } from "@/state/stores/phaseReviewStore";
 
 export interface TimelineStep {
   delayMs: number;
@@ -24,7 +23,11 @@ export interface PhasePlaybook {
   };
   resumeSegment: TimelineStep[];
   approvalQuestion: string;
-  reviewSteps: ReviewStep[];
+  reviewMessages: {
+    opening: string;
+    closing: string;
+  };
+  phaseSummaryPath: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -246,50 +249,13 @@ export const PHASE_PLAYBOOKS: PhasePlaybook[] = [
     resumeSegment: ARCH_RESUME,
     approvalQuestion:
       "The **Architecture** phase is complete. All deliverables have been drafted and reviewed by the team. Please review the artifacts and let us know if you'd like to approve and move to the next phase, or if you have feedback.",
-    reviewSteps: [
-      {
-        id: "arch-step-1",
-        type: "summary",
-        title: "What We Accomplished",
-        content:
-          "Our team completed a comprehensive analysis of your system requirements and designed a serverless architecture tailored to your needs.\n\n" +
-          "We focused on three key areas:\n" +
-          "1. **System design** — how components interact and scale\n" +
-          "2. **Data modeling** — efficient DynamoDB schema with flexible queries\n" +
-          "3. **Security** — IAM policies, authentication, and compliance baseline",
-      },
-      {
-        id: "arch-step-2",
-        type: "decisions",
-        title: "Key Architectural Decisions",
-        content:
-          "**Why Serverless?**\n" +
-          "- Auto-scaling without managing servers\n" +
-          "- Cost-efficient for variable workloads\n" +
-          "- Faster deployment and iteration\n\n" +
-          "**Database Design:**\n" +
-          "- Single DynamoDB table with Global Secondary Indexes\n" +
-          "- Supports all query patterns without over-provisioning\n" +
-          "- Trade-off: requires careful access pattern design\n\n" +
-          "**Authentication:**\n" +
-          "- AWS Cognito for user management\n" +
-          "- JWT tokens for stateless API authorization\n" +
-          "- Prevents session state management overhead",
-      },
-      {
-        id: "arch-step-3",
-        type: "artifacts",
-        title: "Deliverables & Documentation",
-        content:
-          "### Documents Ready for Review\n\n" +
-          "- **System Architecture** — Complete design diagram with all components\n" +
-          "- **Data Model** — DynamoDB schema with access patterns documented\n" +
-          "- **API Contracts** — OpenAPI spec defining all endpoints\n" +
-          "- **Test Strategy** — Coverage targets for serverless architecture\n" +
-          "- **Security Review** — IAM policies and threat modeling results\n\n" +
-          "All documents are available in the Artifacts tab.",
-      },
-    ],
+    reviewMessages: {
+      opening:
+        "Welcome to the **Architecture** phase review! 🎉\n\nOur team has completed a comprehensive analysis of your requirements and designed a serverless architecture tailored to your needs. I've prepared a detailed Phase Summary that synthesizes all our work, along with all technical deliverables.\n\nFeel free to review the documents, ask any questions about the design decisions, and then let me know when you're ready to approve or if you need any revisions.",
+      closing:
+        "Thank you for reviewing the Architecture phase and providing your feedback! Your approval is noted, and the team is now ready to begin the Proof of Concept phase to validate these architectural decisions through working code.\n\nWe're excited to show you the implementation results in the next phase!",
+    },
+    phaseSummaryPath: "docs/phase-summaries/architecture.md",
   },
   {
     phase: "POC",
@@ -302,53 +268,13 @@ export const PHASE_PLAYBOOKS: PhasePlaybook[] = [
     resumeSegment: POC_RESUME,
     approvalQuestion:
       "The **Proof of Concept** phase is complete. Auth integration, API prototype, and load testing are all validated. Security scan passed with zero critical findings. Ready to proceed to Production?",
-    reviewSteps: [
-      {
-        id: "poc-step-1",
-        type: "summary",
-        title: "Proof of Concept Results",
-        content:
-          "We successfully implemented a working authentication system and validated core performance characteristics of your architecture.\n\n" +
-          "**What We Built:**\n" +
-          "- Complete login and signup flow using AWS Cognito\n" +
-          "- Token refresh mechanism for seamless user sessions\n" +
-          "- API prototype with core endpoints functional\n\n" +
-          "**What We Validated:**\n" +
-          "- Performance under load (2x expected traffic)\n" +
-          "- Security scanning for vulnerabilities\n" +
-          "- Network isolation and access controls",
-      },
-      {
-        id: "poc-step-2",
-        type: "decisions",
-        title: "Performance & Optimization Decisions",
-        content:
-          "**Initial Load Test Results:**\n" +
-          "- p95 latency: 183ms (slightly above 200ms target)\n" +
-          "- Throughput: 800 concurrent users\n" +
-          "- Errors: None\n\n" +
-          "**Optimization Applied:**\n" +
-          "- Added provisioned concurrency to Lambda functions\n" +
-          "- Increased memory allocation for faster execution\n" +
-          "- Cost impact: ~$80/month additional\n\n" +
-          "**After Optimization:**\n" +
-          "- p95 latency: 142ms (29% improvement, exceeds target)\n" +
-          "- Throughput: 1,000+ concurrent users sustained\n" +
-          "- Errors: None during 8-hour stress test",
-      },
-      {
-        id: "poc-step-3",
-        type: "artifacts",
-        title: "Deliverables & Test Reports",
-        content:
-          "### Key Deliverables\n\n" +
-          "- **Auth Proof-of-Concept** — Full login/signup/refresh flow documented\n" +
-          "- **Load Test Results** — Detailed performance metrics and graphs\n" +
-          "- **Security Scan Report** — OWASP Top 10 analysis (0 critical findings)\n" +
-          "- **Migration Runbook Draft** — Initial procedures for production migration\n\n" +
-          "All reports are ready for your review in the Artifacts section.",
-      },
-    ],
+    reviewMessages: {
+      opening:
+        "Welcome to the **Proof of Concept** phase review! 🚀\n\nWe've successfully implemented and validated core system components. The authentication flow is working end-to-end, the API prototype has been deployed, and we've completed rigorous load testing.\n\nI've prepared a comprehensive Phase Summary covering all the work we did, key performance metrics, and the validation results. Please take a look at the deliverables and let me know if you have any questions or concerns.",
+      closing:
+        "Thank you for approving the Proof of Concept! The validation results have confirmed that our architecture decisions are sound and the system performs well under load. The team is now ready to proceed to the Production phase to harden the system, set up monitoring, and prepare for customer launch.",
+    },
+    phaseSummaryPath: "docs/phase-summaries/poc.md",
   },
   {
     phase: "PRODUCTION",
@@ -361,52 +287,13 @@ export const PHASE_PLAYBOOKS: PhasePlaybook[] = [
     resumeSegment: PROD_RESUME,
     approvalQuestion:
       "The **Production** phase is complete. Data migration finished with zero data loss, blue-green deployment is live, and all 287 regression tests passed. Monitoring dashboards are active. Ready to proceed to Handoff?",
-    reviewSteps: [
-      {
-        id: "prod-step-1",
-        type: "summary",
-        title: "Production Deployment Success",
-        content:
-          "Your system is now live! We successfully migrated all data, deployed to production using blue-green deployment, and validated end-to-end functionality.\n\n" +
-          "**Deployment Approach:**\n" +
-          "- Blue-green deployment strategy enabled zero-downtime cutover\n" +
-          "- Old system (blue) and new system (green) running in parallel\n" +
-          "- Instant rollback capability if issues detected\n" +
-          "- Actual cutover took 2 minutes with no service interruption",
-      },
-      {
-        id: "prod-step-2",
-        type: "decisions",
-        title: "Data Migration & Testing Decisions",
-        content:
-          "**Data Migration Strategy:**\n" +
-          "- Initial dry run revealed 12 schema mismatches\n" +
-          "- Chose: Build compatibility layer vs. clean source data\n" +
-          "- Added automatic schema transformation for edge cases\n" +
-          "- Final run: 2.8M records migrated with 100% data integrity\n\n" +
-          "**Testing & Validation:**\n" +
-          "- All 287 regression tests passed\n" +
-          "- Performance benchmarks: 2x improvement vs. legacy\n" +
-          "- No errors during 48-hour stability testing\n\n" +
-          "**Operational Readiness:**\n" +
-          "- CloudWatch dashboards monitoring 23 key metrics\n" +
-          "- Alarms configured for critical thresholds\n" +
-          "- Auto-scaling tested and active",
-      },
-      {
-        id: "prod-step-3",
-        type: "artifacts",
-        title: "Production Documentation & Compliance",
-        content:
-          "### Deployment & Operations Documentation\n\n" +
-          "- **Data Migration Report** — Complete records of 2.8M migrations\n" +
-          "- **Deployment Guide** — Blue-green procedures for future updates\n" +
-          "- **Monitoring Configuration** — CloudWatch setup and alert thresholds\n" +
-          "- **Regression Test Results** — All 287 tests with performance profiles\n" +
-          "- **Compliance Report** — PCI-DSS validation evidence\n\n" +
-          "30-day post-launch support period is now active.",
-      },
-    ],
+    reviewMessages: {
+      opening:
+        "Welcome to the **Production** phase review! ✨\n\nYour system is now live! We've successfully migrated all your data, deployed to production using a zero-downtime blue-green strategy, and validated all functionality. The system is running strong with all monitoring in place.\n\nPlease review the Phase Summary and deployment documentation to understand exactly what we've delivered and how the system is now operating in production.",
+      closing:
+        "Thank you for approving the Production phase! Your system is now running reliably in production, serving real users with comprehensive monitoring and alerting in place. The team is ready to proceed to the Handoff phase to transfer operational responsibility to your team.",
+    },
+    phaseSummaryPath: "docs/phase-summaries/production.md",
   },
   {
     phase: "HANDOFF",
@@ -414,57 +301,13 @@ export const PHASE_PLAYBOOKS: PhasePlaybook[] = [
     resumeSegment: [],
     approvalQuestion:
       "The **Handoff** phase is complete. Operations runbook, API documentation, training materials, and compliance report have all been delivered. Three knowledge transfer sessions are complete. Ready to close the engagement?",
-    reviewSteps: [
-      {
-        id: "handoff-step-1",
-        type: "summary",
-        title: "Knowledge Transfer Complete",
-        content:
-          "We've completed comprehensive knowledge transfer to ensure your team can confidently operate and maintain the system independently.\n\n" +
-          "**Training Sessions Completed:**\n" +
-          "- Session 1: Architecture walkthrough with your engineering leads\n" +
-          "- Session 2: Operations procedures and incident response\n" +
-          "- Session 3: API integration and custom extension patterns\n\n" +
-          "**Team Feedback:**\n" +
-          "- All participants confident with core operations\n" +
-          "- Q&A sessions recorded for future reference\n" +
-          "- Scheduled follow-up session in 2 weeks",
-      },
-      {
-        id: "handoff-step-2",
-        type: "decisions",
-        title: "Support & Compliance Strategy",
-        content:
-          "**30-Day Post-Launch Support:**\n" +
-          "- Dedicated channel for critical issues\n" +
-          "- Response time: 1 hour for production incidents\n" +
-          "- Email support for non-critical questions\n" +
-          "- Weekly health check calls\n\n" +
-          "**Compliance & Certifications:**\n" +
-          "- PCI-DSS compliance evidence package provided\n" +
-          "- SOC 2 Type II control mappings documented\n" +
-          "- Audit trail and logging configured\n" +
-          "- Data retention policies configured per requirements\n\n" +
-          "**Long-Term Support:**\n" +
-          "- Knowledge base searchable and indexed\n" +
-          "- All documentation in your GitHub organization\n" +
-          "- Custom SLA available for extended support",
-      },
-      {
-        id: "handoff-step-3",
-        type: "artifacts",
-        title: "Documentation & Resources",
-        content:
-          "### Complete Handoff Package\n\n" +
-          "- **Operations Runbook** — 25+ procedures for daily operations and emergencies\n" +
-          "- **API Documentation** — Complete endpoint reference with code examples\n" +
-          "- **Compliance Report** — PCI-DSS and SOC 2 evidence and attestations\n" +
-          "- **Training Materials** — Recorded sessions and slide decks\n" +
-          "- **Troubleshooting Guide** — Common issues and resolutions\n" +
-          "- **Knowledge Base** — Searchable FAQs and architectural decisions\n\n" +
-          "All resources are available in the secure team portal.",
-      },
-    ],
+    reviewMessages: {
+      opening:
+        "Welcome to the **Handoff** phase review! 🎓\n\nWe've completed comprehensive knowledge transfer to ensure your team can confidently operate and maintain the system independently. All documentation has been finalized, training sessions are complete, and your team is now ready to take full ownership.\n\nPlease review the complete handoff package including the Phase Summary, runbooks, API documentation, and all other resources we've prepared for your ongoing success.",
+      closing:
+        "Thank you for completing the Handoff phase! Your team is now fully equipped and confident to operate the system independently. Our engagement is officially complete, but we remain available for 30-day extended support should you need any assistance.\n\nIt's been a pleasure working with you. Best of luck with your new platform! 🚀",
+    },
+    phaseSummaryPath: "docs/phase-summaries/handoff.md",
   },
 ];
 

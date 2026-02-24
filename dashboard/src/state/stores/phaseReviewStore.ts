@@ -1,13 +1,16 @@
 /**
- * Phase review store — manages step-by-step PM-led phase review.
+ * Phase review store — manages PM-led artifact review with chat.
  *
  * State machine:
- *   not_started → waiting_to_start → reviewing → final_review → completed
+ *   not_started → waiting_to_start → opening_message → artifact_review → closing_message → transitioning → completed
  *
- * When a phase reaches AWAITING_APPROVAL status, the user sees a "Review" button
- * in the dashboard. Clicking it enters reviewing mode. The PM presents review content
- * one step at a time, allowing user comments at each step. After all steps are
- * complete, the final review screen shows all content for approval/revision.
+ * Flow:
+ * 1. User clicks Review button when phase reaches AWAITING_APPROVAL status
+ * 2. PM shows opening message welcoming to review (user clicks Continue)
+ * 3. Artifact review screen shows all artifacts with chat interface
+ * 4. User can review documents, ask questions, and eventually approve
+ * 5. PM shows closing thank-you message
+ * 6. Transition to next phase begins
  */
 
 import { create } from "zustand";
@@ -15,50 +18,69 @@ import { create } from "zustand";
 export type PhaseReviewStatus =
   | "not_started"
   | "waiting_to_start"
-  | "reviewing"
-  | "final_review"
+  | "opening_message"
+  | "artifact_review"
+  | "closing_message"
+  | "closing_complete"
   | "transitioning"
   | "completed";
 
 export type PmVisualState = "active" | "thinking" | "idle";
 
-export interface ReviewStep {
+export interface ChatMessage {
   id: string;
-  type: "summary" | "decisions" | "artifacts";
-  title: string;
+  role: "user" | "pm";
   content: string;
-  userComment?: string;
+  timestamp: number;
 }
 
 interface PhaseReviewState {
   status: PhaseReviewStatus;
   pmState: PmVisualState;
   currentPhase: string | null;
-  currentStepIndex: number;
-  steps: ReviewStep[];
-  currentStepContent: string;
+
+  // Opening message
+  openingMessage: string;
+  openingContent: string;
+
+  // Artifact review
+  phaseSummaryPath: string;
+  chatHistory: ChatMessage[];
+  currentChatContent: string;
+
+  // Closing message
+  closingMessage: string;
+  closingContent: string;
 
   // Actions
   startWaitingForReview: (phase: string) => void;
-  beginReview: (phase: string, steps: ReviewStep[]) => void;
-  setPmState: (state: PmVisualState) => void;
-  appendStepChunk: (chunk: string) => void;
-  setFullStepContent: (text: string) => void;
-  addUserComment: (comment: string) => void;
-  advanceToNextStep: () => void;
-  moveToFinalReview: () => void;
+  beginReview: (phase: string, opening: string, closing: string, phaseSummaryPath: string) => void;
+  startOpeningMessage: (phase: string, opening: string, closing: string, phaseSummaryPath: string) => void;
+  setOpeningContent: (content: string) => void;
+  advanceToArtifactReview: () => void;
+  addUserChatMessage: (content: string) => void;
+  appendChatChunk: (chunk: string) => void;
+  completeChatMessage: () => void;
+  advanceToClosingMessage: (closing: string) => void;
+  setClosingContent: (content: string) => void;
+  advanceFromClosing: () => void;
   startTransition: () => void;
   completeReview: () => void;
   reset: () => void;
+  setPmState: (state: PmVisualState) => void;
 }
 
 export const usePhaseReviewStore = create<PhaseReviewState>()((set) => ({
   status: "not_started",
   pmState: "idle",
   currentPhase: null,
-  currentStepIndex: 0,
-  steps: [],
-  currentStepContent: "",
+  openingMessage: "",
+  openingContent: "",
+  phaseSummaryPath: "",
+  chatHistory: [],
+  currentChatContent: "",
+  closingMessage: "",
+  closingContent: "",
 
   startWaitingForReview: (phase) =>
     set({
@@ -67,56 +89,90 @@ export const usePhaseReviewStore = create<PhaseReviewState>()((set) => ({
       pmState: "idle",
     }),
 
-  beginReview: (phase, steps) =>
+  beginReview: (phase, opening, closing, phaseSummaryPath) =>
     set({
-      status: "reviewing",
+      status: "opening_message",
       currentPhase: phase,
-      steps,
-      currentStepIndex: 0,
+      openingMessage: opening,
+      openingContent: "",
+      closingMessage: closing,
+      phaseSummaryPath,
       pmState: "active",
-      currentStepContent: "",
+      chatHistory: [],
+      currentChatContent: "",
     }),
 
-  setPmState: (pmState) => set({ pmState }),
-
-  appendStepChunk: (chunk) =>
-    set((s) => ({ currentStepContent: s.currentStepContent + chunk })),
-
-  setFullStepContent: (text) => set({ currentStepContent: text }),
-
-  addUserComment: (comment) =>
-    set((s) => {
-      const updatedSteps = [...s.steps];
-      if (updatedSteps[s.currentStepIndex]) {
-        updatedSteps[s.currentStepIndex].userComment = comment;
-      }
-      return { steps: updatedSteps };
-    }),
-
-  advanceToNextStep: () =>
-    set((s) => {
-      const nextIndex = s.currentStepIndex + 1;
-      if (nextIndex >= s.steps.length) {
-        // All steps completed, move to final review
-        return {
-          currentStepIndex: nextIndex,
-          status: "final_review" as const,
-          pmState: "thinking",
-          currentStepContent: "",
-        };
-      }
-      return {
-        currentStepIndex: nextIndex,
-        pmState: "active",
-        currentStepContent: "",
-      };
-    }),
-
-  moveToFinalReview: () =>
+  startOpeningMessage: (phase, opening, closing, phaseSummaryPath) =>
     set({
-      status: "final_review",
+      status: "opening_message",
+      currentPhase: phase,
+      openingMessage: opening,
+      openingContent: "",
+      closingMessage: closing,
+      phaseSummaryPath,
+      pmState: "active",
+      chatHistory: [],
+      currentChatContent: "",
+    }),
+
+  setOpeningContent: (content) =>
+    set({ openingContent: content }),
+
+  advanceToArtifactReview: () =>
+    set({
+      status: "artifact_review",
+      pmState: "thinking",
+      openingContent: "",
+    }),
+
+  addUserChatMessage: (content) =>
+    set((s) => ({
+      chatHistory: [
+        ...s.chatHistory,
+        {
+          id: crypto.randomUUID(),
+          role: "user",
+          content,
+          timestamp: Date.now(),
+        },
+      ],
+      currentChatContent: "",
+      pmState: "active",
+    })),
+
+  appendChatChunk: (chunk) =>
+    set((s) => ({ currentChatContent: s.currentChatContent + chunk })),
+
+  completeChatMessage: () =>
+    set((s) => ({
+      chatHistory: [
+        ...s.chatHistory,
+        {
+          id: crypto.randomUUID(),
+          role: "pm",
+          content: s.currentChatContent,
+          timestamp: Date.now(),
+        },
+      ],
+      currentChatContent: "",
+      pmState: "thinking",
+    })),
+
+  advanceToClosingMessage: (closing) =>
+    set({
+      status: "closing_message",
+      closingMessage: closing,
+      closingContent: "",
+      pmState: "active",
+    }),
+
+  setClosingContent: (content) =>
+    set({ closingContent: content }),
+
+  advanceFromClosing: () =>
+    set({
+      status: "closing_complete",
       pmState: "idle",
-      currentStepContent: "",
     }),
 
   startTransition: () =>
@@ -130,9 +186,13 @@ export const usePhaseReviewStore = create<PhaseReviewState>()((set) => ({
       status: "completed",
       pmState: "idle",
       currentPhase: null,
-      currentStepIndex: 0,
-      steps: [],
-      currentStepContent: "",
+      openingMessage: "",
+      openingContent: "",
+      phaseSummaryPath: "",
+      chatHistory: [],
+      currentChatContent: "",
+      closingMessage: "",
+      closingContent: "",
     }),
 
   reset: () =>
@@ -140,8 +200,14 @@ export const usePhaseReviewStore = create<PhaseReviewState>()((set) => ({
       status: "not_started",
       pmState: "idle",
       currentPhase: null,
-      currentStepIndex: 0,
-      steps: [],
-      currentStepContent: "",
+      openingMessage: "",
+      openingContent: "",
+      phaseSummaryPath: "",
+      chatHistory: [],
+      currentChatContent: "",
+      closingMessage: "",
+      closingContent: "",
     }),
+
+  setPmState: (pmState) => set({ pmState }),
 }));

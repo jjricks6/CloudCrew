@@ -17,7 +17,7 @@
  */
 
 import { useEffect, useRef } from "react";
-import { chunkText, isDemoMode, advanceDemoPhase, DEMO_PROJECT_STATUS } from "@/lib/demo";
+import { chunkText, isDemoMode, DEMO_PROJECT_STATUS } from "@/lib/demo";
 import { useAgentStore } from "@/state/stores/agentStore";
 import { useOnboardingStore } from "@/state/stores/onboardingStore";
 import { usePhaseReviewStore } from "@/state/stores/phaseReviewStore";
@@ -196,45 +196,65 @@ export function useDemoEngine(projectId: string | undefined) {
     }
 
     /**
-     * Stream phase review steps one at a time.
-     * User is guided through each step and can add comments before proceeding.
+     * Stream a review message (opening, closing, or chat) to the phase review store.
+     * Messages are streamed character-by-character for natural effect.
      */
-    function streamPhaseReviewSteps(phaseName: string, steps: ReturnType<typeof usePhaseReviewStore.getState>["steps"]) {
-      usePhaseReviewStore.getState().beginReview(phaseName, steps);
-      // Start streaming the first step's content
-      streamCurrentReviewStep();
-    }
-
-    /**
-     * Stream the content of the current review step.
-     * Called when the step is first displayed and when user clicks Continue.
-     */
-    function streamCurrentReviewStep() {
-      const store = usePhaseReviewStore.getState();
-      const currentStep = store.steps[store.currentStepIndex];
-
-      if (!currentStep) return;
-
-      // Reset content and set PM to active
-      usePhaseReviewStore.getState().setFullStepContent("");
-      usePhaseReviewStore.getState().setPmState("active");
+    function streamReviewMessage(text: string, type: "opening" | "closing" | "chat") {
+      const chunks = chunkText(text);
+      let i = 0;
 
       const thinkingDelay = 300 + Math.random() * 300;
       schedule(() => {
-        const chunks = chunkText(currentStep.content);
-        let i = 0;
+        usePhaseReviewStore.getState().setPmState("active");
 
         const interval = setInterval(() => {
           if (i < chunks.length) {
-            usePhaseReviewStore.getState().appendStepChunk(chunks[i]);
+            if (type === "opening") {
+              usePhaseReviewStore.getState().setOpeningContent(
+                usePhaseReviewStore.getState().openingContent + chunks[i]
+              );
+            } else if (type === "closing") {
+              usePhaseReviewStore.getState().setClosingContent(
+                usePhaseReviewStore.getState().closingContent + chunks[i]
+              );
+            } else if (type === "chat") {
+              usePhaseReviewStore.getState().appendChatChunk(chunks[i]);
+            }
             i++;
           } else {
             clearInterval(interval);
             usePhaseReviewStore.getState().setPmState("thinking");
           }
-        }, 20 + Math.random() * 25);
+        }, 30 + Math.random() * 20);
         intervalsRef.current.push(interval);
       }, thinkingDelay);
+    }
+
+    /**
+     * Generate a canned PM response to a user question during artifact review.
+     * Matches common question patterns and returns relevant responses.
+     */
+    function generateDemoChatResponse(userMessage: string): string {
+      const lower = userMessage.toLowerCase();
+
+      if (lower.includes("summary") || lower.includes("overview")) {
+        return "The Phase Summary document provides a comprehensive overview of all work completed, key decisions made, and their rationale. It's designed to be executive-friendly and outcome-focused.";
+      }
+
+      if (lower.includes("artifact") || lower.includes("document")) {
+        return "All artifacts are available for review in the document browser. You can select any document to preview its full content, and download it if needed.";
+      }
+
+      if (lower.includes("next") || lower.includes("after")) {
+        return "Once you approve this phase, the team will immediately begin work on the next phase. I'll keep you updated on progress and raise any questions that need your input.";
+      }
+
+      if (lower.includes("question") || lower.includes("issue") || lower.includes("concern")) {
+        return "Great question! All deliverables have been reviewed by the team and validated against the SOW requirements. Feel free to review any documents and let me know if you'd like more details.";
+      }
+
+      // Default response
+      return "That's a great point. All the information you need is in the Phase Summary and supporting documents. Please let me know if you have any other questions!";
     }
 
     // ── Playbook execution ────────────────────────────────────────────
@@ -418,10 +438,8 @@ export function useDemoEngine(projectId: string | undefined) {
             detail: "Waiting for customer to review deliverables",
           });
 
-          // Stream phase review steps to the phase review store
+          // Add approval question to chat for dashboard to show Review button
           schedule(() => {
-            streamPhaseReviewSteps(playbook.phase, playbook.reviewSteps);
-            // After review is set up, add the approval question to chat
             addEvent({
               event: "chat_message",
               project_id: "demo",
@@ -437,7 +455,11 @@ export function useDemoEngine(projectId: string | undefined) {
 
     /** Advance to next playbook or start completion with smooth transition. */
     function advanceToNextPlaybook() {
-      const nextIndex = playbookIndexRef.current + 1;
+      // Calculate nextIndex from current phase instead of relying on playbookIndexRef,
+      // since the ref might be stale if user jumped directly to review via debug button
+      const currentPhase = DEMO_PROJECT_STATUS.current_phase;
+      const currentIndex = PHASE_PLAYBOOKS.findIndex((p) => p.phase === currentPhase);
+      const nextIndex = currentIndex >= 0 ? currentIndex + 1 : playbookIndexRef.current + 1;
 
       // 1. Fade all agents to idle — Framer Motion spring animation (~500ms)
       useAgentStore.setState({
@@ -448,9 +470,9 @@ export function useDemoEngine(projectId: string | undefined) {
         })),
       });
 
-      // 2. After agents fade, advance the demo phase (progress bar fills)
+      // 2. After agents fade, start the next playbook (progress bar fills)
+      // Note: phase advancement was already done in approvePhase.mutate()
       schedule(() => {
-        advanceDemoPhase();
         void queryClient.invalidateQueries({ queryKey: ["project"] });
 
         // 3. After progress bar fills, start the next playbook (or completion)
@@ -676,23 +698,53 @@ export function useDemoEngine(projectId: string | undefined) {
 
     // Subscribe to phase review store to stream content when steps change
     const unsubPhaseReview = usePhaseReviewStore.subscribe((state, prevState) => {
-      // When review starts (status changes to reviewing), stream first step
+      // When user clicks "Begin Review" button, opening message starts streaming
       if (
-        (prevState.status === "not_started" || prevState.status === "waiting_to_start") &&
-        state.status === "reviewing"
+        prevState.status !== "opening_message" &&
+        state.status === "opening_message"
       ) {
         cancelAll();
-        streamCurrentReviewStep();
+        streamReviewMessage(state.openingMessage, "opening");
         return;
       }
 
-      // When user advances to next step, stream the new step's content
+      // When opening message starts, stream it
       if (
-        state.status === "reviewing" &&
-        state.currentStepIndex > prevState.currentStepIndex
+        prevState.status !== "opening_message" &&
+        state.status === "opening_message"
       ) {
         cancelAll();
-        streamCurrentReviewStep();
+        streamReviewMessage(state.openingMessage, "opening");
+        return;
+      }
+
+      // When user sends a chat message during artifact review, stream PM response
+      if (
+        state.status === "artifact_review" &&
+        state.chatHistory.length > prevState.chatHistory.length
+      ) {
+        const lastMsg = state.chatHistory[state.chatHistory.length - 1];
+        if (lastMsg.role === "user") {
+          cancelAll();
+
+          // Generate canned PM response
+          const response = generateDemoChatResponse(lastMsg.content);
+
+          // Schedule streaming response with delay
+          schedule(() => {
+            usePhaseReviewStore.getState().setPmState("active");
+            streamReviewMessage(response, "chat");
+          }, 800);
+        }
+      }
+
+      // When closing message starts, stream it
+      if (
+        prevState.status !== "closing_message" &&
+        state.status === "closing_message"
+      ) {
+        cancelAll();
+        streamReviewMessage(state.closingMessage, "closing");
       }
     });
 
