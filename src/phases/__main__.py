@@ -209,6 +209,18 @@ def execute_phase(
                 )
 
             if result.status == Status.COMPLETED:
+                # Generate phase summary before reporting success
+                logger.info("Phase completed. Generating phase summary...")
+                try:
+                    _invoke_pm_for_phase_summary(
+                        project_id=project_id,
+                        phase=phase,
+                        invocation_state=invocation_state,
+                    )
+                except Exception as exc:
+                    logger.exception("Failed to generate phase summary: %s", exc)
+                    # Continue regardless — summary generation is non-critical
+
                 _send_task_success(
                     task_token,
                     {
@@ -237,6 +249,74 @@ def execute_phase(
             time.sleep(PHASE_RETRY_DELAY)
 
     _send_task_failure(task_token, "PhaseExecutionFailed", last_error)
+
+
+def _invoke_pm_for_phase_summary(
+    project_id: str,
+    phase: str,
+    invocation_state: dict[str, Any],
+) -> None:
+    """Invoke PM agent to generate phase summary after phase completes.
+
+    This is a standalone invocation of the PM agent in a single-node Swarm.
+    The PM reads the task ledger and git artifacts to synthesize a summary,
+    then writes it to docs/phase-summaries/{phase-name}.md.
+
+    Args:
+        project_id: The project identifier.
+        phase: The phase name that just completed.
+        invocation_state: The invocation state with memory context.
+    """
+    from strands.multiagent.swarm import Swarm
+
+    from src.agents.pm import create_pm_agent
+    from src.phases.runner import run_phase
+
+    # Build task for PM
+    task = f"""Phase {phase} has completed. Review what was accomplished and generate a comprehensive Phase Summary.
+
+Instructions:
+1. Read the task ledger for this project to understand decisions and deliverables
+2. Review git artifacts in docs/, security/, infra/, app/, and data/ directories
+3. Synthesize into an executive-friendly Phase Summary document
+4. Save to docs/phase-summaries/{phase.lower()}.md using git_write_phase_summary
+
+The summary should:
+- Lead with value delivered to the customer
+- Highlight key technical decisions and trade-offs made
+- List all deliverables with their status
+- Note any risks or follow-up items
+- Be suitable for customer review (professional, non-technical language)
+
+Ensure the summary file is committed to git before completing."""
+
+    # Create factory that produces a single-node Swarm with just PM
+    def create_pm_only_swarm() -> Swarm:
+        """Create a Swarm with only the PM agent."""
+        pm_agent = create_pm_agent()
+        return Swarm(
+            nodes=[pm_agent],
+            entry_point=pm_agent,
+            max_handoffs=0,  # PM doesn't need to handoff
+            max_iterations=1,
+            id="pm-phase-summary-swarm",
+        )
+
+    try:
+        result = run_phase(
+            swarm_factory=create_pm_only_swarm,
+            task=task,
+            invocation_state=invocation_state,
+            max_retries=1,
+        )
+        logger.info(
+            "Phase summary generation completed with status: %s",
+            result.result.status if result.result else "None",
+        )
+    except Exception as exc:
+        logger.exception("Phase summary generation failed: %s", exc)
+        # Re-raise to be caught by caller's exception handler
+        raise
 
 
 def _extract_interrupts(result: Any) -> list[str]:
