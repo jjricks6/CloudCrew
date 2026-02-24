@@ -34,27 +34,23 @@ Every decision is Git-versioned. ADRs explain tradeoffs. Code is production-qual
 
 ## Quick Look
 
-### Demo Mode (No Backend Required)
+### Live Demo (No Installation Required)
 
-```bash
-# Clone and install
-git clone https://github.com/jjricks6/CloudCrew.git
-cd CloudCrew
-source .venv/bin/activate
-cd dashboard && npm install
+**🎮 [Try the Interactive Demo →](https://jjricks6.github.io/CloudCrew/)**
 
-# Run demo (browser-based simulation)
-npm run dev
-
-# Watch the Architecture → POC → Production → Handoff phases
-# Review phase completions, chat with PM, approve to progress
-```
-
-**Demo features:**
-- Full agent collaboration simulation
+Watch a full engagement unfold in your browser:
+- Architecture → POC → Production → Handoff phases
+- Real-time agent collaboration visualization
 - Interactive phase reviews with artifact preview
 - Chat interface for Q&A during review
 - Confetti celebration on engagement completion 🎉
+
+**Demo features:**
+- Full agent collaboration simulation
+- Phase timeline with progress tracking
+- Artifact browser and download capability
+- PM chat during review phases
+- Zero backend required
 
 ### Real Mode (With Backend Deployment)
 
@@ -80,11 +76,10 @@ Pick your path:
 
 | Goal | Start Here |
 |------|-----------|
-| **Understand what CloudCrew does** | [Quick Demo](#demo-mode-no-backend-required) — 5 min |
-| **See it work without deployment** | [Run Dashboard Demo](#demo-mode-no-backend-required) — 10 min |
+| **See it work live** | [Interactive Demo](https://jjricks6.github.io/CloudCrew/) — 5 min, no setup |
+| **Understand the architecture** | [Architecture Deep-Dive](docs/architecture/final-architecture.md) |
 | **Deploy to AWS** | [Deployment Guide](docs/architecture/implementation-guide.md#deployment) |
 | **Build custom agents** | [Agent Development](docs/architecture/agent-specifications.md) |
-| **Understand the architecture** | [Architecture Deep-Dive](docs/architecture/final-architecture.md) |
 | **Contribute or extend** | [Contributing Guide](#contributing) |
 
 ---
@@ -248,20 +243,17 @@ make check  # All checks: format, lint, typecheck, test, security, Terraform val
 
 ### Running Locally
 
-**Demo Mode (No AWS Required):**
+**Backend Development:**
 ```bash
-cd dashboard && npm run dev
-# Simulates full agent collaboration without backend
-```
-
-**With Local Backend:**
-```bash
-# Terminal 1: Backend
+# Terminal 1: Backend server
 python -m src.phases.runner --project-id demo --sow-file sow.md
 
-# Terminal 2: Dashboard
+# Terminal 2: Dashboard (connects to backend)
 cd dashboard && npm run dev
 ```
+
+**Try the demo without setup:**
+- Visit [https://jjricks6.github.io/CloudCrew/](https://jjricks6.github.io/CloudCrew/) for the live interactive demo
 
 ### Development Workflow
 
