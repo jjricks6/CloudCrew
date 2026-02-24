@@ -4,7 +4,6 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Button } from "@/components/ui/button";
 import { PhaseTimeline } from "@/components/PhaseTimeline";
 import { SwarmVisualization } from "@/components/swarm/SwarmVisualization";
 import { ActivityTimeline } from "@/components/swarm/ActivityTimeline";
@@ -90,37 +89,13 @@ export function DashboardPage() {
       className="space-y-4"
     >
       {/* Header row */}
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <h2 className="text-2xl font-bold">
-            {project?.project_name ?? "Project"} Dashboard
-          </h2>
-          <Badge variant={wsStatus === "connected" ? "default" : "outline"}>
-            {wsStatus === "connected" ? "Live" : "Offline"}
-          </Badge>
-        </div>
-        {/* DEBUG: Skip to review button */}
-        {project?.phase_status === "IN_PROGRESS" && (
-          <Button
-            onClick={() => {
-              const phase = project.current_phase;
-              const playbook = PHASE_PLAYBOOKS.find((p) => p.phase === phase);
-              if (playbook) {
-                usePhaseReviewStore.getState().startOpeningMessage(
-                  phase,
-                  playbook.reviewMessages.opening,
-                  playbook.reviewMessages.closing,
-                  playbook.phaseSummaryPath
-                );
-              }
-            }}
-            variant="outline"
-            size="sm"
-            className="text-xs"
-          >
-            Skip to Review (DEBUG)
-          </Button>
-        )}
+      <div className="flex items-center gap-3">
+        <h2 className="text-2xl font-bold">
+          {project?.project_name ?? "Project"} Dashboard
+        </h2>
+        <Badge variant={wsStatus === "connected" ? "default" : "outline"}>
+          {wsStatus === "connected" ? "Live" : "Offline"}
+        </Badge>
       </div>
 
       {/* Phase Progress */}
