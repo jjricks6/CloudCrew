@@ -103,6 +103,7 @@ Agents run as a Swarm, enabling emergent collaboration. Agents hand off work bas
 | **Phase orchestration** | AWS Step Functions | Durable state machine; supports long-lived approval gates |
 | **Agent execution** | ECS Fargate | Swarms exceed Lambda's 15-min limit; persistent connection needed for interrupts |
 | **Agents & handoffs** | Strands Agents SDK | Native support for agent coordination, tool use, and interrupts |
+| **LLM API calls** | Amazon Bedrock (Claude 3.5 Sonnet) | Serverless model access; $3/MTok input, $15/MTok output; no infrastructure management |
 | **Memory** | AgentCore Memory (STM/LTM) | Persistent memory across agent invocations; search via Bedrock KB |
 | **Task ledger** | DynamoDB | Immutable task record; global view of project state |
 | **Artifacts** | Git repository | Version control for all deliverables; audit trail |
@@ -110,7 +111,10 @@ Agents run as a Swarm, enabling emergent collaboration. Agents hand off work bas
 
 ### Cost & Operations
 
-**Monthly Baseline:** ~$50 (dev environment)
+**Monthly Baseline:** ~$60-130 (dev environment with Bedrock LLM calls)
+
+- Infrastructure (Step Functions, Fargate, DynamoDB, etc.): ~$50
+- Bedrock LLM calls (5-50M tokens during development): ~$10-80
 
 **AWS Resources Deployed:**
 
@@ -123,10 +127,13 @@ Agents run as a Swarm, enabling emergent collaboration. Agents hand off work bas
 | **S3** | 1 Terraform state bucket | <$1 | Remote state storage; minimal size |
 | **CloudWatch Logs** | 50-200 GB/month | ~$15-25 | Logs from ECS tasks, Lambda, Step Functions; 30-day retention |
 | **X-Ray** | 1-10M traces/month | ~$5-10 | Distributed tracing for agent execution and handoffs |
+| **Bedrock (Claude 3.5)** | 5-50M tokens/month | ~$10-50 | LLM API calls for agent reasoning; $3/MTok input, $15/MTok output |
 | **VPC / Networking** | 1 VPC, public subnets | Free | No NAT Gateways (dev cost optimization); public subnets acceptable for dev |
 | **RDS (optional)** | None by default | $0 | Project uses DynamoDB; RDS available if needed |
 
-**Per-Project Cost:** ~$10-30 depending on phase complexity and execution time.
+**Per-Project Cost:** ~$20-80 depending on phase complexity and execution time.
+- Infrastructure (ECS, Step Functions): ~$5-15 per project
+- Bedrock LLM calls (agent reasoning): ~$15-65 per project (varies by system prompt depth and phase count)
 
 **Cost Optimization (Built-in):**
 - On-demand DynamoDB (not provisioned capacity) scales automatically
