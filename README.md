@@ -63,7 +63,6 @@ Pick your path:
 | **See it work live** | [Interactive Demo](https://jjricks6.github.io/CloudCrew/) — 5 min, no setup |
 | **Understand the architecture** | [Architecture Deep-Dive](docs/architecture/final-architecture.md) |
 | **Deploy to AWS** | [Deployment Guide](docs/architecture/implementation-guide.md#deployment) |
-| **Build custom agents** | [Agent Development](docs/architecture/agent-specifications.md) |
 | **Contribute or extend** | [Contributing Guide](#contributing) |
 
 ---
