@@ -1,8 +1,23 @@
 # CloudCrew
 
-> **AI-powered delivery team that autonomously executes software projects from requirements to production.**
->
-> 7 specialized agents (PM, Solutions Architect, Infrastructure, Development, Data, Security, QA) collaborate through phased delivery with durable approval gates. Zero coordination overhead — agents handoff work, self-organize, and produce Git-versioned artifacts at every decision point.
+<table>
+  <tr>
+    <td width="40%" style="text-align: center; vertical-align: middle;">
+      <img src="docs/assets/pm-polyhedron.gif" alt="PM Agent Polyhedron" width="100%" style="max-width: 320px;">
+    </td>
+    <td width="60%" style="padding-left: 20px; vertical-align: middle;">
+
+## Welcome to CloudCrew 🚀
+
+**CloudCrew** is an AI-powered delivery team that autonomously executes software projects from requirements to production.
+
+7 specialized agents (PM, Solutions Architect, Infrastructure, Development, Data, Security, QA) collaborate through phased delivery with durable approval gates. Zero coordination overhead — **agents handoff work, self-organize, and produce Git-versioned artifacts at every decision point.**
+
+Think of it as hiring a fully-coordinated software team that needs no management: it takes a project brief, delivers architecture, POC, production code, and handoff documentation—all reviewed and approved by you along the way.
+
+    </td>
+  </tr>
+</table>
 
 ---
 
