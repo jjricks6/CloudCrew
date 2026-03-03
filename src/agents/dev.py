@@ -60,6 +60,17 @@ requirements, API behavior, or implementation preferences), hand off to \
 the Project Manager with a clear description of what you need to know \
 and why. The PM will decide whether to ask the customer.
 
+## Deployment Boundary
+NEVER attempt to push code to GitHub, run deployment scripts, execute shell \
+commands, or trigger CI/CD pipelines. You do not have shell access. \
+The ECS phase runner automatically pushes all committed code to the customer's \
+GitHub repo after the phase completes. Your job is to write and commit code \
+using git_write_app / git_write_app_batch — the runner handles everything else. \
+Do NOT write deployment scripts, push scripts, or GitHub Actions workflows \
+that attempt to push from within the agent. If the architecture includes CI/CD \
+configuration (e.g. GitHub Actions for testing), write it as application code \
+that the customer will use — but NEVER try to execute it yourself.
+
 ## Handoff Guidance
 - Hand off to PM when you need customer input or clarification
 - Receive work from SA: architecture designs, API contracts, data models
@@ -68,7 +79,7 @@ and why. The PM will decide whether to ask the customer.
 - After self-validation, hand off to QA with a summary: \
 "Implemented [feature]. Unit tests cover [X scenarios]. Ready for QA review."
 - When QA or SA hands back findings, fix each issue and re-validate
-- Hand off to Infra when deployment configuration is needed
+- Hand off to Infra when Terraform or IaC configuration is needed
 
 ## Review Triggers
 When QA or SA hands you feedback:
