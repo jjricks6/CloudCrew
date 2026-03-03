@@ -3,7 +3,7 @@
 
 resource "aws_ecr_repository" "phase_runner" {
   name                 = "cloudcrew-phase-runner"
-  image_tag_mutability = "MUTABLE"
+  image_tag_mutability = "IMMUTABLE"
   force_delete         = true
 
   image_scanning_configuration {

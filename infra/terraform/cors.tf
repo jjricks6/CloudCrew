@@ -13,6 +13,7 @@ locals {
     chat              = aws_api_gateway_resource.chat.id
     upload            = aws_api_gateway_resource.upload.id
     tasks             = aws_api_gateway_resource.tasks.id
+    artifacts         = aws_api_gateway_resource.artifacts.id
   }
 }
 
@@ -27,6 +28,11 @@ resource "aws_api_gateway_gateway_response" "cors_4xx" {
     "gatewayresponse.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization'"
     "gatewayresponse.header.Access-Control-Allow-Methods" = "'GET,POST,PUT,DELETE,OPTIONS'"
   }
+
+  # Match AWS default to prevent perpetual drift
+  response_templates = {
+    "application/json" = "{\"message\":$context.error.messageString}"
+  }
 }
 
 resource "aws_api_gateway_gateway_response" "cors_5xx" {
@@ -37,6 +43,11 @@ resource "aws_api_gateway_gateway_response" "cors_5xx" {
     "gatewayresponse.header.Access-Control-Allow-Origin"  = "'${var.dashboard_origin}'"
     "gatewayresponse.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization'"
     "gatewayresponse.header.Access-Control-Allow-Methods" = "'GET,POST,PUT,DELETE,OPTIONS'"
+  }
+
+  # Match AWS default to prevent perpetual drift
+  response_templates = {
+    "application/json" = "{\"message\":$context.error.messageString}"
   }
 }
 

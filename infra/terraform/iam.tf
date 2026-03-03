@@ -94,7 +94,10 @@ resource "aws_iam_role_policy" "ecs_task" {
           "bedrock:InvokeModel",
           "bedrock:InvokeModelWithResponseStream",
         ]
-        Resource = "arn:aws:bedrock:${var.aws_region}::foundation-model/*"
+        Resource = [
+          "arn:aws:bedrock:${var.aws_region}::foundation-model/anthropic.claude-*",
+          "arn:aws:bedrock:${var.aws_region}::foundation-model/us.anthropic.claude-*",
+        ]
       },
       {
         Sid    = "BedrockKB"
@@ -103,6 +106,20 @@ resource "aws_iam_role_policy" "ecs_task" {
           "bedrock:Retrieve",
         ]
         Resource = "arn:aws:bedrock:${var.aws_region}:${data.aws_caller_identity.current.account_id}:knowledge-base/*"
+      },
+      {
+        Sid    = "SecretsManager"
+        Effect = "Allow"
+        Action = [
+          "secretsmanager:GetSecretValue",
+          "secretsmanager:CreateSecret",
+          "secretsmanager:PutSecretValue",
+        ]
+        Resource = [
+          "arn:aws:secretsmanager:${var.aws_region}:${data.aws_caller_identity.current.account_id}:secret:cloudcrew/bedrock-api-key*",
+          "arn:aws:secretsmanager:${var.aws_region}:${data.aws_caller_identity.current.account_id}:secret:cloudcrew/*/github-pat*",
+          "arn:aws:secretsmanager:${var.aws_region}:${data.aws_caller_identity.current.account_id}:secret:cloudcrew/*/aws-credentials*",
+        ]
       },
       {
         Sid    = "DynamoDB"
@@ -144,10 +161,11 @@ resource "aws_iam_role_policy" "ecs_task" {
         Resource = "${aws_apigatewayv2_api.websocket.execution_arn}/${var.environment}/*"
       },
       {
-        Sid    = "S3Read"
+        Sid    = "S3ReadWrite"
         Effect = "Allow"
         Action = [
           "s3:GetObject",
+          "s3:PutObject",
           "s3:ListBucket",
         ]
         Resource = [
@@ -213,7 +231,18 @@ resource "aws_iam_role_policy" "lambda_pm_review" {
           "bedrock:InvokeModel",
           "bedrock:InvokeModelWithResponseStream",
         ]
-        Resource = "arn:aws:bedrock:${var.aws_region}::foundation-model/*"
+        Resource = [
+          "arn:aws:bedrock:${var.aws_region}::foundation-model/anthropic.claude-*",
+          "arn:aws:bedrock:${var.aws_region}::foundation-model/us.anthropic.claude-*",
+        ]
+      },
+      {
+        Sid    = "SecretsManager"
+        Effect = "Allow"
+        Action = [
+          "secretsmanager:GetSecretValue",
+        ]
+        Resource = "arn:aws:secretsmanager:${var.aws_region}:${data.aws_caller_identity.current.account_id}:secret:cloudcrew/bedrock-api-key*"
       },
       {
         Sid    = "DynamoDB"
@@ -231,9 +260,12 @@ resource "aws_iam_role_policy" "lambda_pm_review" {
         Effect = "Allow"
         Action = [
           "s3:GetObject",
+          "s3:ListBucket",
         ]
         Resource = [
+          aws_s3_bucket.sow_uploads.arn,
           "${aws_s3_bucket.sow_uploads.arn}/*",
+          aws_s3_bucket.kb_data.arn,
           "${aws_s3_bucket.kb_data.arn}/*",
         ]
       },
@@ -284,7 +316,18 @@ resource "aws_iam_role_policy" "lambda_pm_chat" {
           "bedrock:InvokeModel",
           "bedrock:InvokeModelWithResponseStream",
         ]
-        Resource = "arn:aws:bedrock:${var.aws_region}::foundation-model/*"
+        Resource = [
+          "arn:aws:bedrock:${var.aws_region}::foundation-model/anthropic.claude-*",
+          "arn:aws:bedrock:${var.aws_region}::foundation-model/us.anthropic.claude-*",
+        ]
+      },
+      {
+        Sid    = "SecretsManager"
+        Effect = "Allow"
+        Action = [
+          "secretsmanager:GetSecretValue",
+        ]
+        Resource = "arn:aws:secretsmanager:${var.aws_region}:${data.aws_caller_identity.current.account_id}:secret:cloudcrew/bedrock-api-key*"
       },
       {
         Sid    = "DynamoDB"
@@ -317,9 +360,124 @@ resource "aws_iam_role_policy" "lambda_pm_chat" {
         Effect = "Allow"
         Action = [
           "s3:GetObject",
+          "s3:ListBucket",
         ]
         Resource = [
+          aws_s3_bucket.sow_uploads.arn,
           "${aws_s3_bucket.sow_uploads.arn}/*",
+          aws_s3_bucket.kb_data.arn,
+          "${aws_s3_bucket.kb_data.arn}/*",
+        ]
+      },
+    ]
+  })
+}
+
+# =============================================================================
+# Lambda: PM Review Message (generates opening/closing messages via streaming)
+# =============================================================================
+
+resource "aws_iam_role" "lambda_pm_review_message" {
+  name = "cloudcrew-lambda-pm-review-msg-${var.environment}"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect    = "Allow"
+      Principal = { Service = "lambda.amazonaws.com" }
+      Action    = "sts:AssumeRole"
+    }]
+  })
+
+  tags = { Name = "cloudcrew-lambda-pm-review-msg-${var.environment}" }
+}
+
+resource "aws_iam_role_policy" "lambda_pm_review_message" {
+  name = "pm-review-message"
+  role = aws_iam_role.lambda_pm_review_message.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "Logs"
+        Effect = "Allow"
+        Action = [
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents",
+        ]
+        Resource = "${aws_cloudwatch_log_group.lambda_pm_review_message.arn}:*"
+      },
+      {
+        Sid    = "Bedrock"
+        Effect = "Allow"
+        Action = [
+          "bedrock:InvokeModel",
+          "bedrock:InvokeModelWithResponseStream",
+        ]
+        Resource = [
+          "arn:aws:bedrock:${var.aws_region}::foundation-model/anthropic.claude-*",
+          "arn:aws:bedrock:${var.aws_region}::foundation-model/us.anthropic.claude-*",
+        ]
+      },
+      {
+        Sid    = "SecretsManager"
+        Effect = "Allow"
+        Action = [
+          "secretsmanager:GetSecretValue",
+        ]
+        Resource = "arn:aws:secretsmanager:${var.aws_region}:${data.aws_caller_identity.current.account_id}:secret:cloudcrew/bedrock-api-key*"
+      },
+      {
+        Sid    = "DynamoDB"
+        Effect = "Allow"
+        Action = [
+          "dynamodb:GetItem",
+          "dynamodb:PutItem",
+          "dynamodb:UpdateItem",
+          "dynamodb:Query",
+        ]
+        Resource = [
+          aws_dynamodb_table.projects.arn,
+          aws_dynamodb_table.board_tasks.arn,
+        ]
+      },
+      {
+        Sid    = "ActivityTable"
+        Effect = "Allow"
+        Action = [
+          "dynamodb:PutItem",
+          "dynamodb:Query",
+        ]
+        Resource = aws_dynamodb_table.activity.arn
+      },
+      {
+        Sid    = "BroadcastConnections"
+        Effect = "Allow"
+        Action = [
+          "dynamodb:Query",
+          "dynamodb:DeleteItem",
+        ]
+        Resource = aws_dynamodb_table.connections.arn
+      },
+      {
+        Sid      = "BroadcastPostToConnection"
+        Effect   = "Allow"
+        Action   = "execute-api:ManageConnections"
+        Resource = "${aws_apigatewayv2_api.websocket.execution_arn}/${var.environment}/*"
+      },
+      {
+        Sid    = "S3Read"
+        Effect = "Allow"
+        Action = [
+          "s3:GetObject",
+          "s3:ListBucket",
+        ]
+        Resource = [
+          aws_s3_bucket.sow_uploads.arn,
+          "${aws_s3_bucket.sow_uploads.arn}/*",
+          aws_s3_bucket.kb_data.arn,
           "${aws_s3_bucket.kb_data.arn}/*",
         ]
       },
@@ -436,16 +594,21 @@ resource "aws_iam_role_policy" "lambda_api" {
         Resource = [
           aws_dynamodb_table.projects.arn,
           aws_dynamodb_table.board_tasks.arn,
+          aws_dynamodb_table.rate_limits.arn,
         ]
       },
       {
-        Sid    = "S3Upload"
+        Sid    = "S3ReadWrite"
         Effect = "Allow"
         Action = [
           "s3:PutObject",
           "s3:GetObject",
+          "s3:ListBucket",
         ]
-        Resource = "${aws_s3_bucket.sow_uploads.arn}/*"
+        Resource = [
+          aws_s3_bucket.sow_uploads.arn,
+          "${aws_s3_bucket.sow_uploads.arn}/*",
+        ]
       },
       {
         Sid    = "StepFunctions"
@@ -460,6 +623,12 @@ resource "aws_iam_role_policy" "lambda_api" {
         Effect   = "Allow"
         Action   = "lambda:InvokeFunction"
         Resource = aws_lambda_function.pm_chat.arn
+      },
+      {
+        Sid      = "InvokePmReviewMessage"
+        Effect   = "Allow"
+        Action   = "lambda:InvokeFunction"
+        Resource = aws_lambda_function.pm_review_message.arn
       },
       {
         Sid    = "BroadcastConnections"
@@ -560,6 +729,18 @@ resource "aws_iam_role_policy" "lambda_sfn_handlers" {
         Action   = "execute-api:ManageConnections"
         Resource = "${aws_apigatewayv2_api.websocket.execution_arn}/${var.environment}/*"
       },
+      {
+        Sid      = "SfnAutoApprove"
+        Effect   = "Allow"
+        Action   = "states:SendTaskSuccess"
+        Resource = aws_sfn_state_machine.orchestrator.arn
+      },
+      {
+        Sid      = "InvokePmReviewMessage"
+        Effect   = "Allow"
+        Action   = "lambda:InvokeFunction"
+        Resource = aws_lambda_function.pm_review_message.arn
+      },
     ]
   })
 }
@@ -595,9 +776,9 @@ resource "aws_iam_role_policy" "sfn_execution" {
         Effect = "Allow"
         Action = "lambda:InvokeFunction"
         Resource = [
-          aws_lambda_function.sfn_handlers.arn,
-          aws_lambda_function.pm_review.arn,
-          aws_lambda_function.approval.arn,
+          "arn:aws:lambda:${var.aws_region}:${data.aws_caller_identity.current.account_id}:function:cloudcrew-sfn-handlers",
+          "arn:aws:lambda:${var.aws_region}:${data.aws_caller_identity.current.account_id}:function:cloudcrew-pm-review",
+          "arn:aws:lambda:${var.aws_region}:${data.aws_caller_identity.current.account_id}:function:cloudcrew-approval",
         ]
       },
       {
@@ -614,6 +795,15 @@ resource "aws_iam_role_policy" "sfn_execution" {
           "logs:DescribeLogGroups",
         ]
         Resource = "*"
+      },
+      {
+        Sid    = "CloudWatchLogs"
+        Effect = "Allow"
+        Action = [
+          "logs:CreateLogStream",
+          "logs:PutLogEvents",
+        ]
+        Resource = "arn:aws:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/states/cloudcrew-orchestrator*"
       },
     ]
   })

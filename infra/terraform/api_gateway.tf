@@ -100,6 +100,13 @@ resource "aws_api_gateway_resource" "tasks" {
   path_part   = "tasks"
 }
 
+# /projects/{id}/artifacts
+resource "aws_api_gateway_resource" "artifacts" {
+  rest_api_id = aws_api_gateway_rest_api.main.id
+  parent_id   = aws_api_gateway_resource.project.id
+  path_part   = "artifacts"
+}
+
 # =============================================================================
 # Cognito Authorizer (conditional — only enforced when var.enable_auth is true)
 # =============================================================================
@@ -283,6 +290,24 @@ resource "aws_api_gateway_integration" "post_upload" {
   uri                     = aws_lambda_function.api.invoke_arn
 }
 
+# GET /projects/{id}/artifacts → api Lambda
+resource "aws_api_gateway_method" "get_artifacts" {
+  rest_api_id   = aws_api_gateway_rest_api.main.id
+  resource_id   = aws_api_gateway_resource.artifacts.id
+  http_method   = "GET"
+  authorization = local.auth_type
+  authorizer_id = local.authorizer_id
+}
+
+resource "aws_api_gateway_integration" "get_artifacts" {
+  rest_api_id             = aws_api_gateway_rest_api.main.id
+  resource_id             = aws_api_gateway_resource.artifacts.id
+  http_method             = aws_api_gateway_method.get_artifacts.http_method
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = aws_lambda_function.api.invoke_arn
+}
+
 # GET /projects/{id}/tasks → api Lambda
 resource "aws_api_gateway_method" "get_tasks" {
   rest_api_id   = aws_api_gateway_rest_api.main.id
@@ -360,9 +385,10 @@ resource "aws_api_gateway_deployment" "main" {
       aws_api_gateway_resource.tasks,
       aws_api_gateway_method.get_tasks,
       aws_api_gateway_integration.get_tasks,
+      aws_api_gateway_resource.artifacts,
+      aws_api_gateway_method.get_artifacts,
+      aws_api_gateway_integration.get_artifacts,
       aws_api_gateway_authorizer.cognito,
-      aws_api_gateway_gateway_response.cors_4xx,
-      aws_api_gateway_gateway_response.cors_5xx,
       aws_api_gateway_method.options,
       aws_api_gateway_integration.options,
       aws_api_gateway_method_response.options,

@@ -85,6 +85,15 @@ resource "aws_dynamodb_table" "connections" {
     type = "S"
   }
 
+  # GSI to look up connections by connectionId (SK) during $disconnect,
+  # avoiding a full table Scan. Only PK is projected since we just need
+  # the partition key to delete the item.
+  global_secondary_index {
+    name            = "ConnectionIdIndex"
+    hash_key        = "SK"
+    projection_type = "KEYS_ONLY"
+  }
+
   ttl {
     attribute_name = "ttl"
     enabled        = true
@@ -160,4 +169,29 @@ resource "aws_dynamodb_table" "board_tasks" {
   }
 
   tags = { Name = "cloudcrew-board-tasks" }
+}
+
+# Table: cloudcrew-rate-limits
+# - API rate limiting per user and minute
+# PK: rate_limit_key (user#{id}#minute#{timestamp}), TTL: 120s
+resource "aws_dynamodb_table" "rate_limits" {
+  name         = "cloudcrew-rate-limits"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "rate_limit_key"
+
+  attribute {
+    name = "rate_limit_key"
+    type = "S"
+  }
+
+  ttl {
+    attribute_name = "ttl"
+    enabled        = true
+  }
+
+  server_side_encryption {
+    enabled = true
+  }
+
+  tags = { Name = "cloudcrew-rate-limits" }
 }

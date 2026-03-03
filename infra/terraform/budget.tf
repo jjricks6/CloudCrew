@@ -16,7 +16,7 @@ resource "aws_budgets_budget" "cloudcrew" {
   notification {
     comparison_operator        = "GREATER_THAN"
     threshold                  = 50
-    threshold_type             = "FORECASTED"
+    threshold_type             = "PERCENTAGE"
     notification_type          = "FORECASTED"
     subscriber_email_addresses = [var.budget_alert_email]
   }

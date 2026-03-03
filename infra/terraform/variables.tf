@@ -69,12 +69,20 @@ variable "lambda_pm_chat_timeout" {
   default     = 120
 }
 
+# --- Container Image ---
+
+variable "image_tag" {
+  description = "Docker image tag for Lambda and ECS containers (use a git SHA or semver in production)"
+  type        = string
+  default     = "latest"
+}
+
 # --- Auth ---
 
 variable "enable_auth" {
   description = "Enable Cognito authorizer on API Gateway methods"
   type        = bool
-  default     = false
+  default     = true
 }
 
 # --- Dashboard ---

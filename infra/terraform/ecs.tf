@@ -36,7 +36,7 @@ resource "aws_ecs_task_definition" "phase_runner" {
   container_definitions = jsonencode([
     {
       name      = "phase-runner"
-      image     = "${aws_ecr_repository.phase_runner.repository_url}:latest"
+      image     = "${aws_ecr_repository.phase_runner.repository_url}:${var.image_tag}"
       essential = true
 
       environment = [
