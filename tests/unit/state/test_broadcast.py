@@ -3,6 +3,7 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
+from botocore.exceptions import ClientError
 from src.state.broadcast import broadcast_to_project
 
 
@@ -91,3 +92,20 @@ class TestBroadcastToProject:
 
         assert result == 0
         mock_table.delete_item.assert_called_once()
+
+    @patch("src.state.broadcast.boto3")
+    @patch("src.state.broadcast.WEBSOCKET_API_ENDPOINT", "https://ws.example.com")
+    @patch("src.state.broadcast.CONNECTIONS_TABLE", "cloudcrew-connections")
+    def test_query_failure_propagates(self, mock_boto3: MagicMock) -> None:
+        """ClientError from DynamoDB query propagates to caller."""
+        mock_table = MagicMock()
+        mock_table.query.side_effect = ClientError(
+            {"Error": {"Code": "InternalServerError"}},
+            "Query",
+        )
+        mock_dynamodb = MagicMock()
+        mock_dynamodb.Table.return_value = mock_table
+        mock_boto3.resource.return_value = mock_dynamodb
+
+        with pytest.raises(ClientError):
+            broadcast_to_project("proj-1", {"event": "test"})

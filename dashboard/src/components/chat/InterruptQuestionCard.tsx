@@ -1,4 +1,5 @@
 import ReactMarkdown from "react-markdown";
+import rehypeSanitize from "rehype-sanitize";
 import remarkGfm from "remark-gfm";
 import { Button } from "@/components/ui/button";
 
@@ -20,10 +21,10 @@ export function InterruptQuestionCard({
   disabled,
 }: InterruptQuestionCardProps) {
   return (
-    <div className="animate-interrupt-glow rounded-lg border border-yellow-500/50 bg-yellow-50/80 p-4 dark:bg-yellow-950/20">
+    <div role="region" aria-label={`Input required for ${phase} phase`} className="animate-interrupt-glow rounded-lg border border-yellow-500/50 bg-yellow-50/80 p-4 dark:bg-yellow-950/20">
       {/* Header */}
       <div className="mb-2 flex items-center gap-2">
-        <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-yellow-500/20 text-yellow-700 dark:text-yellow-400">
+        <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-yellow-500/20 text-yellow-700 dark:text-yellow-400" aria-hidden="true">
           <PauseIcon />
         </span>
         <span className="text-xs font-semibold uppercase tracking-wide text-yellow-700 dark:text-yellow-400">
@@ -36,7 +37,7 @@ export function InterruptQuestionCard({
 
       {/* Question rendered as markdown */}
       <div className="prose prose-sm dark:prose-invert max-w-none text-foreground prose-p:leading-relaxed prose-p:my-1">
-        <ReactMarkdown remarkPlugins={[remarkGfm]}>{question}</ReactMarkdown>
+        <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSanitize]}>{question}</ReactMarkdown>
       </div>
 
       {/* Quick replies */}

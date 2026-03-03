@@ -53,6 +53,10 @@ resource "aws_cloudfront_distribution" "dashboard" {
     response_page_path = "/index.html"
   }
 
+  # TODO(prod): Attach a WAF WebACL for bot/DDoS protection in staging/prod.
+  # Omitted in dev to avoid unnecessary cost (~$5/month + per-request fees).
+  # web_acl_id = aws_wafv2_web_acl.dashboard.arn
+
   restrictions {
     geo_restriction {
       restriction_type = "none"
@@ -61,7 +65,7 @@ resource "aws_cloudfront_distribution" "dashboard" {
 
   viewer_certificate {
     cloudfront_default_certificate = true
-    minimum_protocol_version       = "TLSv1.2_2021"
+    # minimum_protocol_version is not configurable with the default certificate
   }
 
   tags = { Name = "cloudcrew-dashboard-${var.environment}" }

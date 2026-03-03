@@ -120,6 +120,44 @@ class TestStartPhaseHandler:
     @patch("src.state.ledger.write_ledger")
     @patch("src.state.ledger.read_ledger")
     @patch("src.phases.sfn_handlers.boto3")
+    def test_clears_review_messages_on_phase_start(
+        self,
+        mock_boto3: MagicMock,
+        mock_read_ledger: MagicMock,
+        mock_write_ledger: MagicMock,
+        _mock_broadcast: MagicMock,
+    ) -> None:
+        """Verify review messages are cleared when starting a new phase."""
+        from src.phases.sfn_handlers import start_phase_handler
+        from src.state.models import Phase, PhaseStatus, TaskLedger
+
+        mock_ledger = TaskLedger(
+            project_id="proj-1",
+            current_phase=Phase.ARCHITECTURE,
+            phase_status=PhaseStatus.AWAITING_APPROVAL,
+            review_opening_message="Old opening message",
+            review_closing_message="Old closing message",
+        )
+        mock_read_ledger.return_value = mock_ledger
+        mock_ecs = MagicMock()
+        mock_boto3.client.return_value = mock_ecs
+        mock_ecs.run_task.return_value = {"tasks": [{"taskArn": "arn"}], "failures": []}
+
+        event = {
+            "project_id": "proj-1",
+            "phase": "POC",
+            "task_token": "token-abc",
+        }
+
+        start_phase_handler(event, None)
+
+        assert mock_ledger.review_opening_message == ""
+        assert mock_ledger.review_closing_message == ""
+        mock_write_ledger.assert_called_once()
+
+    @patch("src.state.ledger.write_ledger")
+    @patch("src.state.ledger.read_ledger")
+    @patch("src.phases.sfn_handlers.boto3")
     def test_raises_on_ecs_launch_failure(
         self,
         mock_boto3: MagicMock,
@@ -172,6 +210,36 @@ class TestStoreApprovalTokenHandler:
 
         event = {
             "project_id": "proj-1",
+            "phase": "ARCHITECTURE",
+            "task_token": "token-abc",
+        }
+
+        result = store_approval_token_handler(event, None)
+
+        mock_store_token.assert_called_once_with("cloudcrew-projects", "proj-1", "ARCHITECTURE", "token-abc")
+        assert mock_ledger.phase_status == PhaseStatus.AWAITING_APPROVAL
+        mock_write_ledger.assert_called_once()
+        assert result["status"] == "TOKEN_STORED"
+
+    @patch("src.state.ledger.write_ledger")
+    @patch("src.state.ledger.read_ledger")
+    @patch("src.phases.sfn_handlers.store_token")
+    def test_discovery_stores_token_like_other_phases(
+        self,
+        mock_store_token: MagicMock,
+        mock_read_ledger: MagicMock,
+        mock_write_ledger: MagicMock,
+        _mock_broadcast: MagicMock,
+    ) -> None:
+        """Discovery stores token and sets AWAITING_APPROVAL (no auto-approve)."""
+        from src.phases.sfn_handlers import store_approval_token_handler
+        from src.state.models import PhaseStatus, TaskLedger
+
+        mock_ledger = TaskLedger(project_id="proj-1")
+        mock_read_ledger.return_value = mock_ledger
+
+        event = {
+            "project_id": "proj-1",
             "phase": "DISCOVERY",
             "task_token": "token-abc",
         }
@@ -182,6 +250,68 @@ class TestStoreApprovalTokenHandler:
         assert mock_ledger.phase_status == PhaseStatus.AWAITING_APPROVAL
         mock_write_ledger.assert_called_once()
         assert result["status"] == "TOKEN_STORED"
+
+    @patch("src.phases.sfn_handlers.boto3")
+    @patch("src.state.ledger.write_ledger")
+    @patch("src.state.ledger.read_ledger")
+    @patch("src.phases.sfn_handlers.store_token")
+    def test_discovery_skips_pm_review_message(
+        self,
+        _mock_store_token: MagicMock,
+        mock_read_ledger: MagicMock,
+        _mock_write_ledger: MagicMock,
+        mock_boto3: MagicMock,
+        _mock_broadcast: MagicMock,
+    ) -> None:
+        """Discovery does not invoke PM review message Lambda."""
+        from src.phases.sfn_handlers import store_approval_token_handler
+        from src.state.models import TaskLedger
+
+        mock_read_ledger.return_value = TaskLedger(project_id="proj-1")
+        mock_lambda = MagicMock()
+        mock_boto3.client.return_value = mock_lambda
+
+        event = {
+            "project_id": "proj-1",
+            "phase": "DISCOVERY",
+            "task_token": "token-abc",
+        }
+
+        store_approval_token_handler(event, None)
+
+        # Lambda client should never be created for Discovery
+        mock_boto3.client.assert_not_called()
+
+    @patch("src.phases.sfn_handlers.boto3")
+    @patch("src.state.ledger.write_ledger")
+    @patch("src.state.ledger.read_ledger")
+    @patch("src.phases.sfn_handlers.store_token")
+    def test_non_discovery_invokes_pm_review_message(
+        self,
+        _mock_store_token: MagicMock,
+        mock_read_ledger: MagicMock,
+        _mock_write_ledger: MagicMock,
+        mock_boto3: MagicMock,
+        _mock_broadcast: MagicMock,
+    ) -> None:
+        """Non-Discovery phases invoke PM review message Lambda."""
+        from src.phases.sfn_handlers import store_approval_token_handler
+        from src.state.models import TaskLedger
+
+        mock_read_ledger.return_value = TaskLedger(project_id="proj-1")
+        mock_lambda = MagicMock()
+        mock_boto3.client.return_value = mock_lambda
+
+        event = {
+            "project_id": "proj-1",
+            "phase": "ARCHITECTURE",
+            "task_token": "token-abc",
+        }
+
+        store_approval_token_handler(event, None)
+
+        mock_boto3.client.assert_called_once_with("lambda", region_name="us-east-1")
+        mock_lambda.invoke.assert_called_once()
 
 
 @pytest.mark.unit
@@ -213,7 +343,7 @@ class TestSfnRoute:
         from src.state.models import TaskLedger
 
         mock_read.return_value = TaskLedger(project_id="p1")
-        event = {"action": "store_approval_token", "project_id": "p1", "phase": "DISCOVERY", "task_token": "t"}
+        event = {"action": "store_approval_token", "project_id": "p1", "phase": "ARCHITECTURE", "task_token": "t"}
         result = route(event, None)
         assert result["status"] == "TOKEN_STORED"
 

@@ -14,7 +14,7 @@ resource "aws_sfn_state_machine" "orchestrator" {
   name     = "cloudcrew-orchestrator-${var.environment}"
   role_arn = aws_iam_role.sfn_execution.arn
 
-  logging_configuration {
+  logging_configuration { #checkov:skip=CKV_AWS_285:Logging is enabled
     log_destination        = "${aws_cloudwatch_log_group.sfn.arn}:*"
     include_execution_data = true
     level                  = "ALL"

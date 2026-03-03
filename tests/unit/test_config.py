@@ -46,8 +46,13 @@ class TestConfigDefaults:
 
             importlib.reload(src.config)
             assert src.config.KNOWLEDGE_BASE_ID == ""
+            assert src.config.PATTERNS_KNOWLEDGE_BASE_ID == ""
             assert src.config.PROJECT_REPO_PATH == ""
             assert src.config.PATTERNS_BUCKET == ""
+            assert src.config.STM_MEMORY_ID == ""
+            assert src.config.LTM_MEMORY_ID == ""
+            assert src.config.PM_CHAT_LAMBDA_NAME == ""
+            assert src.config.TAVILY_API_KEY == ""
 
     def test_timeout_defaults(self) -> None:
         with patch.dict(os.environ, {}, clear=True):
@@ -106,6 +111,7 @@ class TestConfigDefaults:
             importlib.reload(src.config)
             assert src.config.BEDROCK_READ_TIMEOUT == 300
             assert src.config.BEDROCK_MAX_RETRIES == 3
+            assert src.config.BEDROCK_API_KEY_SECRET == "cloudcrew/bedrock-api-key"
 
     def test_dashboard_event_defaults(self) -> None:
         with patch.dict(os.environ, {}, clear=True):
@@ -127,6 +133,59 @@ class TestConfigDefaults:
             importlib.reload(src.config)
             assert src.config.COGNITO_USER_POOL_ID == ""
             assert src.config.COGNITO_CLIENT_ID == ""
+
+    def test_aws_region_default(self) -> None:
+        with patch.dict(os.environ, {}, clear=True):
+            import importlib
+
+            import src.config
+
+            importlib.reload(src.config)
+            assert src.config.AWS_REGION == "us-east-1"
+
+    def test_named_table_defaults(self) -> None:
+        with patch.dict(os.environ, {}, clear=True):
+            import importlib
+
+            import src.config
+
+            importlib.reload(src.config)
+            assert src.config.METRICS_TABLE == "cloudcrew-metrics"
+            assert src.config.BOARD_TASKS_TABLE == "cloudcrew-board-tasks"
+            assert src.config.RATE_LIMIT_TABLE == "cloudcrew-rate-limits"
+            assert src.config.PM_REVIEW_MESSAGE_FUNCTION == "cloudcrew-pm-review-message"
+
+    def test_cors_defaults(self) -> None:
+        with patch.dict(os.environ, {}, clear=True):
+            import importlib
+
+            import src.config
+
+            importlib.reload(src.config)
+            assert src.config.CORS_ALLOWED_ORIGINS == "*"
+            assert src.config.CORS_MAX_AGE == "86400"
+
+    def test_rate_limit_defaults(self) -> None:
+        with patch.dict(os.environ, {}, clear=True):
+            import importlib
+
+            import src.config
+
+            importlib.reload(src.config)
+            assert src.config.RATE_LIMIT_REQUESTS_PER_MINUTE == 100
+            assert src.config.RATE_LIMIT_ENABLED is True
+
+    def test_ecs_runner_input_defaults(self) -> None:
+        with patch.dict(os.environ, {}, clear=True):
+            import importlib
+
+            import src.config
+
+            importlib.reload(src.config)
+            assert src.config.ECS_PROJECT_ID == ""
+            assert src.config.ECS_PHASE == ""
+            assert src.config.ECS_TASK_TOKEN == ""
+            assert src.config.ECS_CUSTOMER_FEEDBACK == ""
 
 
 @pytest.mark.unit

@@ -1,4 +1,5 @@
 import ReactMarkdown from "react-markdown";
+import rehypeSanitize from "rehype-sanitize";
 import remarkGfm from "remark-gfm";
 
 interface ChatBubbleProps {
@@ -41,7 +42,7 @@ export function ChatBubble({
         Project Manager
       </p>
       <div className="prose prose-sm dark:prose-invert max-w-none text-foreground prose-p:leading-relaxed prose-p:my-1 prose-ul:my-1 prose-ol:my-1 prose-li:my-0.5 prose-headings:mb-2 prose-headings:mt-3 prose-pre:bg-muted prose-pre:text-foreground">
-        <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
+        <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSanitize]}>{content}</ReactMarkdown>
         {isStreaming && (
           <span className="ml-0.5 inline-block h-4 w-0.5 animate-pulse bg-foreground" />
         )}

@@ -11,6 +11,7 @@ from strands import Agent
 from src.agents.base import SONNET
 from src.tools.activity_tools import report_activity
 from src.tools.board_tools import add_task_comment, create_board_task, update_board_task
+from src.tools.deploy_tools import terraform_apply, terraform_destroy, terraform_output, terraform_plan
 from src.tools.git_tools import git_list, git_read, git_write_infra, git_write_infra_batch
 from src.tools.ledger_tools import read_task_ledger
 from src.tools.security_tools import checkov_scan
@@ -89,6 +90,35 @@ scaling requirements, or cost constraints), hand off to the Project \
 Manager with a clear description of what you need to know and why. The \
 PM will decide whether to ask the customer.
 
+## Deployment (Production Phase Only)
+During the Production phase, you can deploy infrastructure to the customer's \
+AWS account using terraform_plan and terraform_apply.
+
+Deployment workflow:
+1. Run terraform_plan on the infrastructure directory to generate the plan
+2. Hand off to PM with the FULL plan output: "Please show this deployment plan \
+to the customer for approval: [plan text]"
+3. Wait for PM to confirm customer approved
+4. Run terraform_apply to deploy
+5. If apply fails, read the error, fix the Terraform code, re-validate, and \
+repeat from step 1
+6. After successful apply, run terraform_output to capture endpoints and ARNs
+7. Record the deployment results in a board task comment
+
+RULES:
+- NEVER run terraform_apply without PM confirmation of customer approval
+- NEVER run terraform_destroy without PM confirmation of customer approval
+- If apply fails, fix the code and generate a NEW plan for approval
+
+In phases before Production (Architecture, PoC), you do NOT have deployment \
+access. Write and validate IaC only — the ECS runner pushes code to GitHub.
+
+## Remote State Management
+Terraform state is automatically stored in a remote S3 backend in the customer's \
+AWS account. You do NOT need to configure backends manually — the deploy tools \
+handle provisioning and initialization automatically. State persists across \
+container restarts, so terraform_destroy works correctly from any ECS task.
+
 ## Handoff Guidance
 - Hand off to PM when you need customer input or clarification
 - Receive work from SA: architecture designs, component specifications, ADRs
@@ -151,6 +181,10 @@ def create_infra_agent() -> Agent:
             git_write_infra,
             git_write_infra_batch,
             terraform_validate,
+            terraform_plan,
+            terraform_apply,
+            terraform_output,
+            terraform_destroy,
             checkov_scan,
             read_task_ledger,
             create_board_task,

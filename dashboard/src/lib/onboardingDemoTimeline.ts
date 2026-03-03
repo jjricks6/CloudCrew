@@ -20,14 +20,7 @@ export interface OnboardingStep {
 export const ONBOARDING_STEPS: OnboardingStep[] = [
   {
     question:
-      "Welcome to CloudCrew! I'm your Project Manager and I'll be guiding your team of AI specialists through your project. Let's get started — what would you like to name your project?",
-    placeholder: "e.g., Customer Portal Modernization",
-    allowUpload: false,
-    demoAnswer: "E-Commerce Platform Migration",
-  },
-  {
-    question:
-      "Great choice! Can you give me a brief overview of the project goals? What problem are you solving, and what does success look like?",
+      "Welcome to CloudCrew! I'm your Project Manager and I'll be guiding your team of AI specialists through your E-Commerce Platform Migration project. I've reviewed your initial requirements — let me ask a few clarifying questions. Can you give me a brief overview of the project goals? What problem are you solving, and what does success look like?",
     placeholder: "Describe your project goals...",
     allowUpload: true,
     demoAnswer:

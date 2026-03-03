@@ -14,6 +14,7 @@ import boto3
 from src.config import (
     AWS_REGION,
     PM_CHAT_LAMBDA_NAME,
+    PM_REVIEW_MESSAGE_FUNCTION,
     SOW_BUCKET,
     STATE_MACHINE_ARN,
     TASK_LEDGER_TABLE,
@@ -38,22 +39,28 @@ from src.state.models import TaskLedger
 logger = logging.getLogger(__name__)
 
 
+def _parse_json_body(event: dict[str, Any]) -> dict[str, Any]:
+    try:
+        return json.loads(event.get("body", "{}"))  # type: ignore[no-any-return]
+    except json.JSONDecodeError:
+        return api_response(400, {"error": "Invalid JSON in request body"})
+
+
 def create_project_handler(event: dict[str, Any]) -> dict[str, Any]:
-    """Create a new project.
-
-    POST /projects
-    Body: {project_name, customer, sow_text}
-
-    Creates a task ledger in DynamoDB, uploads SOW to S3, and starts
-    the Step Functions state machine.
-    """
-    body = json.loads(event.get("body", "{}"))
+    """POST /projects — create a new project."""
+    body = _parse_json_body(event)
+    if "error" in body:
+        return body
     project_name: str = body.get("project_name", "")
     customer: str = body.get("customer", "")
     sow_text: str = body.get("sow_text", "")
+    initial_requirements: str = body.get("initial_requirements", "")
 
-    if not project_name or not sow_text:
-        return api_response(400, {"error": "project_name and sow_text are required"})
+    if not project_name:
+        return api_response(400, {"error": "project_name is required"})
+
+    if not sow_text and not initial_requirements:
+        return api_response(400, {"error": "Either sow_text or initial_requirements is required"})
 
     # Verify user is authenticated
     user_id = get_user_id_from_event(event)
@@ -69,11 +76,12 @@ def create_project_handler(event: dict[str, Any]) -> dict[str, Any]:
         project_name=project_name,
         customer=customer,
         owner_id=user_id,
+        initial_requirements=initial_requirements,
     )
     write_ledger(TASK_LEDGER_TABLE, project_id, ledger)
 
-    # Upload SOW to S3
-    if SOW_BUCKET:
+    # Upload SOW to S3 only if provided (not if generating from requirements)
+    if sow_text and SOW_BUCKET:
         s3 = boto3.client("s3", region_name=AWS_REGION)
         s3.put_object(
             Bucket=SOW_BUCKET,
@@ -93,6 +101,7 @@ def create_project_handler(event: dict[str, Any]) -> dict[str, Any]:
                     "project_id": project_id,
                     "project_name": project_name,
                     "sow_text": sow_text,
+                    "initial_requirements": initial_requirements,
                 }
             ),
         )
@@ -109,10 +118,7 @@ def create_project_handler(event: dict[str, Any]) -> dict[str, Any]:
 
 
 def project_status_handler(event: dict[str, Any]) -> dict[str, Any]:
-    """Get project status.
-
-    GET /projects/{id}/status
-    """
+    """GET /projects/{id}/status — project status."""
     project_id = event.get("pathParameters", {}).get("id", "")
     if not project_id:
         return api_response(400, {"error": "project_id is required"})
@@ -134,18 +140,23 @@ def project_status_handler(event: dict[str, Any]) -> dict[str, Any]:
         "phase_status": ledger.phase_status.value,
     }
 
+    # Include the customer's GitHub repo URL when available
+    if ledger.git_repo_url_customer:
+        response_data["git_repo_url"] = ledger.git_repo_url_customer
+
     # Add review context when phase is awaiting approval
     if ledger.phase_status.value == "AWAITING_APPROVAL":
         response_data["review_context"] = build_review_context(current_phase)
+        if ledger.review_opening_message:
+            response_data["review_opening_message"] = ledger.review_opening_message
+        if ledger.review_closing_message:
+            response_data["review_closing_message"] = ledger.review_closing_message
 
     return api_response(200, response_data)
 
 
 def project_deliverables_handler(event: dict[str, Any]) -> dict[str, Any]:
-    """Get project deliverables.
-
-    GET /projects/{id}/deliverables
-    """
+    """GET /projects/{id}/deliverables — project deliverables."""
     project_id = event.get("pathParameters", {}).get("id", "")
     if not project_id:
         return api_response(400, {"error": "project_id is required"})
@@ -168,12 +179,23 @@ def project_deliverables_handler(event: dict[str, Any]) -> dict[str, Any]:
     )
 
 
-def approve_handler(event: dict[str, Any]) -> dict[str, Any]:
-    """Approve a phase.
+def _invoke_pm_review_message(project_id: str, phase: str, message_type: str) -> None:
+    """Async-invoke the PM Review Message Lambda (best-effort)."""
+    if not PM_REVIEW_MESSAGE_FUNCTION:
+        return
+    try:
+        boto3.client("lambda", region_name=AWS_REGION).invoke(
+            FunctionName=PM_REVIEW_MESSAGE_FUNCTION,
+            InvocationType="Event",
+            Payload=json.dumps({"project_id": project_id, "phase": phase, "message_type": message_type}),
+        )
+        logger.info("Triggered PM %s message for project=%s, phase=%s", message_type, project_id, phase)
+    except Exception:
+        logger.exception("Failed to trigger PM %s message for project=%s", message_type, project_id)
 
-    POST /projects/{id}/approve
-    Retrieves the stored task token and sends approval to Step Functions.
-    """
+
+def approve_handler(event: dict[str, Any]) -> dict[str, Any]:
+    """POST /projects/{id}/approve — approve a phase."""
     project_id = event.get("pathParameters", {}).get("id", "")
     if not project_id:
         return api_response(400, {"error": "project_id is required"})
@@ -199,15 +221,15 @@ def approve_handler(event: dict[str, Any]) -> dict[str, Any]:
 
     delete_token(TASK_LEDGER_TABLE, project_id, phase)
 
+    # Trigger PM closing message for phases with a full review flow.
+    # Discovery uses a simplified gate (no PM messages), so skip it.
+    if phase != "DISCOVERY":
+        _invoke_pm_review_message(project_id, phase, "closing")
     return api_response(200, {"project_id": project_id, "phase": phase, "decision": "APPROVED"})
 
 
 def revise_handler(event: dict[str, Any]) -> dict[str, Any]:
-    """Request revision for a phase.
-
-    POST /projects/{id}/revise
-    Body: {feedback}
-    """
+    """POST /projects/{id}/revise — request revision."""
     project_id = event.get("pathParameters", {}).get("id", "")
     if not project_id:
         return api_response(400, {"error": "project_id is required"})
@@ -218,7 +240,9 @@ def revise_handler(event: dict[str, Any]) -> dict[str, Any]:
         logger.warning("Unauthorized revision attempt for project=%s", project_id)
         return api_response(403, {"error": "Forbidden"})
 
-    body = json.loads(event.get("body", "{}"))
+    body = _parse_json_body(event)
+    if "error" in body:
+        return body
     feedback: str = body.get("feedback", "")
     if not feedback:
         return api_response(400, {"error": "feedback is required"})
@@ -256,11 +280,7 @@ def revise_handler(event: dict[str, Any]) -> dict[str, Any]:
 
 
 def interrupt_respond_handler(event: dict[str, Any]) -> dict[str, Any]:
-    """Respond to a mid-phase interrupt.
-
-    POST /projects/{id}/interrupt/{interruptId}/respond
-    Body: {response}
-    """
+    """POST /projects/{id}/interrupt/{interruptId}/respond."""
     project_id = event.get("pathParameters", {}).get("id", "")
     interrupt_id = event.get("pathParameters", {}).get("interruptId", "")
     if not project_id or not interrupt_id:
@@ -272,7 +292,9 @@ def interrupt_respond_handler(event: dict[str, Any]) -> dict[str, Any]:
         logger.warning("Unauthorized interrupt response for project=%s", project_id)
         return api_response(403, {"error": "Forbidden"})
 
-    body = json.loads(event.get("body", "{}"))
+    body = _parse_json_body(event)
+    if "error" in body:
+        return body
     response_text: str = body.get("response", "")
     if not response_text:
         return api_response(400, {"error": "response is required"})
@@ -290,15 +312,7 @@ def interrupt_respond_handler(event: dict[str, Any]) -> dict[str, Any]:
 
 
 def pm_chat_post_handler(event: dict[str, Any]) -> dict[str, Any]:
-    """Send a chat message to the PM agent.
-
-    POST /projects/{id}/chat
-    Body: {message}
-
-    Stores the customer message, broadcasts it via WebSocket, then
-    asynchronously invokes the PM Chat Lambda to generate a streamed
-    response.  Returns 202 immediately.
-    """
+    """POST /projects/{id}/chat — send message to PM, returns 202."""
     project_id = event.get("pathParameters", {}).get("id", "")
     if not project_id:
         return api_response(400, {"error": "project_id is required"})
@@ -309,7 +323,9 @@ def pm_chat_post_handler(event: dict[str, Any]) -> dict[str, Any]:
         logger.warning("Unauthorized chat attempt for project=%s", project_id)
         return api_response(403, {"error": "Forbidden"})
 
-    body = json.loads(event.get("body", "{}"))
+    body = _parse_json_body(event)
+    if "error" in body:
+        return body
     message: str = body.get("message", "")
     if not message:
         return api_response(400, {"error": "message is required"})
@@ -362,10 +378,7 @@ def pm_chat_post_handler(event: dict[str, Any]) -> dict[str, Any]:
 
 
 def pm_chat_get_handler(event: dict[str, Any]) -> dict[str, Any]:
-    """Get chat history.
-
-    GET /projects/{id}/chat?limit=50
-    """
+    """GET /projects/{id}/chat — chat history."""
     project_id = event.get("pathParameters", {}).get("id", "")
     if not project_id:
         return api_response(400, {"error": "project_id is required"})
@@ -401,49 +414,30 @@ def pm_chat_get_handler(event: dict[str, Any]) -> dict[str, Any]:
 
 
 def upload_url_handler(event: dict[str, Any]) -> dict[str, Any]:
-    """Generate a presigned S3 URL for file upload.
-
-    POST /projects/{id}/upload
-    Body: {filename, content_type}
-
-    Returns a presigned PUT URL that the client can use to upload
-    the file directly to S3.
-    """
+    """Generate presigned S3 URL for file upload."""
     project_id = event.get("pathParameters", {}).get("id", "")
     if not project_id:
         return api_response(400, {"error": "project_id is required"})
-
-    body = json.loads(event.get("body", "{}"))
-    filename: str = body.get("filename", "")
-    content_type: str = body.get("content_type", "application/octet-stream")
+    body = _parse_json_body(event)
+    if "error" in body:
+        return body
+    filename = body.get("filename", "")
     if not filename:
         return api_response(400, {"error": "filename is required"})
-
     if not SOW_BUCKET:
         return api_response(503, {"error": "Upload storage not configured"})
-
-    file_id = str(uuid.uuid4())
-    s3_key = f"projects/{project_id}/uploads/{file_id}_{filename}"
-
+    s3_key = f"projects/{project_id}/uploads/{uuid.uuid4()}_{filename}"
     s3 = boto3.client("s3", region_name=AWS_REGION)
     upload_url = s3.generate_presigned_url(
         "put_object",
         Params={
             "Bucket": SOW_BUCKET,
             "Key": s3_key,
-            "ContentType": content_type,
+            "ContentType": body.get("content_type", "application/octet-stream"),
         },
         ExpiresIn=300,
     )
-
-    return api_response(
-        200,
-        {
-            "upload_url": upload_url,
-            "key": s3_key,
-            "filename": filename,
-        },
-    )
+    return api_response(200, {"upload_url": upload_url, "key": s3_key, "filename": filename})
 
 
 def route(event: dict[str, Any], context: Any) -> dict[str, Any]:

@@ -68,7 +68,12 @@ def read_ledger(table_name: str, project_id: str) -> TaskLedger:
     if not item:
         logger.info("No ledger found for project %s, returning empty", project_id)
         return TaskLedger(project_id=project_id)
-    return TaskLedger.model_validate(item.get("data", {}))
+    try:
+        return TaskLedger.model_validate(item.get("data", {}))
+    except Exception as e:
+        logger.error("Invalid task ledger data for project %s: %s", project_id, e)
+        # Return empty ledger as fallback to prevent cascading failures
+        return TaskLedger(project_id=project_id)
 
 
 def write_ledger(table_name: str, project_id: str, ledger: TaskLedger) -> None:

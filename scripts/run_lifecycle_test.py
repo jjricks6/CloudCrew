@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
-"""Full lifecycle integration test: All 5 phases with live agent logging.
+"""Full lifecycle observability harness: runs all 5 phases with live agent logging.
 
 Creates ephemeral AWS resources (DynamoDB table + AgentCore Memory),
 runs all 5 delivery phases sequentially through their Swarms with a
 sample SOW, then tears down all resources.
+
+This is an operational script for manual verification and demos — not an
+automated test.  For the pytest integration test, see
+tests/integration/test_phase_orchestration.py.
 
 Phases executed in order:
     1. DISCOVERY — PM (entry) + all specialists: Parse SOW, create project plan
@@ -14,11 +18,11 @@ Phases executed in order:
 
 Run directly for live output (all phases):
     source .venv/bin/activate
-    python tests/integration/test_discovery_swarm.py
+    python scripts/run_lifecycle_test.py
 
 Run specific phases:
-    python tests/integration/test_discovery_swarm.py --phases DISCOVERY ARCHITECTURE
-    python tests/integration/test_discovery_swarm.py --phases DISCOVERY  # single phase
+    python scripts/run_lifecycle_test.py --phases DISCOVERY ARCHITECTURE
+    python scripts/run_lifecycle_test.py --phases DISCOVERY  # single phase
 
 Resources created (and destroyed after):
     - DynamoDB table: cloudcrew-inttest-{random}

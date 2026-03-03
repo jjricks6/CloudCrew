@@ -27,6 +27,72 @@ class TestStoreInterrupt:
         assert item["status"] == "PENDING"
         assert item["response"] == ""
 
+    @patch("src.state.interrupts.broadcast_to_project")
+    @patch("src.state.interrupts.boto3")
+    def test_broadcasts_interrupt_raised_for_normal_question(
+        self,
+        mock_boto3: MagicMock,
+        mock_broadcast: MagicMock,
+    ) -> None:
+        from src.state.interrupts import store_interrupt
+
+        mock_table = MagicMock()
+        mock_boto3.resource.return_value.Table.return_value = mock_table
+
+        store_interrupt("test-table", "proj-1", "int-001", "What color?", phase="DISCOVERY")
+
+        mock_broadcast.assert_called_once()
+        msg = mock_broadcast.call_args.args[1]
+        assert msg["event"] == "interrupt_raised"
+        assert msg["question"] == "What color?"
+
+    @patch("src.state.interrupts.broadcast_to_project")
+    @patch("src.state.interrupts.boto3")
+    def test_broadcasts_sow_review_for_sow_prefix(
+        self,
+        mock_boto3: MagicMock,
+        mock_broadcast: MagicMock,
+    ) -> None:
+        from src.state.interrupts import store_interrupt
+
+        mock_table = MagicMock()
+        mock_boto3.resource.return_value.Table.return_value = mock_table
+
+        store_interrupt("test-table", "proj-1", "int-002", "sow_review:", phase="DISCOVERY")
+
+        mock_broadcast.assert_called_once()
+        msg = mock_broadcast.call_args.args[1]
+        assert msg["event"] == "sow_review"
+        assert msg["interrupt_id"] == "int-002"
+        assert "question" not in msg
+        assert "sow_content" not in msg
+
+    @patch("src.state.interrupts.broadcast_to_project")
+    @patch("src.state.interrupts.boto3")
+    def test_broadcasts_sow_review_with_content(
+        self,
+        mock_boto3: MagicMock,
+        mock_broadcast: MagicMock,
+    ) -> None:
+        from src.state.interrupts import store_interrupt
+
+        mock_table = MagicMock()
+        mock_boto3.resource.return_value.Table.return_value = mock_table
+
+        store_interrupt(
+            "test-table",
+            "proj-1",
+            "int-003",
+            "sow_review:",
+            phase="DISCOVERY",
+            sow_content="# SOW\nProject details here",
+        )
+
+        mock_broadcast.assert_called_once()
+        msg = mock_broadcast.call_args.args[1]
+        assert msg["event"] == "sow_review"
+        assert msg["sow_content"] == "# SOW\nProject details here"
+
 
 @pytest.mark.unit
 class TestGetInterruptResponse:

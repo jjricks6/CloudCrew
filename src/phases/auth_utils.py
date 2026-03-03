@@ -44,7 +44,16 @@ def get_user_id_from_event(event: dict[str, Any]) -> str | None:
     request_context = event.get("requestContext", {})
     authorizer = request_context.get("authorizer", {})
     claims = authorizer.get("claims", {})
-    return claims.get("sub")  # type: ignore[no-any-return]
+    user_id: str | None = claims.get("sub")
+
+    if not user_id:
+        logger.warning(
+            "No user ID found in claims. requestContext keys=%s, authorizer keys=%s",
+            list(request_context.keys()) if isinstance(request_context, dict) else "not a dict",
+            list(authorizer.keys()) if isinstance(authorizer, dict) else "not a dict",
+        )
+
+    return user_id
 
 
 def verify_project_access(
@@ -145,8 +154,12 @@ def check_rate_limit(user_id: str | None) -> tuple[bool, str | None]:
         - is_allowed is True if request is allowed
         - error_message is None if allowed, otherwise describes the limit
     """
-    if not RATE_LIMIT_ENABLED or not user_id:
+    if not RATE_LIMIT_ENABLED:
         return True, None
+
+    # Rate limiting applies to ALL requests, authenticated or not.
+    # Use user_id if available, otherwise use a placeholder for unauthenticated requests.
+    identifier = user_id or "unauthenticated"
 
     try:
         dynamodb = boto3.resource("dynamodb")
@@ -154,7 +167,7 @@ def check_rate_limit(user_id: str | None) -> tuple[bool, str | None]:
 
         # Create a key for the current minute
         current_minute = int(time.time()) // 60
-        rate_limit_key = f"user#{user_id}#minute#{current_minute}"
+        rate_limit_key = f"user#{identifier}#minute#{current_minute}"
 
         # Increment request count for this minute
         response = table.update_item(
@@ -172,8 +185,8 @@ def check_rate_limit(user_id: str | None) -> tuple[bool, str | None]:
 
         if request_count > RATE_LIMIT_REQUESTS_PER_MINUTE:
             logger.warning(
-                "Rate limit exceeded: user=%s, count=%d, limit=%d",
-                user_id,
+                "Rate limit exceeded: identifier=%s, count=%d, limit=%d",
+                identifier,
                 request_count,
                 RATE_LIMIT_REQUESTS_PER_MINUTE,
             )
@@ -182,5 +195,5 @@ def check_rate_limit(user_id: str | None) -> tuple[bool, str | None]:
         return True, None
     except Exception as exc:
         # On error, allow request but log warning
-        logger.warning("Rate limit check failed for user=%s: %s", user_id, exc)
+        logger.warning("Rate limit check failed for identifier=%s: %s", identifier, exc)
         return True, None

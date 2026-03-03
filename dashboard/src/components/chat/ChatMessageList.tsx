@@ -36,7 +36,7 @@ export function ChatMessageList({
   }, [messages, streamingContent, isThinking]);
 
   return (
-    <div className="flex-1 overflow-y-auto">
+    <div role="log" aria-label="Chat messages" className="flex-1 overflow-y-auto">
       <div className="mx-auto max-w-3xl space-y-4 px-4 py-6">
         {messages.length === 0 && !isThinking && !streamingContent && (
           <div className="flex flex-col items-center justify-center py-20 text-center">
@@ -49,7 +49,7 @@ export function ChatMessageList({
         {messages.map((msg) => {
           // Interrupt messages get the special yellow card treatment
           if (
-            msg.message_id.startsWith("interrupt-") &&
+            msg.type === "interrupt" &&
             interrupt &&
             onReply &&
             onTypeOwn
@@ -69,7 +69,7 @@ export function ChatMessageList({
 
           // Approval messages get the approval card with approve/revise controls
           if (
-            msg.message_id.startsWith("approval-") &&
+            msg.type === "approval" &&
             approval &&
             onApprove &&
             onRevise

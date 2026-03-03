@@ -42,6 +42,7 @@ interface PhaseReviewState {
   // Opening message
   openingMessage: string;
   openingContent: string;
+  openingMessageComplete: boolean;
 
   // Artifact review
   phaseSummaryPath: string;
@@ -51,12 +52,15 @@ interface PhaseReviewState {
   // Closing message
   closingMessage: string;
   closingContent: string;
+  closingMessageComplete: boolean;
 
   // Actions
   startWaitingForReview: (phase: string) => void;
   beginReview: (phase: string, opening: string, closing: string, phaseSummaryPath: string) => void;
   startOpeningMessage: (phase: string, opening: string, closing: string, phaseSummaryPath: string) => void;
   setOpeningContent: (content: string) => void;
+  appendMessageContent: (messageType: "opening" | "closing", chunk: string) => void;
+  setMessageComplete: (messageType: "opening" | "closing") => void;
   advanceToArtifactReview: () => void;
   addUserChatMessage: (content: string) => void;
   appendChatChunk: (chunk: string) => void;
@@ -76,11 +80,13 @@ export const usePhaseReviewStore = create<PhaseReviewState>()((set) => ({
   currentPhase: null,
   openingMessage: "",
   openingContent: "",
+  openingMessageComplete: false,
   phaseSummaryPath: "",
   chatHistory: [],
   currentChatContent: "",
   closingMessage: "",
   closingContent: "",
+  closingMessageComplete: false,
 
   startWaitingForReview: (phase) =>
     set({
@@ -90,33 +96,85 @@ export const usePhaseReviewStore = create<PhaseReviewState>()((set) => ({
     }),
 
   beginReview: (phase, opening, closing, phaseSummaryPath) =>
-    set({
-      status: "opening_message",
-      currentPhase: phase,
-      openingMessage: opening,
-      openingContent: "",
-      closingMessage: closing,
-      phaseSummaryPath,
-      pmState: "active",
-      chatHistory: [],
-      currentChatContent: "",
+    set((s) => {
+      // If there's no opening message (e.g., Discovery phase), skip directly
+      // to artifact review — no PM welcome screen needed.
+      const hasStreamedOpening = s.openingContent.length > 0;
+      const hasOpening = hasStreamedOpening || !!opening;
+      if (!hasOpening) {
+        return {
+          status: "artifact_review",
+          currentPhase: phase,
+          openingMessage: "",
+          openingContent: "",
+          openingMessageComplete: true,
+          closingMessage: closing,
+          phaseSummaryPath,
+          pmState: "thinking",
+          chatHistory: [],
+          currentChatContent: "",
+        };
+      }
+
+      // Use persisted message from API if no WebSocket content has arrived.
+      // This handles the case where the user opens review after the PM Lambda
+      // already finished (WebSocket stream was missed or user wasn't connected).
+      const effectiveOpeningContent = hasStreamedOpening ? s.openingContent : opening;
+      const isOpeningComplete = s.openingMessageComplete || (!hasStreamedOpening && !!opening);
+      return {
+        status: "opening_message",
+        currentPhase: phase,
+        openingMessage: opening,
+        openingContent: effectiveOpeningContent,
+        openingMessageComplete: isOpeningComplete,
+        closingMessage: closing,
+        phaseSummaryPath,
+        pmState: isOpeningComplete ? "thinking" : "active",
+        chatHistory: [],
+        currentChatContent: "",
+      };
     }),
 
   startOpeningMessage: (phase, opening, closing, phaseSummaryPath) =>
-    set({
+    set((s) => ({
       status: "opening_message",
       currentPhase: phase,
       openingMessage: opening,
-      openingContent: "",
+      openingContent: s.openingContent,
       closingMessage: closing,
       phaseSummaryPath,
-      pmState: "active",
+      pmState: s.openingMessageComplete ? "thinking" : "active",
       chatHistory: [],
       currentChatContent: "",
-    }),
+    })),
 
   setOpeningContent: (content) =>
     set({ openingContent: content }),
+
+  appendMessageContent: (messageType, chunk) =>
+    set((s) => {
+      if (messageType === "opening") {
+        return { openingContent: s.openingContent + chunk };
+      } else {
+        return { closingContent: s.closingContent + chunk };
+      }
+    }),
+
+  setMessageComplete: (messageType) =>
+    set((s) => {
+      if (messageType === "opening") {
+        return {
+          openingMessageComplete: true,
+          // If we're already showing the opening message, update PM state
+          pmState: s.status === "opening_message" ? "thinking" : s.pmState,
+        };
+      } else {
+        return {
+          closingMessageComplete: true,
+          pmState: s.status === "closing_message" ? "thinking" : s.pmState,
+        };
+      }
+    }),
 
   advanceToArtifactReview: () =>
     set({
@@ -159,12 +217,13 @@ export const usePhaseReviewStore = create<PhaseReviewState>()((set) => ({
     })),
 
   advanceToClosingMessage: (closing) =>
-    set({
+    set((s) => ({
       status: "closing_message",
       closingMessage: closing,
-      closingContent: "",
-      pmState: "active",
-    }),
+      // Preserve any closing content already streamed
+      closingContent: s.closingContent,
+      pmState: s.closingMessageComplete ? "thinking" : "active",
+    })),
 
   setClosingContent: (content) =>
     set({ closingContent: content }),
@@ -188,11 +247,13 @@ export const usePhaseReviewStore = create<PhaseReviewState>()((set) => ({
       currentPhase: null,
       openingMessage: "",
       openingContent: "",
+      openingMessageComplete: false,
       phaseSummaryPath: "",
       chatHistory: [],
       currentChatContent: "",
       closingMessage: "",
       closingContent: "",
+      closingMessageComplete: false,
     }),
 
   reset: () =>
@@ -202,11 +263,13 @@ export const usePhaseReviewStore = create<PhaseReviewState>()((set) => ({
       currentPhase: null,
       openingMessage: "",
       openingContent: "",
+      openingMessageComplete: false,
       phaseSummaryPath: "",
       chatHistory: [],
       currentChatContent: "",
       closingMessage: "",
       closingContent: "",
+      closingMessageComplete: false,
     }),
 
   setPmState: (pmState) => set({ pmState }),

@@ -83,6 +83,24 @@ class DeliverableItem(BaseModel):
     created_at: str = ""
 
 
+# --- Terraform Backend ---
+
+
+class TerraformBackend(BaseModel):
+    """Remote S3 backend configuration for customer Terraform state.
+
+    Provisioned automatically during the first terraform_plan invocation.
+    Stored in the task ledger so subsequent runs (including terraform_destroy
+    from a fresh ECS container) can reconnect to the remote state.
+    """
+
+    bucket: str = Field(description="S3 bucket name for Terraform state")
+    key: str = Field(description="S3 object key for the state file")
+    region: str = Field(description="AWS region of the backend resources")
+    dynamodb_table: str = Field(description="DynamoDB table for state locking")
+    provisioned_at: str = Field(default="", description="ISO timestamp when backend was created")
+
+
 # --- Task Ledger ---
 
 
@@ -97,6 +115,10 @@ class TaskLedger(BaseModel):
     project_name: str = ""
     customer: str = ""
     owner_id: str = ""  # Cognito user ID of project creator
+    initial_requirements: str = ""  # Customer's brief project description for SOW generation
+    git_repo_url_customer: str = ""  # Customer's target repo (e.g., github.com/org/repo)
+    aws_account_id: str = ""  # Target AWS account for deployment
+    aws_region_target: str = ""  # Target AWS region for deployment
     current_phase: Phase = Phase.DISCOVERY
     phase_status: PhaseStatus = PhaseStatus.IN_PROGRESS
     facts: list[Fact] = Field(default_factory=list)
@@ -104,6 +126,9 @@ class TaskLedger(BaseModel):
     decisions: list[Decision] = Field(default_factory=list)
     blockers: list[Blocker] = Field(default_factory=list)
     deliverables: dict[str, list[DeliverableItem]] = Field(default_factory=dict)
+    terraform_backend: TerraformBackend | None = None  # Remote state config, set by deploy tools
+    review_opening_message: str = ""  # PM-generated opening message for current review
+    review_closing_message: str = ""  # PM-generated closing message for current review
     created_at: str = ""
     updated_at: str = ""
 

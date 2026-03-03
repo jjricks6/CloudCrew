@@ -1,8 +1,9 @@
 """POC (Proof of Concept) phase Swarm assembly.
 
 Wires together all specialist agents into a Swarm for the POC phase.
-Dev is the entry point; all agents are available for handoffs so the
-team can collaborate organically based on their system prompts.
+PM is the entry point — it reads the task ledger, delegates to specialists,
+and coordinates the build→review→security cycle. All agents are available
+for handoffs so the team can collaborate organically.
 
 This module is in phases/ — the ONLY package allowed to import from agents/.
 """
@@ -15,6 +16,7 @@ from strands.multiagent.swarm import Swarm
 from src.agents.data import create_data_agent
 from src.agents.dev import create_dev_agent
 from src.agents.infra import create_infra_agent
+from src.agents.pm import create_pm_agent
 from src.agents.qa import create_qa_agent
 from src.agents.sa import create_sa_agent
 from src.agents.security import create_security_agent
@@ -32,9 +34,9 @@ def create_poc_swarm(
 ) -> Swarm:
     """Create the POC phase Swarm.
 
-    All specialist agents are available so the team can collaborate
-    organically. Dev drives the build; QA validates, Security scans,
-    Infra provisions, and SA/Data consult as needed.
+    PM is the entry point — it reviews the task ledger and architecture
+    from prior phases, then delegates to specialists. Dev builds,
+    QA validates, Security scans, Infra provisions, and SA/Data consult.
 
     Configuration:
         - max_handoffs=25: High enough for per-module build->review cycles
@@ -47,6 +49,7 @@ def create_poc_swarm(
     Returns:
         Configured Swarm ready for invocation with invocation_state.
     """
+    pm = create_pm_agent()
     dev = create_dev_agent()
     infra = create_infra_agent()
     data = create_data_agent()
@@ -54,7 +57,7 @@ def create_poc_swarm(
     sa = create_sa_agent()
     qa = create_qa_agent()
 
-    logger.info("Creating POC swarm with agents: dev, infra, data, security, sa, qa")
+    logger.info("Creating POC swarm with agents: pm, dev, infra, data, security, sa, qa")
 
     hooks: list[HookProvider] = [
         ResilienceHook(),
@@ -63,8 +66,8 @@ def create_poc_swarm(
     ]
 
     return Swarm(
-        nodes=[dev, infra, data, security, sa, qa],
-        entry_point=dev,
+        nodes=[pm, dev, infra, data, security, sa, qa],
+        entry_point=pm,
         max_handoffs=25,
         max_iterations=25,
         execution_timeout=EXECUTION_TIMEOUT_POC,

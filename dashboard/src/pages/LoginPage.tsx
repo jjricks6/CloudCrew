@@ -23,7 +23,7 @@ export function LoginPage() {
     setError("");
     try {
       await signIn(email, password);
-      navigate("/project/demo");
+      navigate("/projects");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Sign in failed");
     } finally {
@@ -50,7 +50,7 @@ export function LoginPage() {
     try {
       await confirmSignUp(email, code);
       await signIn(email, password);
-      navigate("/project/demo");
+      navigate("/projects");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Confirmation failed");
     } finally {
@@ -171,6 +171,16 @@ export function LoginPage() {
               {pending ? "Verifying..." : "Verify Email"}
             </Button>
           )}
+
+          <div className="pt-2 border-t">
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => navigate("/project/demo")}
+            >
+              Try Demo
+            </Button>
+          </div>
         </CardContent>
       </Card>
     </div>

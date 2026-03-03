@@ -6,6 +6,7 @@ store_approval_token_handler: Stores a task token for customer approval.
 This module is in phases/ — the ONLY package allowed to import from agents/.
 """
 
+import json
 import logging
 from typing import Any
 
@@ -17,6 +18,7 @@ from src.config import (
     ECS_SECURITY_GROUP,
     ECS_SUBNETS,
     ECS_TASK_DEFINITION,
+    PM_REVIEW_MESSAGE_FUNCTION,
     TASK_LEDGER_TABLE,
 )
 from src.state.approval import store_token
@@ -60,6 +62,8 @@ def start_phase_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
     ledger = read_ledger(TASK_LEDGER_TABLE, project_id)
     ledger.current_phase = Phase(phase)
     ledger.phase_status = PhaseStatus.IN_PROGRESS
+    ledger.review_opening_message = ""
+    ledger.review_closing_message = ""
     write_ledger(TASK_LEDGER_TABLE, project_id, ledger)
 
     # Broadcast phase_started event to connected dashboard clients
@@ -126,6 +130,9 @@ def store_approval_token_handler(event: dict[str, Any], context: Any) -> dict[st
     The token is stored in DynamoDB so the customer API can retrieve it
     when the customer approves or requests revision.
 
+    After storing the token, triggers async PM Review Message Lambda to
+    generate and stream a personalized opening message.
+
     Args:
         event: Contains project_id, phase, task_token.
         context: Lambda context (unused).
@@ -159,6 +166,36 @@ def store_approval_token_handler(event: dict[str, Any], context: Any) -> dict[st
             "detail": f"Phase {phase} awaiting customer approval",
         },
     )
+
+    # Trigger PM to generate and stream opening message asynchronously.
+    # Skip for Discovery — the customer already approved the SOW during the
+    # phase; the dashboard shows a simple "Begin Next Phase" button instead
+    # of the full review flow with PM messages.
+    if phase != "DISCOVERY":
+        lambda_client = boto3.client("lambda", region_name=AWS_REGION)
+        try:
+            lambda_client.invoke(
+                FunctionName=PM_REVIEW_MESSAGE_FUNCTION,
+                InvocationType="Event",
+                Payload=json.dumps(
+                    {
+                        "project_id": project_id,
+                        "phase": phase,
+                        "message_type": "opening",
+                    }
+                ),
+            )
+            logger.info(
+                "Triggered PM opening message generation for project=%s, phase=%s",
+                project_id,
+                phase,
+            )
+        except Exception as e:
+            logger.error(
+                "Failed to invoke PM review message lambda for project=%s: %s",
+                project_id,
+                str(e),
+            )
 
     return {
         "project_id": project_id,

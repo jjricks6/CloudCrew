@@ -4,6 +4,9 @@
  * Displays the PM's streamed question text with a blinking cursor,
  * a text input area, an optional file upload zone, and a send button.
  * Only the current question is visible — previous Q&A pairs are not shown.
+ *
+ * In real mode, the parent provides an `onSend` callback that sends the
+ * answer to the backend interrupt API instead of advancing demo steps.
  */
 
 import { useState, useCallback } from "react";
@@ -18,12 +21,15 @@ interface OnboardingQuestionCardProps {
   step: OnboardingStep;
   questionText: string;
   isStreaming: boolean;
+  /** Override submit handler for real mode (sends to interrupt API). */
+  onSend?: (answer: string) => void;
 }
 
 export function OnboardingQuestionCard({
   step,
   questionText,
   isStreaming,
+  onSend,
 }: OnboardingQuestionCardProps) {
   const [input, setInput] = useState("");
   const [uploadedFile, setUploadedFile] = useState<string | null>(null);
@@ -35,11 +41,15 @@ export function OnboardingQuestionCard({
 
   const handleSend = useCallback(() => {
     if (!canSend) return;
-    answerStep(input.trim());
-    advanceStep();
+    if (onSend) {
+      onSend(input.trim());
+    } else {
+      answerStep(input.trim());
+      advanceStep();
+    }
     setInput("");
     setUploadedFile(null);
-  }, [canSend, input, answerStep, advanceStep]);
+  }, [canSend, input, onSend, answerStep, advanceStep]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {

@@ -91,6 +91,9 @@ export interface ProjectStatusSummary {
   project_name: string;
   current_phase: Phase;
   phase_status: PhaseStatus;
+  review_opening_message?: string;
+  review_closing_message?: string;
+  git_repo_url?: string;
 }
 
 // --- WebSocket Events ---
@@ -167,6 +170,29 @@ export interface DeliverableCreatedEvent extends BaseEvent {
   version: string;
 }
 
+export interface SowReviewEvent extends BaseEvent {
+  event: "sow_review";
+  interrupt_id: string;
+  sow_content?: string;
+}
+
+export interface ReviewMessageEvent extends BaseEvent {
+  event: "review_message";
+  message_type: "opening" | "closing";
+  content: string;
+}
+
+export interface ReviewMessageThinkingEvent extends BaseEvent {
+  event: "review_message_thinking";
+  message_type: "opening" | "closing";
+}
+
+export interface ReviewMessageCompleteEvent extends BaseEvent {
+  event: "review_message_complete";
+  message_type: "opening" | "closing";
+  length: number;
+}
+
 export type WebSocketEvent =
   | AgentActiveEvent
   | AgentIdleEvent
@@ -175,13 +201,17 @@ export type WebSocketEvent =
   | AwaitingApprovalEvent
   | InterruptRaisedEvent
   | InterruptAnsweredEvent
+  | SowReviewEvent
   | ChatMessageEvent
   | ChatThinkingEvent
   | ChatChunkEvent
   | ChatDoneEvent
   | TaskCreatedEvent
   | TaskUpdatedEvent
-  | DeliverableCreatedEvent;
+  | DeliverableCreatedEvent
+  | ReviewMessageEvent
+  | ReviewMessageThinkingEvent
+  | ReviewMessageCompleteEvent;
 
 // --- Board Tasks (Kanban) ---
 
@@ -247,6 +277,8 @@ export interface ChatMessage {
   role: "customer" | "pm";
   content: string;
   timestamp: string;
+  /** Determines which card component renders this message. */
+  type?: "chat" | "interrupt" | "approval";
 }
 
 // --- Agent Activity (for Zustand store) ---

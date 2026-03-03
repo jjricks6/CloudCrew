@@ -69,8 +69,8 @@ def broadcast_to_project(project_id: str, message: dict[str, Any]) -> int:
         except apigw.exceptions.GoneException:
             logger.debug("Removing stale connection %s", connection_id)
             table.delete_item(Key={"PK": conn["PK"], "SK": conn["SK"]})
-        except Exception:
-            logger.exception("Failed to send to connection %s", connection_id)
+        except (apigw.exceptions.ClientError, Exception) as e:
+            logger.exception("Failed to send to connection %s: %s", connection_id, type(e).__name__)
 
     logger.debug(
         "Broadcast to %d/%d clients for project %s",

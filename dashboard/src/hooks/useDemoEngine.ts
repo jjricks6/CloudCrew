@@ -223,7 +223,11 @@ export function useDemoEngine(projectId: string | undefined) {
             i++;
           } else {
             clearInterval(interval);
-            usePhaseReviewStore.getState().setPmState("thinking");
+            if (type === "chat") {
+              usePhaseReviewStore.getState().completeChatMessage();
+            } else {
+              usePhaseReviewStore.getState().setPmState("thinking");
+            }
           }
         }, 30 + Math.random() * 20);
         intervalsRef.current.push(interval);
@@ -372,18 +376,8 @@ export function useDemoEngine(projectId: string | undefined) {
             agent_name: "Project Manager",
             detail: "Waiting for customer response",
           });
-
-          // Also post the question as a chat message so it appears in chat
-          schedule(() => {
-            addEvent({
-              event: "chat_message",
-              project_id: "demo",
-              phase: playbook.phase,
-              message_id: `interrupt-${id}`,
-              role: "pm",
-              content: question,
-            });
-          }, 100);
+          // agentStore's interrupt_raised handler already injects the chat
+          // message — no need to duplicate it here.
         }, 1500);
       }, 2000);
     }
@@ -700,16 +694,6 @@ export function useDemoEngine(projectId: string | undefined) {
     // Subscribe to phase review store to stream content when steps change
     const unsubPhaseReview = usePhaseReviewStore.subscribe((state, prevState) => {
       // When user clicks "Begin Review" button, opening message starts streaming
-      if (
-        prevState.status !== "opening_message" &&
-        state.status === "opening_message"
-      ) {
-        cancelAll();
-        streamReviewMessage(state.openingMessage, "opening");
-        return;
-      }
-
-      // When opening message starts, stream it
       if (
         prevState.status !== "opening_message" &&
         state.status === "opening_message"

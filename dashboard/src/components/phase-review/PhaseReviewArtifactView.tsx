@@ -18,29 +18,26 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import ReactMarkdown from "react-markdown";
+import rehypeSanitize from "rehype-sanitize";
 import remarkGfm from "remark-gfm";
-import { Download, Send, ArrowLeft } from "lucide-react";
-import { fetchArtifactContent } from "@/lib/api";
-import { isDemoMode, getArtifactContent } from "@/lib/demo";
+import { Download, Send, ArrowLeft, ExternalLink } from "lucide-react";
+import { PhaseApprovalCard } from "./PhaseApprovalCard";
+import { fetchArtifactContent, fetchArtifactList, post } from "@/lib/api";
+import type { ArtifactListItem } from "@/lib/api";
+import { isDemoMode, getArtifactContent, getDemoArtifactList } from "@/lib/demo";
 import type { ChatMessage } from "@/state/stores/phaseReviewStore";
-
-interface DeliverableItem {
-  name: string;
-  git_path: string;
-  version: string;
-}
 
 interface Props {
   projectId?: string;
   phaseName: string;
-  phaseSummaryPath?: string;
-  artifacts: DeliverableItem[];
   chatHistory: ChatMessage[];
   currentChatContent: string;
   isChatStreaming: boolean;
   onSendMessage: (message: string) => void;
   onApprove: () => void;
+  onRequestChanges: (feedback: string) => void;
   isLoading: boolean;
+  gitRepoUrl?: string;
 }
 
 interface Document {
@@ -52,38 +49,68 @@ interface Document {
 export function PhaseReviewArtifactView({
   projectId,
   phaseName,
-  phaseSummaryPath,
-  artifacts,
   chatHistory,
   currentChatContent,
   isChatStreaming,
   onSendMessage,
   onApprove,
+  onRequestChanges,
   isLoading,
+  gitRepoUrl,
 }: Props) {
-  const [selectedDocId, setSelectedDocId] = useState("phase-summary");
+  const [documents, setDocuments] = useState<Document[]>([]);
+  const [selectedDocId, setSelectedDocId] = useState<string>("");
   const [docContent, setDocContent] = useState<string>("");
   const [isLoadingDoc, setIsLoadingDoc] = useState(false);
+  const [isLoadingList, setIsLoadingList] = useState(true);
   const [chatInput, setChatInput] = useState("");
   const [inChatMode, setInChatMode] = useState(false);
 
-  // Build document list: Phase Summary (if available) + all artifacts
-  const documents: Document[] = [
-    ...(phaseSummaryPath
-      ? [{ id: "phase-summary", name: "Phase Summary", path: phaseSummaryPath }]
-      : []),
-    ...artifacts.map((a, idx) => ({
-      id: `artifact-${idx}`,
-      name: a.name,
-      path: a.git_path,
-    })),
-  ];
+  // Fetch artifact list from S3 via API (or demo data)
+  useEffect(() => {
+    if (!projectId) return;
+    let cancelled = false;
+
+    const loadList = async () => {
+      setIsLoadingList(true);
+      try {
+        let items: ArtifactListItem[];
+        if (isDemoMode(projectId)) {
+          items = getDemoArtifactList(phaseName);
+        } else {
+          items = await fetchArtifactList(projectId);
+        }
+        if (!cancelled) {
+          const docs = items.map((item, idx) => ({
+            id: `artifact-${idx}`,
+            name: item.name,
+            path: item.path,
+          }));
+          setDocuments(docs);
+          // Auto-select first document
+          if (docs.length > 0 && !selectedDocId) {
+            setSelectedDocId(docs[0].id);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load artifact list:", err);
+      } finally {
+        if (!cancelled) setIsLoadingList(false);
+      }
+    };
+    loadList();
+
+    return () => { cancelled = true; };
+  }, [projectId, phaseName]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const selectedDoc = documents.find((d) => d.id === selectedDocId) || documents[0];
 
-  // Fetch selected document content
+  // Fetch selected document content — use selectedDoc.path (a string) as the
+  // dependency instead of the selectedDoc object to avoid infinite re-renders
+  // (documents array is rebuilt each render, creating new object references).
+  const selectedPath = selectedDoc?.path;
   useEffect(() => {
-    if (!selectedDoc || !projectId) return;
+    if (!selectedPath || !projectId) return;
 
     let cancelled = false;
 
@@ -92,7 +119,7 @@ export function PhaseReviewArtifactView({
 
       if (isDemoMode(projectId)) {
         // Demo mode: use canned content
-        const content = getArtifactContent(selectedDoc.path);
+        const content = getArtifactContent(selectedPath);
         if (!cancelled) {
           setDocContent(content);
           setIsLoadingDoc(false);
@@ -100,7 +127,7 @@ export function PhaseReviewArtifactView({
       } else {
         // Real mode: fetch from API
         try {
-          const data = await fetchArtifactContent(projectId, selectedDoc.path);
+          const data = await fetchArtifactContent(projectId, selectedPath);
           if (!cancelled) {
             setDocContent(data.exists ? data.content : "Document not found.");
           }
@@ -121,14 +148,26 @@ export function PhaseReviewArtifactView({
     return () => {
       cancelled = true;
     };
-  }, [selectedDoc, projectId]);
+  }, [selectedPath, projectId]);
 
-  const handleSendChat = () => {
+  const handleSendChat = async () => {
     if (chatInput.trim()) {
-      onSendMessage(chatInput.trim());
+      const message = chatInput.trim();
       setChatInput("");
       // Enter chat mode when user sends a message
       setInChatMode(true);
+
+      // Add user message to phaseReviewStore chat history
+      onSendMessage(message);
+
+      if (!isDemoMode(projectId) && projectId) {
+        // Real mode: call chat API — PM response streams via WebSocket
+        try {
+          await post(`/projects/${projectId}/chat`, { message });
+        } catch (error) {
+          console.error("Error sending chat message:", error);
+        }
+      }
     }
   };
 
@@ -140,7 +179,12 @@ export function PhaseReviewArtifactView({
   };
 
   const handleDownload = (doc: Document) => {
-    const content = `# ${doc.name}\n\n**Path:** ${doc.path}\n\nThis artifact was delivered as part of the engagement.\n`;
+    // Use the currently loaded content if we're viewing this document,
+    // otherwise fall back to a placeholder with the path.
+    const content =
+      selectedDoc?.path === doc.path && docContent
+        ? docContent
+        : `# ${doc.name}\n\n**Path:** ${doc.path}\n\nContent not yet loaded. Select this artifact to preview it first.\n`;
     const blob = new Blob([content], { type: "text/markdown" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -158,7 +202,20 @@ export function PhaseReviewArtifactView({
       animate={{ opacity: 1 }}
       className="flex flex-col min-h-0 flex-1 gap-4"
     >
-      <h3 className="text-lg font-semibold">{phaseName} review</h3>
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="text-lg font-semibold">{phaseName} review</h3>
+        {gitRepoUrl && (
+          <a
+            href={gitRepoUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-950 transition-colors"
+          >
+            <ExternalLink className="w-4 h-4" />
+            View Code on GitHub
+          </a>
+        )}
+      </div>
 
       <AnimatePresence mode="wait">
         {/* Artifact Review Mode */}
@@ -174,46 +231,62 @@ export function PhaseReviewArtifactView({
             <div className="flex-1 min-h-0 flex flex-col md:flex-row gap-4">
               {/* Artifact buttons */}
               <div className="flex md:flex-col gap-2 overflow-x-auto md:overflow-y-auto md:w-48 flex-shrink-0 pb-2 md:pb-0">
-                {documents.map((doc) => (
-                  <button
-                    key={doc.id}
-                    onClick={() => setSelectedDocId(doc.id)}
-                    className={`px-3 py-2 rounded text-sm font-medium whitespace-nowrap transition-colors ${
-                      doc.id === selectedDocId
-                        ? "bg-blue-600 text-white dark:bg-blue-700"
-                        : "bg-muted text-muted-foreground hover:bg-muted/80 dark:hover:bg-muted/60"
-                    }`}
-                  >
-                    {doc.name}
-                  </button>
-                ))}
+                {isLoadingList ? (
+                  <p className="text-xs text-muted-foreground px-3 py-2">Loading artifacts...</p>
+                ) : documents.length === 0 ? (
+                  <p className="text-xs text-muted-foreground px-3 py-2">No artifacts found</p>
+                ) : (
+                  documents.map((doc) => (
+                    <button
+                      key={doc.id}
+                      onClick={() => setSelectedDocId(doc.id)}
+                      className={`px-3 py-2 rounded text-sm font-medium whitespace-nowrap transition-colors ${
+                        doc.id === selectedDocId
+                          ? "bg-blue-600 text-white dark:bg-blue-700"
+                          : "bg-muted text-muted-foreground hover:bg-muted/80 dark:hover:bg-muted/60"
+                      }`}
+                    >
+                      {doc.name}
+                    </button>
+                  ))
+                )}
               </div>
 
               {/* Document preview */}
               <div className="flex-1 min-h-0 flex flex-col rounded-md border bg-muted/30 overflow-hidden">
-                <div className="border-b p-3 flex items-center justify-between bg-muted/50 gap-3 flex-shrink-0">
-                  <h4 className="font-semibold text-sm">{selectedDoc.name}</h4>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleDownload(selectedDoc)}
-                    className="flex-shrink-0"
-                  >
-                    <Download className="w-4 h-4 mr-1.5" />
-                    Download
-                  </Button>
-                </div>
-                <div className="flex-1 overflow-y-auto p-4 min-h-0">
-                  {isLoadingDoc ? (
-                    <p className="text-sm text-muted-foreground">Loading...</p>
-                  ) : (
-                    <div className="prose prose-sm dark:prose-invert max-w-none">
-                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                        {docContent}
-                      </ReactMarkdown>
+                {selectedDoc ? (
+                  <>
+                    <div className="border-b p-3 flex items-center justify-between bg-muted/50 gap-3 flex-shrink-0">
+                      <h4 className="font-semibold text-sm">{selectedDoc.name}</h4>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDownload(selectedDoc)}
+                        className="flex-shrink-0"
+                      >
+                        <Download className="w-4 h-4 mr-1.5" />
+                        Download
+                      </Button>
                     </div>
-                  )}
-                </div>
+                    <div className="flex-1 overflow-y-auto p-4 min-h-0">
+                      {isLoadingDoc ? (
+                        <p className="text-sm text-muted-foreground">Loading...</p>
+                      ) : (
+                        <div className="prose prose-sm dark:prose-invert max-w-none">
+                          <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSanitize]}>
+                            {docContent}
+                          </ReactMarkdown>
+                        </div>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex-1 flex items-center justify-center p-4">
+                    <p className="text-sm text-muted-foreground">
+                      {isLoadingList ? "Loading artifacts..." : "No artifacts available"}
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -240,17 +313,13 @@ export function PhaseReviewArtifactView({
                 </Button>
               </div>
 
-              {/* Approval buttons */}
-              <div className="flex gap-2 flex-shrink-0">
-                <Button
-                  onClick={onApprove}
-                  disabled={isLoading || isChatStreaming}
-                  className="bg-green-600 hover:bg-green-700 text-sm"
-                  size="sm"
-                >
-                  Approve & Continue
-                </Button>
-              </div>
+              {/* Approval gate */}
+              <PhaseApprovalCard
+                phaseName={phaseName}
+                onApprove={onApprove}
+                onRequestChanges={onRequestChanges}
+                isLoading={isLoading || isChatStreaming}
+              />
             </div>
           </motion.div>
         )}

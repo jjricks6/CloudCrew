@@ -5,6 +5,10 @@
  *   not_started → in_progress → sow_review → wrapup → completed
  *                                    ↑ revise ↓
  *
+ * Supports two modes:
+ *   - Demo mode: driven by useDemoEngine with scripted ONBOARDING_STEPS
+ *   - Real mode: driven by PM agent interrupts arriving via WebSocket
+ *
  * In demo mode, sessionStorage persists the "completed" status so page
  * refreshes skip straight to the full dashboard. Closing the tab resets.
  */
@@ -25,8 +29,23 @@ interface OnboardingState {
   sowContent: string;
   isRevision: boolean;
 
+  /** True when driven by real PM agent interrupts (not demo script). */
+  isRealMode: boolean;
+  /** Interrupt ID for the current PM question (real mode only). */
+  liveInterruptId: string | null;
+  /** Dynamic thinking message shown while PM is working (real mode). */
+  thinkingMessage: string;
+  /** Number of questions answered (real mode — drives thinking text). */
+  questionsAnswered: number;
+
   // Actions
   start: () => void;
+  /** Start onboarding in real mode (PM agent, not demo script). */
+  startReal: () => void;
+  /** Set a dynamic question from a PM interrupt (real mode). */
+  setLiveQuestion: (question: string, interruptId: string) => void;
+  /** Update the thinking message (e.g. from agent_active events). */
+  setThinkingMessage: (message: string) => void;
   setPmState: (state: PmVisualState) => void;
   appendQuestionChunk: (chunk: string) => void;
   setFullQuestion: (text: string) => void;
@@ -69,6 +88,10 @@ export const useOnboardingStore = create<OnboardingState>()((set) => ({
   answers: {},
   sowContent: "",
   isRevision: false,
+  isRealMode: false,
+  liveInterruptId: null,
+  thinkingMessage: "",
+  questionsAnswered: 0,
 
   start: () =>
     set({
@@ -79,7 +102,35 @@ export const useOnboardingStore = create<OnboardingState>()((set) => ({
       answers: {},
       sowContent: "",
       isRevision: false,
+      isRealMode: false,
+      liveInterruptId: null,
+      thinkingMessage: "",
+      questionsAnswered: 0,
     }),
+
+  startReal: () =>
+    set({
+      status: "in_progress",
+      isRealMode: true,
+      currentStep: 0,
+      pmState: "thinking",
+      currentQuestionText: "",
+      answers: {},
+      sowContent: "",
+      isRevision: false,
+      liveInterruptId: null,
+      thinkingMessage: "Analyzing your project details and preparing questions",
+      questionsAnswered: 0,
+    }),
+
+  setLiveQuestion: (question, interruptId) =>
+    set({
+      currentQuestionText: question,
+      liveInterruptId: interruptId,
+      pmState: "idle",
+    }),
+
+  setThinkingMessage: (message) => set({ thinkingMessage: message }),
 
   setPmState: (pmState) => set({ pmState }),
 
@@ -138,6 +189,10 @@ export const useOnboardingStore = create<OnboardingState>()((set) => ({
       answers: {},
       sowContent: "",
       isRevision: false,
+      isRealMode: false,
+      liveInterruptId: null,
+      thinkingMessage: "",
+      questionsAnswered: 0,
     });
   },
 }));

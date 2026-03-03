@@ -826,6 +826,59 @@ monthly_budget_amount = 50
 
 See `infra/terraform/example.tfvars` for the template.
 
+### Cross-Account Bedrock Setup
+
+If you want to deploy CloudCrew to your AWS account but use Claude API from a different AWS account's Bedrock service:
+
+#### 1. Create Secret in Your Account
+
+Store the Bedrock API key from the other account in AWS Secrets Manager:
+
+```bash
+aws secretsmanager create-secret \
+  --name cloudcrew/bedrock-api-key \
+  --secret-string "your-api-key-from-other-account" \
+  --region us-east-1
+```
+
+Or as JSON (CloudCrew will parse `api_key` field):
+
+```bash
+aws secretsmanager create-secret \
+  --name cloudcrew/bedrock-api-key \
+  --secret-string '{"api_key": "your-api-key-from-other-account"}' \
+  --region us-east-1
+```
+
+#### 2. Set Environment Variable (Optional)
+
+If you use a different secret name:
+
+```bash
+export BEDROCK_API_KEY_SECRET="your-custom-secret-name"
+```
+
+CloudCrew defaults to `cloudcrew/bedrock-api-key` if not set.
+
+#### 3. Deploy
+
+Proceed with normal deployment. CloudCrew will automatically fetch the API key from Secrets Manager during initialization:
+
+```bash
+make tf-init
+make tf-plan
+make tf-apply
+make docker-build
+make docker-push
+```
+
+**How it works:**
+- All Lambda and ECS roles have `secretsmanager:GetSecretValue` permission for the secret
+- On startup, `src/state/secrets.get_bedrock_api_key()` fetches the key from Secrets Manager (cached for the Lambda container lifetime)
+- If the secret is not found or retrieval fails, CloudCrew falls back to using IAM role permissions (local Bedrock access)
+
+**Cost:** Secrets Manager charges $0.40/secret/month plus $0.05 per 10,000 API calls. With caching, API calls are minimal.
+
 ### Per-Milestone Deploy/Test/Destroy Cycle
 
 ```bash

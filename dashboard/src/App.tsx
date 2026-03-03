@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -11,6 +11,7 @@ import { ChatPage } from "@/pages/ChatPage";
 import { BoardPage } from "@/pages/BoardPage";
 import { ArtifactsPage } from "@/pages/ArtifactsPage";
 import { LoginPage } from "@/pages/LoginPage";
+import { ProjectsPage } from "@/pages/ProjectsPage";
 import { NotFoundPage } from "@/pages/NotFoundPage";
 import { isAuthEnabled } from "@/lib/auth";
 import { AuthProvider, useAuth } from "@/lib/AuthContext";
@@ -22,6 +23,12 @@ import { AuthProvider, useAuth } from "@/lib/AuthContext";
  */
 function AuthGate({ children }: { children: React.ReactNode }) {
   const { loading, session } = useAuth();
+  const location = useLocation();
+
+  // Demo project is publicly accessible — no sign-in required
+  if (location.pathname.startsWith("/project/demo")) {
+    return children;
+  }
 
   if (loading) {
     return (
@@ -41,7 +48,8 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 function AppRoutes() {
   return (
     <Routes>
-      <Route index element={<Navigate to="/project/demo" replace />} />
+      <Route index element={<Navigate to="/projects" replace />} />
+      <Route path="/projects" element={<ProjectsPage />} />
       <Route path="/project/:projectId" element={<AppLayout />}>
         <Route index element={<DashboardPage />} />
         <Route path="chat" element={<ChatPage />} />

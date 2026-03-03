@@ -43,7 +43,7 @@ resource "aws_lambda_function" "sfn_handlers" {
   function_name = "cloudcrew-sfn-handlers"
   role          = aws_iam_role.lambda_sfn_handlers.arn
   package_type  = "Image"
-  image_uri     = "${aws_ecr_repository.phase_runner.repository_url}:latest"
+  image_uri     = "${aws_ecr_repository.phase_runner.repository_url}:${var.image_tag}"
   memory_size   = 128
   timeout       = 30
 
@@ -54,14 +54,14 @@ resource "aws_lambda_function" "sfn_handlers" {
 
   environment {
     variables = {
-      AWS_DEFAULT_REGION     = var.aws_region
-      TASK_LEDGER_TABLE      = aws_dynamodb_table.projects.name
-      ECS_CLUSTER_ARN        = aws_ecs_cluster.main.arn
-      ECS_TASK_DEFINITION    = aws_ecs_task_definition.phase_runner.arn
-      ECS_SUBNETS            = join(",", aws_subnet.public[*].id)
-      ECS_SECURITY_GROUP     = aws_security_group.ecs_tasks.id
-      CONNECTIONS_TABLE      = aws_dynamodb_table.connections.name
-      WEBSOCKET_API_ENDPOINT = "https://${aws_apigatewayv2_api.websocket.id}.execute-api.${var.aws_region}.amazonaws.com/${var.environment}"
+      TASK_LEDGER_TABLE          = aws_dynamodb_table.projects.name
+      ECS_CLUSTER_ARN            = aws_ecs_cluster.main.arn
+      ECS_TASK_DEFINITION        = aws_ecs_task_definition.phase_runner.arn
+      ECS_SUBNETS                = join(",", aws_subnet.public[*].id)
+      ECS_SECURITY_GROUP         = aws_security_group.ecs_tasks.id
+      CONNECTIONS_TABLE          = aws_dynamodb_table.connections.name
+      WEBSOCKET_API_ENDPOINT     = "https://${aws_apigatewayv2_api.websocket.id}.execute-api.${var.aws_region}.amazonaws.com/${var.environment}"
+      PM_REVIEW_MESSAGE_FUNCTION = aws_lambda_function.pm_review_message.function_name
     }
   }
 
@@ -76,7 +76,7 @@ resource "aws_lambda_function" "pm_review" {
   function_name = "cloudcrew-pm-review"
   role          = aws_iam_role.lambda_pm_review.arn
   package_type  = "Image"
-  image_uri     = "${aws_ecr_repository.phase_runner.repository_url}:latest"
+  image_uri     = "${aws_ecr_repository.phase_runner.repository_url}:${var.image_tag}"
   memory_size   = var.lambda_pm_review_memory
   timeout       = var.lambda_pm_review_timeout
 
@@ -87,9 +87,8 @@ resource "aws_lambda_function" "pm_review" {
 
   environment {
     variables = {
-      AWS_DEFAULT_REGION = var.aws_region
-      TASK_LEDGER_TABLE  = aws_dynamodb_table.projects.name
-      SOW_BUCKET         = aws_s3_bucket.sow_uploads.id
+      TASK_LEDGER_TABLE = aws_dynamodb_table.projects.name
+      SOW_BUCKET        = aws_s3_bucket.sow_uploads.id
     }
   }
 
@@ -104,7 +103,7 @@ resource "aws_lambda_function" "approval" {
   function_name = "cloudcrew-approval"
   role          = aws_iam_role.lambda_approval.arn
   package_type  = "Image"
-  image_uri     = "${aws_ecr_repository.phase_runner.repository_url}:latest"
+  image_uri     = "${aws_ecr_repository.phase_runner.repository_url}:${var.image_tag}"
   memory_size   = 128
   timeout       = 30
 
@@ -115,15 +114,52 @@ resource "aws_lambda_function" "approval" {
 
   environment {
     variables = {
-      AWS_DEFAULT_REGION = var.aws_region
-      TASK_LEDGER_TABLE  = aws_dynamodb_table.projects.name
-      STATE_MACHINE_ARN  = aws_sfn_state_machine.orchestrator.arn
+      TASK_LEDGER_TABLE = aws_dynamodb_table.projects.name
+      STATE_MACHINE_ARN = aws_sfn_state_machine.orchestrator.arn
     }
   }
 
   depends_on = [aws_cloudwatch_log_group.lambda_approval]
 
   tags = { Name = "cloudcrew-approval" }
+}
+
+# --- PM Review Message (generates opening/closing review messages via streaming) ---
+
+resource "aws_cloudwatch_log_group" "lambda_pm_review_message" {
+  name              = "/aws/lambda/cloudcrew-pm-review-message"
+  retention_in_days = 14
+
+  tags = { Name = "cloudcrew-pm-review-message-logs" }
+}
+
+resource "aws_lambda_function" "pm_review_message" {
+  function_name = "cloudcrew-pm-review-message"
+  role          = aws_iam_role.lambda_pm_review_message.arn
+  package_type  = "Image"
+  image_uri     = "${aws_ecr_repository.phase_runner.repository_url}:${var.image_tag}"
+  memory_size   = var.lambda_pm_review_memory
+  timeout       = var.lambda_pm_review_timeout
+
+  image_config {
+    entry_point = ["python", "-m", "awslambdaric"]
+    command     = ["src.phases.pm_review_message_handler.handler"]
+  }
+
+  environment {
+    variables = {
+      TASK_LEDGER_TABLE      = aws_dynamodb_table.projects.name
+      CONNECTIONS_TABLE      = aws_dynamodb_table.connections.name
+      WEBSOCKET_API_ENDPOINT = "https://${aws_apigatewayv2_api.websocket.id}.execute-api.${var.aws_region}.amazonaws.com/${var.environment}"
+      SOW_BUCKET             = aws_s3_bucket.sow_uploads.id
+      ACTIVITY_TABLE         = aws_dynamodb_table.activity.name
+      BOARD_TASKS_TABLE      = aws_dynamodb_table.board_tasks.name
+    }
+  }
+
+  depends_on = [aws_cloudwatch_log_group.lambda_pm_review_message]
+
+  tags = { Name = "cloudcrew-pm-review-message" }
 }
 
 # --- PM Chat (async PM agent for customer chat with streaming) ---
@@ -139,7 +175,7 @@ resource "aws_lambda_function" "pm_chat" {
   function_name = "cloudcrew-pm-chat"
   role          = aws_iam_role.lambda_pm_chat.arn
   package_type  = "Image"
-  image_uri     = "${aws_ecr_repository.phase_runner.repository_url}:latest"
+  image_uri     = "${aws_ecr_repository.phase_runner.repository_url}:${var.image_tag}"
   memory_size   = var.lambda_pm_chat_memory
   timeout       = var.lambda_pm_chat_timeout
 
@@ -150,7 +186,6 @@ resource "aws_lambda_function" "pm_chat" {
 
   environment {
     variables = {
-      AWS_DEFAULT_REGION     = var.aws_region
       TASK_LEDGER_TABLE      = aws_dynamodb_table.projects.name
       CONNECTIONS_TABLE      = aws_dynamodb_table.connections.name
       WEBSOCKET_API_ENDPOINT = "https://${aws_apigatewayv2_api.websocket.id}.execute-api.${var.aws_region}.amazonaws.com/${var.environment}"
@@ -169,7 +204,7 @@ resource "aws_lambda_function" "api" {
   function_name = "cloudcrew-api"
   role          = aws_iam_role.lambda_api.arn
   package_type  = "Image"
-  image_uri     = "${aws_ecr_repository.phase_runner.repository_url}:latest"
+  image_uri     = "${aws_ecr_repository.phase_runner.repository_url}:${var.image_tag}"
   memory_size   = 256
   timeout       = 30
 
@@ -180,14 +215,17 @@ resource "aws_lambda_function" "api" {
 
   environment {
     variables = {
-      AWS_DEFAULT_REGION     = var.aws_region
-      TASK_LEDGER_TABLE      = aws_dynamodb_table.projects.name
-      SOW_BUCKET             = aws_s3_bucket.sow_uploads.id
-      STATE_MACHINE_ARN      = aws_sfn_state_machine.orchestrator.arn
-      PM_CHAT_LAMBDA_NAME    = aws_lambda_function.pm_chat.function_name
-      CONNECTIONS_TABLE      = aws_dynamodb_table.connections.name
-      WEBSOCKET_API_ENDPOINT = "https://${aws_apigatewayv2_api.websocket.id}.execute-api.${var.aws_region}.amazonaws.com/${var.environment}"
-      BOARD_TASKS_TABLE      = aws_dynamodb_table.board_tasks.name
+      TASK_LEDGER_TABLE              = aws_dynamodb_table.projects.name
+      SOW_BUCKET                     = aws_s3_bucket.sow_uploads.id
+      STATE_MACHINE_ARN              = aws_sfn_state_machine.orchestrator.arn
+      PM_CHAT_LAMBDA_NAME            = aws_lambda_function.pm_chat.function_name
+      PM_REVIEW_MESSAGE_FUNCTION     = aws_lambda_function.pm_review_message.function_name
+      CONNECTIONS_TABLE              = aws_dynamodb_table.connections.name
+      WEBSOCKET_API_ENDPOINT         = "https://${aws_apigatewayv2_api.websocket.id}.execute-api.${var.aws_region}.amazonaws.com/${var.environment}"
+      BOARD_TASKS_TABLE              = aws_dynamodb_table.board_tasks.name
+      RATE_LIMIT_ENABLED             = var.environment == "dev" ? "false" : "true"
+      RATE_LIMIT_TABLE               = aws_dynamodb_table.rate_limits.name
+      RATE_LIMIT_REQUESTS_PER_MINUTE = "60"
     }
   }
 

@@ -56,6 +56,19 @@ export interface ArtifactContentResponse {
   exists: boolean;
 }
 
+export interface ArtifactListItem {
+  name: string;
+  path: string;
+}
+
+interface ArtifactListResponse {
+  artifacts: ArtifactListItem[];
+}
+
 export function fetchArtifactContent(projectId: string, filePath: string): Promise<ArtifactContentResponse> {
   return get<ArtifactContentResponse>(`/projects/${projectId}/artifacts?path=${encodeURIComponent(filePath)}`);
+}
+
+export function fetchArtifactList(projectId: string): Promise<ArtifactListItem[]> {
+  return get<ArtifactListResponse>(`/projects/${projectId}/artifacts?action=list`).then((r) => r.artifacts);
 }

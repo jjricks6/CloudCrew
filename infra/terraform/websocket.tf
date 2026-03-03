@@ -34,7 +34,7 @@ resource "aws_lambda_function" "ws_handlers" {
   function_name = "cloudcrew-ws-handlers"
   role          = aws_iam_role.lambda_ws.arn
   package_type  = "Image"
-  image_uri     = "${aws_ecr_repository.phase_runner.repository_url}:latest"
+  image_uri     = "${aws_ecr_repository.phase_runner.repository_url}:${var.image_tag}"
   memory_size   = 128
   timeout       = 10
 
@@ -45,7 +45,6 @@ resource "aws_lambda_function" "ws_handlers" {
 
   environment {
     variables = {
-      AWS_DEFAULT_REGION   = var.aws_region
       CONNECTIONS_TABLE    = aws_dynamodb_table.connections.name
       COGNITO_USER_POOL_ID = aws_cognito_user_pool.main.id
       COGNITO_CLIENT_ID    = aws_cognito_user_pool_client.dashboard.id
@@ -100,9 +99,12 @@ resource "aws_iam_role_policy" "lambda_ws" {
           "dynamodb:GetItem",
           "dynamodb:PutItem",
           "dynamodb:DeleteItem",
-          "dynamodb:Scan",
+          "dynamodb:Query",
         ]
-        Resource = aws_dynamodb_table.connections.arn
+        Resource = [
+          aws_dynamodb_table.connections.arn,
+          "${aws_dynamodb_table.connections.arn}/index/ConnectionIdIndex",
+        ]
       },
       {
         Sid      = "ManageConnections"
@@ -163,10 +165,31 @@ resource "aws_apigatewayv2_route" "default" {
 # Stage
 # =============================================================================
 
+resource "aws_cloudwatch_log_group" "ws_access_logs" {
+  name              = "/aws/apigateway/cloudcrew-ws-${var.environment}"
+  retention_in_days = 14
+
+  tags = { Name = "cloudcrew-ws-access-logs" }
+}
+
 resource "aws_apigatewayv2_stage" "ws" {
   api_id      = aws_apigatewayv2_api.websocket.id
   name        = var.environment
   auto_deploy = true
+
+  access_log_settings {
+    destination_arn = aws_cloudwatch_log_group.ws_access_logs.arn
+    format = jsonencode({
+      requestId      = "$context.requestId"
+      ip             = "$context.identity.sourceIp"
+      connectionId   = "$context.connectionId"
+      routeKey       = "$context.routeKey"
+      status         = "$context.status"
+      errorMessage   = "$context.error.message"
+      integrationErr = "$context.integration.error"
+      requestTime    = "$context.requestTime"
+    })
+  }
 
   default_route_settings {
     throttling_burst_limit = 100
