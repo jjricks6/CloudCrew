@@ -28,6 +28,7 @@ PROJECT_REPO_PATH: str = os.environ.get("PROJECT_REPO_PATH", "")
 # --- Bedrock Client ---
 BEDROCK_READ_TIMEOUT: int = int(os.environ.get("BEDROCK_READ_TIMEOUT", "300"))
 BEDROCK_MAX_RETRIES: int = int(os.environ.get("BEDROCK_MAX_RETRIES", "3"))
+BEDROCK_API_KEY_SECRET: str = os.environ.get("BEDROCK_API_KEY_SECRET", "cloudcrew/bedrock-api-key")
 
 # --- Timeouts (seconds) ---
 NODE_TIMEOUT: float = float(os.environ.get("NODE_TIMEOUT", "1800.0"))
@@ -76,6 +77,13 @@ RATE_LIMIT_ENABLED: bool = os.environ.get("RATE_LIMIT_ENABLED", "true").lower() 
 
 # --- PM Chat ---
 PM_CHAT_LAMBDA_NAME: str = os.environ.get("PM_CHAT_LAMBDA_NAME", "")
+PM_REVIEW_MESSAGE_FUNCTION: str = os.environ.get("PM_REVIEW_MESSAGE_FUNCTION", "cloudcrew-pm-review-message")
 
 # --- External APIs ---
 TAVILY_API_KEY: str = os.environ.get("TAVILY_API_KEY", "")
+
+# --- ECS Phase Runner Input ---
+ECS_PROJECT_ID: str = os.environ.get("PROJECT_ID", "")
+ECS_PHASE: str = os.environ.get("PHASE", "")
+ECS_TASK_TOKEN: str = os.environ.get("TASK_TOKEN", "")
+ECS_CUSTOMER_FEEDBACK: str = os.environ.get("CUSTOMER_FEEDBACK", "")
