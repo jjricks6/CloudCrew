@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
+import rehypeSanitize from "rehype-sanitize";
 import remarkGfm from "remark-gfm";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -30,10 +31,10 @@ export function ApprovalQuestionCard({
   };
 
   return (
-    <div className="animate-interrupt-glow rounded-lg border border-yellow-500/50 bg-yellow-50/80 p-4 dark:bg-yellow-950/20">
+    <div role="region" aria-label={`Phase review for ${phase} phase`} className="animate-interrupt-glow rounded-lg border border-yellow-500/50 bg-yellow-50/80 p-4 dark:bg-yellow-950/20">
       {/* Header */}
       <div className="mb-2 flex items-center gap-2">
-        <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-yellow-500/20 text-yellow-700 dark:text-yellow-400">
+        <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-yellow-500/20 text-yellow-700 dark:text-yellow-400" aria-hidden="true">
           <CheckCircleIcon />
         </span>
         <span className="text-xs font-semibold uppercase tracking-wide text-yellow-700 dark:text-yellow-400">
@@ -46,7 +47,7 @@ export function ApprovalQuestionCard({
 
       {/* Question rendered as markdown */}
       <div className="prose prose-sm dark:prose-invert max-w-none text-foreground prose-p:leading-relaxed prose-p:my-1">
-        <ReactMarkdown remarkPlugins={[remarkGfm]}>{question}</ReactMarkdown>
+        <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSanitize]}>{question}</ReactMarkdown>
       </div>
 
       {/* Action buttons */}
@@ -72,6 +73,7 @@ export function ApprovalQuestionCard({
       {/* Feedback textarea */}
       <div className="mt-3 space-y-2">
         <Textarea
+          aria-label="Revision feedback"
           placeholder="Have feedback or questions? Type here..."
           value={feedback}
           onChange={(e) => setFeedback(e.target.value)}

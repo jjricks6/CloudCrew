@@ -7,6 +7,7 @@
 
 import { motion } from "framer-motion";
 import ReactMarkdown from "react-markdown";
+import rehypeSanitize from "rehype-sanitize";
 import remarkGfm from "remark-gfm";
 
 interface PhaseReviewCardProps {
@@ -33,7 +34,7 @@ export function PhaseReviewCard({
         <div className="flex flex-col gap-2">
           <div className="min-h-[100px] text-base leading-relaxed text-foreground">
             <div className="prose prose-sm dark:prose-invert max-w-none">
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+              <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSanitize]}>
                 {reviewText}
               </ReactMarkdown>
             </div>
@@ -52,7 +53,7 @@ export function PhaseReviewCard({
           <h4 className="font-semibold text-foreground">Deliverables</h4>
           <div className="max-h-[40vh] overflow-y-auto rounded-md border bg-muted/30 p-4">
             <div className="prose prose-sm dark:prose-invert max-w-none">
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+              <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSanitize]}>
                 {artifactsText}
               </ReactMarkdown>
             </div>

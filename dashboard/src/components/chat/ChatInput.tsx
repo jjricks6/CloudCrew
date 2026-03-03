@@ -106,6 +106,7 @@ export function ChatInput({
               onClick={open}
               disabled={isUploading || disabled}
               className="mb-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-50"
+              aria-label="Attach file"
               title="Attach file"
             >
               {isUploading ? (
@@ -151,6 +152,7 @@ export function ChatInput({
             value={value}
             onChange={handleChange}
             onKeyDown={handleKeyDown}
+            aria-label="Message your Project Manager"
             placeholder="Message your Project Manager..."
             disabled={disabled}
             rows={1}
@@ -163,6 +165,7 @@ export function ChatInput({
             onClick={handleSend}
             disabled={disabled || !value.trim()}
             className="mb-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
+            aria-label="Send message"
             title="Send message"
           >
             <svg

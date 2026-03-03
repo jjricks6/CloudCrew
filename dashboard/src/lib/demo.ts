@@ -420,6 +420,40 @@ export function resetDemoData(): void {
 }
 
 // ---------------------------------------------------------------------------
+// Phase deliverables — maps each phase to its expected artifacts.
+// Used by getDemoArtifactList() and demoCheckpoints.ts.
+// ---------------------------------------------------------------------------
+
+export const PHASE_DELIVERABLES: Record<string, { name: string; git_path: string }[]> = {
+  DISCOVERY: [
+    { name: "Requirements Document", git_path: "docs/requirements.md" },
+    { name: "Stakeholder Interviews", git_path: "docs/interviews.md" },
+  ],
+  ARCHITECTURE: [
+    { name: "Data Model", git_path: "docs/data-model.md" },
+    { name: "System Architecture", git_path: "docs/architecture.md" },
+    { name: "API Contracts", git_path: "docs/api-contracts.md" },
+    { name: "Test Strategy", git_path: "docs/test-strategy.md" },
+  ],
+  POC: [
+    { name: "Auth Proof-of-Concept", git_path: "poc/auth-poc.md" },
+    { name: "Load Test Results", git_path: "poc/load-test-results.md" },
+    { name: "Migration Runbook Draft", git_path: "poc/migration-runbook.md" },
+  ],
+  PRODUCTION: [
+    { name: "Deployment Guide", git_path: "production/deployment-guide.md" },
+    { name: "Monitoring Configuration", git_path: "production/monitoring.md" },
+    { name: "Data Migration Report", git_path: "production/migration-report.md" },
+  ],
+  HANDOFF: [
+    { name: "Operations Runbook", git_path: "handoff/operations-runbook.md" },
+    { name: "API Documentation", git_path: "handoff/api-docs.md" },
+    { name: "Compliance Report", git_path: "handoff/compliance-report.md" },
+    { name: "Training Materials", git_path: "handoff/training-materials.md" },
+  ],
+};
+
+// ---------------------------------------------------------------------------
 // M5f: Mock artifact content (markdown previews)
 // ---------------------------------------------------------------------------
 
@@ -512,6 +546,101 @@ Serverless-first architecture using AWS managed services to minimize operational
 1. **GSI1**: Phase lookup — PK: PHASE#{name}, SK: PROJECT#{id}
 2. **GSI2**: Agent lookup — PK: AGENT#{name}, SK: TASK#{id}
 3. **GSI3**: Status lookup — PK: STATUS#{status}, SK: timestamp
+`,
+  "docs/api-contracts.md": `# API Contracts
+
+## REST API Specification
+
+### Base URL
+\`https://api.ecommerce-migration.example.com/v1\`
+
+### Authentication
+All endpoints require a valid JWT from Cognito in the \`Authorization: Bearer <token>\` header.
+The \`tenant_id\` claim is extracted for row-level data isolation.
+
+### Endpoints
+
+#### Products
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | /products | List products (paginated, filterable) |
+| GET | /products/{id} | Get product details |
+| POST | /products | Create a product |
+| PUT | /products/{id} | Update a product |
+| DELETE | /products/{id} | Soft-delete a product |
+
+#### Orders
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | /orders | List orders for tenant |
+| GET | /orders/{id} | Get order details |
+| POST | /orders | Place a new order |
+| PATCH | /orders/{id}/status | Update order status |
+
+#### Users
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | /users/me | Get current user profile |
+| PUT | /users/me | Update profile |
+| GET | /users | List users (admin only) |
+
+### Error Responses
+All errors follow RFC 7807 format:
+\`\`\`json
+{
+  "type": "https://api.example.com/errors/not-found",
+  "title": "Resource Not Found",
+  "status": 404,
+  "detail": "Product with ID 'abc123' does not exist"
+}
+\`\`\`
+
+### Rate Limits
+- Standard: 1000 requests/minute per tenant
+- Burst: 100 requests/second per tenant
+- Admin endpoints: 100 requests/minute
+`,
+  "docs/test-strategy.md": `# Test Strategy
+
+## Testing Pyramid
+
+### Unit Tests (Target: 80% coverage)
+- **Framework**: pytest (backend), Jest (frontend)
+- **Scope**: Individual functions, data transformations, business logic
+- **Mocking**: AWS services mocked with moto/localstack
+- **Run time**: < 2 minutes for full suite
+
+### Integration Tests (Target: key flows)
+- **Framework**: pytest with real AWS services in dev account
+- **Scope**: API Gateway → Lambda → DynamoDB end-to-end
+- **Data**: Isolated test tenant with seeded data
+- **Run time**: < 10 minutes
+
+### Load Tests (Target: 2x expected traffic)
+- **Tool**: k6 (Grafana)
+- **Scenarios**:
+  - Sustained load: 500 req/s for 30 minutes
+  - Spike test: 0 → 2000 req/s in 60 seconds
+  - Soak test: 200 req/s for 4 hours
+- **Pass criteria**: p95 < 200ms, error rate < 0.1%
+
+### Security Tests
+- **SAST**: Bandit (Python), ESLint security plugin (TypeScript)
+- **DAST**: OWASP ZAP against staging
+- **Dependency scan**: Dependabot + Snyk
+- **IAM analysis**: AWS IAM Access Analyzer
+
+## CI/CD Integration
+- Unit tests: run on every PR
+- Integration tests: run on merge to main
+- Load tests: run weekly + before each release
+- Security scans: run daily + on every PR
+
+## Acceptance Criteria
+- All API endpoints have integration tests
+- Load test passes at 2x expected traffic (1000 req/s)
+- Zero critical/high security findings
+- Migration rollback tested and documented
 `,
   "poc/auth-poc.md": `# Auth Proof-of-Concept
 
@@ -752,7 +881,7 @@ Authorization: Bearer <id_token>
 | 404 | Resource not found |
 | 429 | Rate limit exceeded (retry after header included) |
 `,
-  "handoff/training.md": `# Training Materials
+  "handoff/training-materials.md": `# Training Materials
 
 ## Session 1: Architecture Overview (2 hours)
 
@@ -1082,6 +1211,25 @@ export function getArtifactContent(gitPath: string): string {
     DEMO_ARTIFACT_CONTENT[gitPath] ??
     `# ${gitPath.split("/").pop()}\n\n*Content preview available in live mode.*`
   );
+}
+
+/** Get the demo artifact list for a given phase, with Phase Summary first. */
+export function getDemoArtifactList(
+  phaseName: string,
+): { name: string; path: string }[] {
+  const deliverables = PHASE_DELIVERABLES[phaseName] ?? [];
+  const items: { name: string; path: string }[] = deliverables.map((d) => ({
+    name: d.name,
+    path: d.git_path,
+  }));
+
+  // Add phase summary if content exists for this phase
+  const summaryPath = `docs/phase-summaries/${phaseName.toLowerCase()}.md`;
+  if (DEMO_ARTIFACT_CONTENT[summaryPath]) {
+    items.unshift({ name: "Phase Summary", path: summaryPath });
+  }
+
+  return items;
 }
 
 // ---------------------------------------------------------------------------

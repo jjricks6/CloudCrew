@@ -13,6 +13,8 @@ import type {
 } from "@/lib/types";
 import { queryClient } from "@/state/queryClient";
 import { useChatStore } from "./chatStore";
+import { useOnboardingStore } from "./onboardingStore";
+import { usePhaseReviewStore } from "./phaseReviewStore";
 import {
   isDemoMode,
   setDemoAwaitingApproval,
@@ -103,6 +105,17 @@ export const useAgentStore = create<AgentState>((set, get) => ({
           event.detail,
           event.phase,
         );
+
+        // Update onboarding thinking message when PM reports activity
+        const onboarding = useOnboardingStore.getState();
+        if (
+          onboarding.isRealMode &&
+          onboarding.status === "in_progress" &&
+          event.agent_name === "Project Manager" &&
+          onboarding.pmState === "thinking"
+        ) {
+          onboarding.setThinkingMessage(event.detail);
+        }
 
         const existing = state.agents.find(
           (a) => a.agent_name === event.agent_name,
@@ -210,28 +223,68 @@ export const useAgentStore = create<AgentState>((set, get) => ({
       // Chat events → dispatch to chatStore
       if (event.event === "chat_message") {
         if (event.role === "pm") {
+          // Infer message card type from the message_id convention.
+          // Centralised here so ChatMessageList uses the explicit type field.
+          const msgType = event.message_id.startsWith("approval-")
+            ? ("approval" as const)
+            : ("chat" as const);
           useChatStore.getState().addMessage({
             message_id: event.message_id,
             role: event.role,
             content: event.content,
             timestamp: new Date().toISOString(),
+            type: msgType,
           });
         }
         return {};
       }
 
       if (event.event === "chat_thinking") {
-        useChatStore.getState().setThinking(true);
+        const reviewStatus = usePhaseReviewStore.getState().status;
+        if (reviewStatus === "artifact_review") {
+          usePhaseReviewStore.getState().setPmState("active");
+        } else {
+          useChatStore.getState().setThinking(true);
+        }
         return {};
       }
 
       if (event.event === "chat_chunk") {
-        useChatStore.getState().appendChunk(event.content);
+        const reviewStatus = usePhaseReviewStore.getState().status;
+        if (reviewStatus === "artifact_review") {
+          usePhaseReviewStore.getState().appendChatChunk(event.content);
+        } else {
+          useChatStore.getState().appendChunk(event.content);
+        }
         return {};
       }
 
       if (event.event === "chat_done") {
-        useChatStore.getState().finalizeStream(event.message_id);
+        const reviewStatus = usePhaseReviewStore.getState().status;
+        if (reviewStatus === "artifact_review") {
+          usePhaseReviewStore.getState().completeChatMessage();
+        } else {
+          useChatStore.getState().finalizeStream(event.message_id);
+        }
+        return {};
+      }
+
+      // Review message events → dispatch to phaseReviewStore
+      if (event.event === "review_message") {
+        usePhaseReviewStore.getState().appendMessageContent(
+          event.message_type,
+          event.content,
+        );
+        return {};
+      }
+
+      if (event.event === "review_message_thinking") {
+        usePhaseReviewStore.getState().setPmState("active");
+        return {};
+      }
+
+      if (event.event === "review_message_complete") {
+        usePhaseReviewStore.getState().setMessageComplete(event.message_type);
         return {};
       }
 
@@ -282,12 +335,56 @@ export const useAgentStore = create<AgentState>((set, get) => ({
         };
       }
 
-      // Interrupt events → store for UI notification
+      // SOW review event → show review card with embedded SOW content
+      if (event.event === "sow_review") {
+        void queryClient.invalidateQueries({ queryKey: ["project"] });
+
+        const onboarding = useOnboardingStore.getState();
+        if (onboarding.isRealMode && onboarding.status === "in_progress") {
+          // Store the interrupt ID so accept/revise handlers can respond
+          useOnboardingStore.setState({ liveInterruptId: event.interrupt_id });
+
+          // Use SOW content from the WebSocket event (sent by ECS runner)
+          if (event.sow_content) {
+            useOnboardingStore.getState().enterSowReview(event.sow_content);
+          } else {
+            console.warn("sow_review event received without sow_content");
+          }
+        }
+
+        return {
+          pendingInterrupt: {
+            interrupt_id: event.interrupt_id,
+            question: "SOW review",
+            phase: event.phase,
+            timestamp: now,
+          },
+        };
+      }
+
+      // Interrupt events → store for UI notification + inject chat message
       if (event.event === "interrupt_raised") {
         if (isDemoMode(event.project_id)) {
           setDemoAwaitingInput();
         }
         void queryClient.invalidateQueries({ queryKey: ["project"] });
+
+        // Route to onboarding UI if in real-mode onboarding (Discovery phase)
+        const onboarding = useOnboardingStore.getState();
+        if (onboarding.isRealMode && onboarding.status === "in_progress") {
+          onboarding.setLiveQuestion(event.question, event.interrupt_id);
+        }
+
+        // Inject a synthetic chat message so ChatMessageList renders the
+        // InterruptQuestionCard via the explicit type field.
+        useChatStore.getState().addMessage({
+          message_id: `interrupt-${event.interrupt_id}`,
+          role: "pm",
+          content: event.question,
+          timestamp: new Date().toISOString(),
+          type: "interrupt",
+        });
+
         return {
           pendingInterrupt: {
             interrupt_id: event.interrupt_id,

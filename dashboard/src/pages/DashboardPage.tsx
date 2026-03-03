@@ -1,10 +1,9 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Button } from "@/components/ui/button";
 import { PhaseTimeline } from "@/components/PhaseTimeline";
 import { SwarmVisualization } from "@/components/swarm/SwarmVisualization";
 import { ActivityTimeline } from "@/components/swarm/ActivityTimeline";
@@ -15,13 +14,16 @@ import { useAgentStore } from "@/state/stores/agentStore";
 import { useOnboardingStore } from "@/state/stores/onboardingStore";
 import { usePhaseReviewStore } from "@/state/stores/phaseReviewStore";
 import { useProjectStatus } from "@/state/queries/useProjectQueries";
+import { useApprovePhase } from "@/state/queries/useApprovalQueries";
 import { PHASE_PLAYBOOKS } from "@/lib/demoTimeline";
+import { isDemoMode } from "@/lib/demo";
 import type { AgentActivity } from "@/lib/types";
 
 export function DashboardPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
   const onboardingStatus = useOnboardingStore((s) => s.status);
+  const isRealMode = useOnboardingStore((s) => s.isRealMode);
   const phaseReviewStatus = usePhaseReviewStore((s) => s.status);
   const wsStatus = useAgentStore((s) => s.wsStatus);
   const agents = useAgentStore((s) => s.agents);
@@ -32,6 +34,64 @@ export function DashboardPage() {
 
   const { data: project, isLoading: projectLoading } =
     useProjectStatus(projectId);
+
+  const demo = isDemoMode(projectId);
+  const approvePhase = useApprovePhase(projectId);
+  const discoveryApprovedRef = useRef(false);
+  const isRealDiscovery =
+    !demo &&
+    project?.current_phase === "DISCOVERY" &&
+    project?.phase_status === "IN_PROGRESS";
+
+  // Auto-start real-mode onboarding when entering Discovery phase
+  useEffect(() => {
+    const store = useOnboardingStore.getState();
+
+    // If backend says Discovery IN_PROGRESS but store says "completed",
+    // this is a new project — reset stale sessionStorage and restart.
+    if (isRealDiscovery && store.status === "completed") {
+      store.reset();
+      store.startReal();
+      return;
+    }
+
+    if (isRealDiscovery && !store.isRealMode && store.status !== "completed") {
+      store.startReal();
+    }
+    // Complete real-mode onboarding when Discovery finishes
+    if (
+      store.isRealMode &&
+      store.status !== "completed" &&
+      project &&
+      (project.current_phase !== "DISCOVERY" ||
+        project.phase_status !== "IN_PROGRESS")
+    ) {
+      store.complete();
+    }
+  }, [isRealDiscovery, project]);
+
+  // Auto-approve Discovery phase — the user already approved the SOW during
+  // onboarding, so there's nothing to review. Fire the approve API once to
+  // tell the backend to advance to Architecture.
+  useEffect(() => {
+    if (
+      project?.current_phase === "DISCOVERY" &&
+      project.phase_status === "AWAITING_APPROVAL" &&
+      !discoveryApprovedRef.current &&
+      !approvePhase.isPending
+    ) {
+      discoveryApprovedRef.current = true;
+      approvePhase.mutate(undefined, {
+        onSuccess: () => {
+          useAgentStore.getState().dismissApproval();
+        },
+        onError: () => {
+          // Allow retry on next render cycle
+          discoveryApprovedRef.current = false;
+        },
+      });
+    }
+  }, [project, approvePhase]);
 
   // Build center notification for the swarm circle
   const centerNotification = useMemo(() => {
@@ -46,6 +106,7 @@ export function DashboardPage() {
     if (
       project?.phase_status === "AWAITING_APPROVAL" &&
       project.current_phase &&
+      project.current_phase !== "DISCOVERY" &&
       (phaseReviewStatus === "not_started" || phaseReviewStatus === "completed")
     ) {
       return {
@@ -53,27 +114,43 @@ export function DashboardPage() {
         message: `The ${project.current_phase} phase is ready for your review.`,
         buttonLabel: "Review",
         onAction: () => {
-          const playbook = PHASE_PLAYBOOKS.find(
-            (p) => p.phase === project.current_phase
-          );
-          if (playbook && project.current_phase) {
+          if (demo) {
+            // Demo mode: use startOpeningMessage so demo engine can stream
+            // character-by-character (beginReview pre-populates content)
+            const playbook = PHASE_PLAYBOOKS.find(
+              (p) => p.phase === project.current_phase
+            );
+            if (playbook && project.current_phase) {
+              usePhaseReviewStore
+                .getState()
+                .startOpeningMessage(
+                  project.current_phase,
+                  playbook.reviewMessages.opening,
+                  playbook.reviewMessages.closing,
+                  playbook.phaseSummaryPath
+                );
+            }
+          } else if (project.current_phase) {
+            // Real mode: use persisted messages from API if available,
+            // otherwise WebSocket streaming will fill them in
+            const opening = project.review_opening_message ?? "";
+            const closing = project.review_closing_message ?? "";
+            const summaryPath = `docs/phase-summaries/${project.current_phase.toLowerCase()}.md`;
             usePhaseReviewStore
               .getState()
-              .beginReview(
-                project.current_phase,
-                playbook.reviewMessages.opening,
-                playbook.reviewMessages.closing,
-                playbook.phaseSummaryPath
-              );
+              .beginReview(project.current_phase, opening, closing, summaryPath);
           }
         },
       };
     }
     return null;
-  }, [interrupt, project, phaseReviewStatus, navigate]);
+  }, [interrupt, project, phaseReviewStatus, navigate, demo]);
 
-  // Show onboarding wizard until completed
-  if (onboardingStatus !== "completed") {
+  // Show onboarding wizard for demo mode or real Discovery phase
+  if (
+    onboardingStatus !== "completed" &&
+    (demo || isRealDiscovery || isRealMode)
+  ) {
     return <OnboardingView />;
   }
 
@@ -90,37 +167,13 @@ export function DashboardPage() {
       className="space-y-4"
     >
       {/* Header row */}
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <h2 className="text-2xl font-bold">
-            {project?.project_name ?? "Project"} Dashboard
-          </h2>
-          <Badge variant={wsStatus === "connected" ? "default" : "outline"}>
-            {wsStatus === "connected" ? "Live" : "Offline"}
-          </Badge>
-        </div>
-        {/* DEBUG: Skip to review button */}
-        {project?.phase_status === "IN_PROGRESS" && (
-          <Button
-            onClick={() => {
-              const phase = project.current_phase;
-              const playbook = PHASE_PLAYBOOKS.find((p) => p.phase === phase);
-              if (playbook) {
-                usePhaseReviewStore.getState().startOpeningMessage(
-                  phase,
-                  playbook.reviewMessages.opening,
-                  playbook.reviewMessages.closing,
-                  playbook.phaseSummaryPath
-                );
-              }
-            }}
-            variant="outline"
-            size="sm"
-            className="text-xs"
-          >
-            Skip to Review (DEBUG)
-          </Button>
-        )}
+      <div className="flex items-center gap-3">
+        <h2 className="text-2xl font-bold">
+          {project?.project_name ?? "Project"} Dashboard
+        </h2>
+        <Badge variant={wsStatus === "connected" ? "default" : "outline"}>
+          {wsStatus === "connected" ? "Live" : "Offline"}
+        </Badge>
       </div>
 
       {/* Phase Progress */}

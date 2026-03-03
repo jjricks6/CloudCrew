@@ -26,12 +26,13 @@ export function useProjectStatus(projectId: string | undefined) {
 export function useProjectDeliverables(projectId: string | undefined) {
   return useQuery<ProjectStatus["deliverables"]>({
     queryKey: ["deliverables", projectId],
-    queryFn: () => {
+    queryFn: async () => {
       if (isDemoMode(projectId))
         return structuredClone(DEMO_PROJECT_STATUS.deliverables);
-      return get<ProjectStatus["deliverables"]>(
+      const res = await get<{ deliverables: ProjectStatus["deliverables"] }>(
         `/projects/${projectId}/deliverables`,
       );
+      return res.deliverables;
     },
     enabled: !!projectId,
   });

@@ -25,6 +25,15 @@ const READY_STATE_MAP: Record<ReadyState, WsStatus> = {
 /**
  * Build the WebSocket URL, appending auth token when Cognito is enabled.
  * Returns a Promise so react-use-websocket resolves it before connecting.
+ *
+ * SECURITY NOTE: The browser WebSocket API does not support custom headers,
+ * so the token must be passed as a query parameter. This is the standard
+ * pattern for API Gateway WebSocket auth (see AWS docs). The risk is
+ * mitigated by: (1) WSS encrypts the URL in transit, (2) Cognito ID tokens
+ * are short-lived (1h default), (3) API Gateway does not log query params
+ * by default. For production, consider a ticket-exchange pattern: POST to
+ * a REST endpoint to obtain a single-use, short-lived connection ticket,
+ * then pass only the ticket (not the full JWT) in the query string.
  */
 async function buildSocketUrl(projectId: string): Promise<string> {
   let url = `${WS_URL}?projectId=${projectId}`;

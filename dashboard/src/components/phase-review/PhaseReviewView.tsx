@@ -22,27 +22,30 @@
  * Responsive: stacks vertically on narrow screens.
  */
 
+import { useEffect, useRef } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { AgentPolyhedron } from "@/components/swarm/AgentPolyhedron";
-import { AGENT_CONFIG } from "@/components/swarm/swarm-constants";
+import { AGENT_CONFIG, PHASE_LABELS } from "@/components/swarm/swarm-constants";
 import { Button } from "@/components/ui/button";
 import { Confetti } from "@/components/ui/Confetti";
 import { PhaseReviewMessageCard } from "./PhaseReviewMessageCard";
 import { PhaseReviewArtifactView } from "./PhaseReviewArtifactView";
 import { usePhaseReviewStore } from "@/state/stores/phaseReviewStore";
-import { useApprovePhase } from "@/state/queries/useApprovalQueries";
+import { useApprovePhase, useRevisePhase } from "@/state/queries/useApprovalQueries";
+import { useProjectStatus } from "@/state/queries/useProjectQueries";
 import { useProjectId } from "@/lib/useProjectId";
-import { useProjectDeliverables } from "@/state/queries/useProjectQueries";
 import { useChatStore } from "@/state/stores/chatStore";
 import { useAgentStore } from "@/state/stores/agentStore";
+import { isDemoMode } from "@/lib/demo";
 import { useNavigate } from "react-router-dom";
+import { PHASE_ORDER, type Phase } from "@/lib/types";
 
 const PM_CONFIG = AGENT_CONFIG["Project Manager"];
 
 export function PhaseReviewView() {
   const projectId = useProjectId();
   const navigate = useNavigate();
-  const { data: deliverables } = useProjectDeliverables(projectId);
+  const { data: project } = useProjectStatus(projectId);
 
   const status = usePhaseReviewStore((s) => s.status);
   const currentPhase = usePhaseReviewStore((s) => s.currentPhase);
@@ -53,7 +56,6 @@ export function PhaseReviewView() {
   const openingContent = usePhaseReviewStore((s) => s.openingContent);
 
   // Artifact review
-  const phaseSummaryPath = usePhaseReviewStore((s) => s.phaseSummaryPath);
   const chatHistory = usePhaseReviewStore((s) => s.chatHistory);
   const currentChatContent = usePhaseReviewStore((s) => s.currentChatContent);
 
@@ -62,16 +64,58 @@ export function PhaseReviewView() {
   const closingContent = usePhaseReviewStore((s) => s.closingContent);
 
   const approvePhase = useApprovePhase(projectId);
+  const revisePhase = useRevisePhase(projectId);
 
-  const isLoading = approvePhase.isPending;
+  const isLoading = approvePhase.isPending || revisePhase.isPending;
   const isChatStreaming = pmState === "active";
 
-  // Get artifacts from project data, excluding Phase Summary
-  const artifacts = currentPhase && deliverables
-    ? (deliverables[currentPhase] || []).filter(
-        (item) => item.name !== "Phase Summary"
-      )
-    : [];
+  // Compute human-readable next phase name for the "Begin" screen
+  const currentIndex = currentPhase
+    ? PHASE_ORDER.indexOf(currentPhase as Phase)
+    : -1;
+  const nextPhase =
+    currentIndex >= 0 && currentIndex < PHASE_ORDER.length - 1
+      ? PHASE_ORDER[currentIndex + 1]
+      : null;
+  const nextPhaseName = nextPhase ? PHASE_LABELS[nextPhase] : "Next";
+
+  // Timeout fallback: if closing message never arrives (Lambda failure or
+  // WebSocket disconnect), auto-advance after 15 seconds so the user isn't
+  // stuck on a blank screen.
+  const closingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (status !== "closing_message") {
+      // Clear any pending timeout when we leave closing_message state
+      if (closingTimeoutRef.current) {
+        clearTimeout(closingTimeoutRef.current);
+        closingTimeoutRef.current = null;
+      }
+      return;
+    }
+
+    // Only set timeout if no content has arrived yet
+    const hasContent = closingContent.length > 0 || closingMessage.length > 0;
+    if (hasContent) return;
+
+    closingTimeoutRef.current = setTimeout(() => {
+      const store = usePhaseReviewStore.getState();
+      // Only auto-advance if we're still stuck with no content
+      if (
+        store.status === "closing_message" &&
+        !store.closingContent &&
+        !store.closingMessage
+      ) {
+        store.advanceFromClosing();
+      }
+    }, 15_000);
+
+    return () => {
+      if (closingTimeoutRef.current) {
+        clearTimeout(closingTimeoutRef.current);
+        closingTimeoutRef.current = null;
+      }
+    };
+  }, [status, closingContent, closingMessage]);
 
   const handleOpeningContinue = () => {
     usePhaseReviewStore.getState().advanceToArtifactReview();
@@ -94,17 +138,58 @@ export function PhaseReviewView() {
       timestamp: new Date().toISOString(),
     });
 
-    // Advance to closing message (use the message from playbook)
-    usePhaseReviewStore.getState().advanceToClosingMessage(closingMessage);
+    if (isDemoMode(projectId)) {
+      // Demo: advance with static closing message from playbook
+      usePhaseReviewStore.getState().advanceToClosingMessage(closingMessage);
+    } else if (currentPhase === "DISCOVERY") {
+      // Discovery: backend skips PM closing message generation, so go
+      // directly to closing_complete and approve in one step.
+      approvePhase.mutate(undefined, {
+        onSuccess: () => {
+          useAgentStore.getState().dismissApproval();
+          usePhaseReviewStore.getState().advanceFromClosing();
+        },
+      });
+    } else {
+      // Real: advance to closing_message with empty content, then call
+      // approve API. Backend triggers PM closing message via WebSocket.
+      usePhaseReviewStore.getState().advanceToClosingMessage("");
+      approvePhase.mutate(undefined, {
+        onSuccess: () => {
+          useAgentStore.getState().dismissApproval();
+          // Backend will trigger PM closing message Lambda — tokens
+          // stream via WebSocket into closingContent.
+        },
+      });
+    }
+  };
+
+  const handleRequestChanges = (feedback: string) => {
+    if (isDemoMode(projectId)) {
+      // Demo: just exit review — demo engine handles the rest
+      usePhaseReviewStore.getState().completeReview();
+    } else {
+      revisePhase.mutate(feedback, {
+        onSuccess: () => {
+          usePhaseReviewStore.getState().completeReview();
+        },
+      });
+    }
   };
 
   const handleStartNextPhase = () => {
-    approvePhase.mutate(undefined, {
-      onSuccess: () => {
-        useAgentStore.getState().dismissApproval();
-        usePhaseReviewStore.getState().completeReview();
-      },
-    });
+    if (isDemoMode(projectId)) {
+      // Demo: approval happens here (no API call was made in handleApprove)
+      approvePhase.mutate(undefined, {
+        onSuccess: () => {
+          useAgentStore.getState().dismissApproval();
+          usePhaseReviewStore.getState().completeReview();
+        },
+      });
+    } else {
+      // Real: approval already happened in handleApprove — just complete
+      usePhaseReviewStore.getState().completeReview();
+    }
   };
 
   const handleReturnToDashboard = () => {
@@ -143,9 +228,12 @@ export function PhaseReviewView() {
             {status === "opening_message" && (
               <motion.div key="opening" className="flex flex-col min-h-0 flex-1">
                 <PhaseReviewMessageCard
-                  content={openingContent || openingMessage}
+                  content={pmState === "active" ? openingContent : (openingContent || openingMessage)}
                   isStreaming={pmState === "active"}
-                  showContinue={true}
+                  showContinue={
+                    pmState !== "active" &&
+                    (openingContent.length > 0 || openingMessage.length > 0)
+                  }
                   onContinue={handleOpeningContinue}
                 />
               </motion.div>
@@ -156,14 +244,14 @@ export function PhaseReviewView() {
                 <PhaseReviewArtifactView
                   projectId={projectId}
                   phaseName={currentPhase || "Current"}
-                  phaseSummaryPath={phaseSummaryPath}
-                  artifacts={artifacts}
                   chatHistory={chatHistory}
                   currentChatContent={currentChatContent}
                   isChatStreaming={isChatStreaming}
                   onSendMessage={handleSendChatMessage}
                   onApprove={handleApprove}
+                  onRequestChanges={handleRequestChanges}
                   isLoading={isLoading}
+                  gitRepoUrl={project?.git_repo_url}
                 />
               </motion.div>
             )}
@@ -171,9 +259,12 @@ export function PhaseReviewView() {
             {status === "closing_message" && (
               <motion.div key="closing" className="flex flex-col min-h-0 flex-1">
                 <PhaseReviewMessageCard
-                  content={closingContent || closingMessage}
+                  content={pmState === "active" ? closingContent : (closingContent || closingMessage)}
                   isStreaming={pmState === "active"}
-                  showContinue={true}
+                  showContinue={
+                    pmState !== "active" &&
+                    (closingContent.length > 0 || closingMessage.length > 0)
+                  }
                   onContinue={handleClosingContinue}
                 />
               </motion.div>
@@ -209,18 +300,27 @@ export function PhaseReviewView() {
             )}
 
             {status === "closing_complete" && currentPhase !== "HANDOFF" && (
-              <motion.div key="closing-continue" className="flex flex-col min-h-0 flex-1 justify-center">
+              <motion.div
+                key="closing-continue"
+                className="flex flex-col min-h-0 flex-1 justify-center"
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.5 }}
+              >
                 <div className="flex flex-col gap-4 items-center text-center">
-                  <h2 className="text-2xl font-bold">Begin Next Phase</h2>
+                  <h2 className="text-2xl font-bold">
+                    Begin {nextPhaseName} Phase
+                  </h2>
                   <p className="text-muted-foreground max-w-sm">
-                    The {currentPhase} phase has been approved. Click below to start work on the next phase.
+                    The {currentPhase ? PHASE_LABELS[currentPhase as Phase] ?? currentPhase : "current"} phase
+                    has been approved. Click below to start the {nextPhaseName} phase.
                   </p>
                   <Button
                     onClick={handleStartNextPhase}
                     size="lg"
                     className="mt-4"
                   >
-                    Start Next Phase
+                    Start {nextPhaseName} Phase
                   </Button>
                 </div>
               </motion.div>

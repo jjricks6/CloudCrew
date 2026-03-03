@@ -8,11 +8,13 @@
 import { useAgentStore } from "@/state/stores/agentStore";
 import { useChatStore } from "@/state/stores/chatStore";
 import { useOnboardingStore } from "@/state/stores/onboardingStore";
+import { usePhaseReviewStore } from "@/state/stores/phaseReviewStore";
 import {
   resetDemoData,
   DEMO_PROJECT_STATUS,
   DEMO_BOARD_TASKS,
   DEMO_CHAT_HISTORY,
+  PHASE_DELIVERABLES,
 } from "@/lib/demo";
 import { queryClient } from "@/state/queryClient";
 import type { DemoPhase } from "@/state/stores/demoControlStore";
@@ -36,32 +38,6 @@ function completePhaseTasks(phase: string): void {
     }
   }
 }
-
-/** Deliverable definitions per phase, used by both timeline and checkpoints. */
-const PHASE_DELIVERABLES: Record<string, { name: string; git_path: string }[]> = {
-  ARCHITECTURE: [
-    { name: "Data Model", git_path: "docs/data-model.md" },
-    { name: "System Architecture", git_path: "docs/architecture.md" },
-    { name: "API Contracts", git_path: "docs/api-contracts.md" },
-    { name: "Test Strategy", git_path: "docs/test-strategy.md" },
-  ],
-  POC: [
-    { name: "Auth Proof-of-Concept", git_path: "poc/auth-poc.md" },
-    { name: "Load Test Results", git_path: "poc/load-test-results.md" },
-    { name: "Migration Runbook Draft", git_path: "poc/migration-runbook.md" },
-  ],
-  PRODUCTION: [
-    { name: "Deployment Guide", git_path: "production/deployment-guide.md" },
-    { name: "Monitoring Configuration", git_path: "production/monitoring.md" },
-    { name: "Data Migration Report", git_path: "production/migration-report.md" },
-  ],
-  HANDOFF: [
-    { name: "Operations Runbook", git_path: "handoff/operations-runbook.md" },
-    { name: "API Documentation", git_path: "handoff/api-docs.md" },
-    { name: "Compliance Report", git_path: "handoff/compliance-report.md" },
-    { name: "Training Materials", git_path: "handoff/training-materials.md" },
-  ],
-};
 
 /** Seed all deliverables for a phase at v1.0 (used when jumping past a phase). */
 function seedDeliverables(phase: string): void {
@@ -115,6 +91,7 @@ export function applyCheckpoint(phase: DemoPhase): void {
   useAgentStore.getState().reset();
   useChatStore.getState().reset();
   useOnboardingStore.getState().reset();
+  usePhaseReviewStore.getState().reset();
   resetDemoData();
 
   // 2. Apply phase-specific state

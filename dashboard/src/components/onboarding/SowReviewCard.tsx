@@ -4,28 +4,44 @@
  * Displays the generated Statement of Work as rendered markdown with
  * two action buttons: "Accept SOW" (completes onboarding) and
  * "Request Changes" (returns to the last question for refinement).
+ *
+ * In real mode, optional `onAccept` / `onRevise` callbacks override the
+ * default demo-mode store transitions to send responses via the interrupt API.
  */
 
 import { motion } from "framer-motion";
 import ReactMarkdown from "react-markdown";
+import rehypeSanitize from "rehype-sanitize";
 import remarkGfm from "remark-gfm";
 import { Button } from "@/components/ui/button";
 import { useOnboardingStore } from "@/state/stores/onboardingStore";
 
 interface SowReviewCardProps {
   sowContent: string;
+  /** Override accept handler for real mode (sends approval via interrupt API). */
+  onAccept?: () => void;
+  /** Override revise handler for real mode (enters revision flow). */
+  onRevise?: () => void;
 }
 
-export function SowReviewCard({ sowContent }: SowReviewCardProps) {
+export function SowReviewCard({ sowContent, onAccept, onRevise }: SowReviewCardProps) {
   const enterWrapup = useOnboardingStore((s) => s.enterWrapup);
   const requestRevision = useOnboardingStore((s) => s.requestRevision);
 
   const handleAccept = () => {
-    enterWrapup();
+    if (onAccept) {
+      onAccept();
+    } else {
+      enterWrapup();
+    }
   };
 
   const handleRevise = () => {
-    requestRevision();
+    if (onRevise) {
+      onRevise();
+    } else {
+      requestRevision();
+    }
   };
 
   return (
@@ -44,7 +60,7 @@ export function SowReviewCard({ sowContent }: SowReviewCardProps) {
       {/* Scrollable SOW content */}
       <div className="max-h-[50vh] overflow-y-auto rounded-md border bg-muted/30 p-4">
         <div className="prose prose-sm dark:prose-invert max-w-none">
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+          <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSanitize]}>
             {sowContent}
           </ReactMarkdown>
         </div>

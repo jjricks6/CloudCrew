@@ -1,4 +1,5 @@
 import ReactMarkdown from "react-markdown";
+import rehypeSanitize from "rehype-sanitize";
 import remarkGfm from "remark-gfm";
 import { Button } from "@/components/ui/button";
 import {
@@ -51,7 +52,7 @@ export function ArtifactPreviewDialog({
               </DialogDescription>
             </DialogHeader>
             <div className="prose dark:prose-invert max-w-none text-sm">
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+              <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSanitize]}>
                 {content}
               </ReactMarkdown>
             </div>
