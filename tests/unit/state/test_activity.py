@@ -3,6 +3,7 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
+from botocore.exceptions import ClientError
 from src.state.activity import get_recent_activity, store_activity_event
 
 
@@ -74,6 +75,19 @@ class TestStoreActivityEvent:
         # TTL should be between 23h and 25h from now
         assert now + 82800 < ttl < now + 90000
 
+    @patch("src.state.activity._get_table")
+    def test_propagates_dynamo_error(self, mock_get_table: MagicMock) -> None:
+        """ClientError from DynamoDB put_item propagates to caller."""
+        mock_table = MagicMock()
+        mock_get_table.return_value = mock_table
+        mock_table.put_item.side_effect = ClientError(
+            {"Error": {"Code": "ProvisionedThroughputExceededException"}},
+            "PutItem",
+        )
+
+        with pytest.raises(ClientError):
+            store_activity_event("cloudcrew-activity", "proj-1", "agent_active", "pm", "DISCOVERY")
+
 
 @pytest.mark.unit
 class TestGetRecentActivity:
@@ -124,3 +138,16 @@ class TestGetRecentActivity:
         query_kwargs = mock_table.query.call_args.kwargs
         assert query_kwargs["Limit"] == 10
         assert query_kwargs["ScanIndexForward"] is False
+
+    @patch("src.state.activity._get_table")
+    def test_propagates_dynamo_error(self, mock_get_table: MagicMock) -> None:
+        """ClientError from DynamoDB query propagates to caller."""
+        mock_table = MagicMock()
+        mock_get_table.return_value = mock_table
+        mock_table.query.side_effect = ClientError(
+            {"Error": {"Code": "InternalServerError"}},
+            "Query",
+        )
+
+        with pytest.raises(ClientError):
+            get_recent_activity("cloudcrew-activity", "proj-1")

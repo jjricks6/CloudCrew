@@ -3,6 +3,7 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
+from botocore.exceptions import ClientError
 
 
 @pytest.mark.unit
@@ -25,6 +26,21 @@ class TestStoreToken:
         assert item["task_token"] == "token-abc"
         assert item["phase"] == "DISCOVERY"
         assert "created_at" in item
+
+    @patch("src.state.approval.boto3")
+    def test_propagates_dynamo_error(self, mock_boto3: MagicMock) -> None:
+        """ClientError from DynamoDB put_item propagates to caller."""
+        from src.state.approval import store_token
+
+        mock_table = MagicMock()
+        mock_boto3.resource.return_value.Table.return_value = mock_table
+        mock_table.put_item.side_effect = ClientError(
+            {"Error": {"Code": "ConditionalCheckFailedException"}},
+            "PutItem",
+        )
+
+        with pytest.raises(ClientError):
+            store_token("test-table", "proj-1", "DISCOVERY", "token-abc")
 
 
 @pytest.mark.unit
@@ -55,6 +71,21 @@ class TestGetToken:
         result = get_token("test-table", "proj-1", "DISCOVERY")
         assert result == ""
 
+    @patch("src.state.approval.boto3")
+    def test_propagates_dynamo_error(self, mock_boto3: MagicMock) -> None:
+        """ClientError from DynamoDB get_item propagates to caller."""
+        from src.state.approval import get_token
+
+        mock_table = MagicMock()
+        mock_boto3.resource.return_value.Table.return_value = mock_table
+        mock_table.get_item.side_effect = ClientError(
+            {"Error": {"Code": "InternalServerError"}},
+            "GetItem",
+        )
+
+        with pytest.raises(ClientError):
+            get_token("test-table", "proj-1", "DISCOVERY")
+
 
 @pytest.mark.unit
 class TestDeleteToken:
@@ -72,3 +103,18 @@ class TestDeleteToken:
         mock_table.delete_item.assert_called_once_with(
             Key={"PK": "PROJECT#proj-1", "SK": "TOKEN#DISCOVERY"},
         )
+
+    @patch("src.state.approval.boto3")
+    def test_propagates_dynamo_error(self, mock_boto3: MagicMock) -> None:
+        """ClientError from DynamoDB delete_item propagates to caller."""
+        from src.state.approval import delete_token
+
+        mock_table = MagicMock()
+        mock_boto3.resource.return_value.Table.return_value = mock_table
+        mock_table.delete_item.side_effect = ClientError(
+            {"Error": {"Code": "InternalServerError"}},
+            "DeleteItem",
+        )
+
+        with pytest.raises(ClientError):
+            delete_token("test-table", "proj-1", "DISCOVERY")

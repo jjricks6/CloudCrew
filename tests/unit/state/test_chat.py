@@ -3,6 +3,7 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
+from botocore.exceptions import ClientError
 from src.state.chat import (
     ChatMessage,
     chat_history_to_prompt,
@@ -59,6 +60,19 @@ class TestStoreChatMessage:
         item = mock_table.put_item.call_args.kwargs["Item"]
         assert item["timestamp"] != ""
         assert result.timestamp != ""
+
+    @patch("src.state.chat._get_table")
+    def test_propagates_dynamo_error(self, mock_get_table: MagicMock) -> None:
+        """ClientError from DynamoDB put_item propagates to caller."""
+        mock_table = MagicMock()
+        mock_get_table.return_value = mock_table
+        mock_table.put_item.side_effect = ClientError(
+            {"Error": {"Code": "ProvisionedThroughputExceededException"}},
+            "PutItem",
+        )
+
+        with pytest.raises(ClientError):
+            store_chat_message("cloudcrew-projects", "proj-1", "msg-003", "customer", "Test")
 
 
 @pytest.mark.unit
@@ -127,6 +141,19 @@ class TestGetChatHistory:
         query_kwargs = mock_table.query.call_args.kwargs
         assert ":prefix" in query_kwargs["ExpressionAttributeValues"]
         assert query_kwargs["ExpressionAttributeValues"][":prefix"] == "CHAT#"
+
+    @patch("src.state.chat._get_table")
+    def test_propagates_dynamo_error(self, mock_get_table: MagicMock) -> None:
+        """ClientError from DynamoDB query propagates to caller."""
+        mock_table = MagicMock()
+        mock_get_table.return_value = mock_table
+        mock_table.query.side_effect = ClientError(
+            {"Error": {"Code": "InternalServerError"}},
+            "Query",
+        )
+
+        with pytest.raises(ClientError):
+            get_chat_history("cloudcrew-projects", "proj-1")
 
 
 @pytest.mark.unit

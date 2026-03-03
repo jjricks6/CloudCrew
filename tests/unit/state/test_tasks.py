@@ -3,6 +3,7 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
+from botocore.exceptions import ClientError
 
 
 @pytest.mark.unit
@@ -50,6 +51,22 @@ class TestCreateTask:
         assert event["project_id"] == "proj-1"
         assert event["phase"] == "ARCHITECTURE"
         assert event["title"] == "Implement auth"
+
+    @patch("src.state.tasks.broadcast_to_project")
+    @patch("src.state.tasks._get_table")
+    def test_propagates_dynamo_error(self, mock_get_table: MagicMock, _mock_broadcast: MagicMock) -> None:
+        """ClientError from DynamoDB put_item propagates to caller."""
+        from src.state.tasks import create_task
+
+        mock_table = MagicMock()
+        mock_get_table.return_value = mock_table
+        mock_table.put_item.side_effect = ClientError(
+            {"Error": {"Code": "ProvisionedThroughputExceededException"}},
+            "PutItem",
+        )
+
+        with pytest.raises(ClientError):
+            create_task("test-table", "proj-1", "Auth", "Cognito", "ARCH", "sa")
 
 
 @pytest.mark.unit
@@ -126,6 +143,22 @@ class TestUpdateTask:
         mock_table.update_item.assert_not_called()
         mock_broadcast.assert_not_called()
 
+    @patch("src.state.tasks.broadcast_to_project")
+    @patch("src.state.tasks._get_table")
+    def test_propagates_dynamo_error(self, mock_get_table: MagicMock, _mock_broadcast: MagicMock) -> None:
+        """ClientError from DynamoDB update_item propagates to caller."""
+        from src.state.tasks import update_task
+
+        mock_table = MagicMock()
+        mock_get_table.return_value = mock_table
+        mock_table.update_item.side_effect = ClientError(
+            {"Error": {"Code": "ConditionalCheckFailedException"}},
+            "UpdateItem",
+        )
+
+        with pytest.raises(ClientError):
+            update_task("test-table", "proj-1", "ARCH", "task-001", {"status": "done"})
+
 
 @pytest.mark.unit
 class TestAddComment:
@@ -163,6 +196,22 @@ class TestAddComment:
         event = mock_broadcast.call_args[0][1]
         assert event["event"] == "task_updated"
         assert "comment_added" in event["updates"]
+
+    @patch("src.state.tasks.broadcast_to_project")
+    @patch("src.state.tasks._get_table")
+    def test_propagates_dynamo_error(self, mock_get_table: MagicMock, _mock_broadcast: MagicMock) -> None:
+        """ClientError from DynamoDB update_item propagates to caller."""
+        from src.state.tasks import add_comment
+
+        mock_table = MagicMock()
+        mock_get_table.return_value = mock_table
+        mock_table.update_item.side_effect = ClientError(
+            {"Error": {"Code": "InternalServerError"}},
+            "UpdateItem",
+        )
+
+        with pytest.raises(ClientError):
+            add_comment("test-table", "proj-1", "ARCH", "task-001", "sa", "Review")
 
 
 @pytest.mark.unit
@@ -221,6 +270,21 @@ class TestListTasks:
         call_kwargs = mock_table.query.call_args.kwargs
         assert call_kwargs["ExpressionAttributeValues"][":prefix"] == "TASK#ARCHITECTURE#"
 
+    @patch("src.state.tasks._get_table")
+    def test_propagates_dynamo_error(self, mock_get_table: MagicMock) -> None:
+        """ClientError from DynamoDB query propagates to caller."""
+        from src.state.tasks import list_tasks
+
+        mock_table = MagicMock()
+        mock_get_table.return_value = mock_table
+        mock_table.query.side_effect = ClientError(
+            {"Error": {"Code": "InternalServerError"}},
+            "Query",
+        )
+
+        with pytest.raises(ClientError):
+            list_tasks("test-table", "proj-1")
+
 
 @pytest.mark.unit
 class TestGetTask:
@@ -256,3 +320,18 @@ class TestGetTask:
 
         result = get_task("test-table", "proj-1", "DISCOVERY", "missing")
         assert result is None
+
+    @patch("src.state.tasks._get_table")
+    def test_propagates_dynamo_error(self, mock_get_table: MagicMock) -> None:
+        """ClientError from DynamoDB get_item propagates to caller."""
+        from src.state.tasks import get_task
+
+        mock_table = MagicMock()
+        mock_get_table.return_value = mock_table
+        mock_table.get_item.side_effect = ClientError(
+            {"Error": {"Code": "InternalServerError"}},
+            "GetItem",
+        )
+
+        with pytest.raises(ClientError):
+            get_task("test-table", "proj-1", "ARCH", "task-001")

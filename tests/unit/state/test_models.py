@@ -13,6 +13,7 @@ from src.state.models import (
     Phase,
     PhaseStatus,
     TaskLedger,
+    TerraformBackend,
 )
 
 
@@ -130,6 +131,7 @@ class TestTaskLedger:
         assert ledger.decisions == []
         assert ledger.blockers == []
         assert ledger.deliverables == {}
+        assert ledger.terraform_backend is None
 
     def test_full_construction(self) -> None:
         ledger = TaskLedger(
@@ -269,3 +271,59 @@ class TestInvocationState:
         )
         assert state.stm_memory_id == "stm-001"
         assert state.ltm_memory_id == "ltm-001"
+
+
+@pytest.mark.unit
+class TestTerraformBackend:
+    """Verify TerraformBackend model."""
+
+    def test_valid_construction(self) -> None:
+        backend = TerraformBackend(
+            bucket="cloudcrew-tfstate-proj-001",
+            key="terraform.tfstate",
+            region="us-west-2",
+            dynamodb_table="cloudcrew-tflocks-proj-001",
+        )
+        assert backend.bucket == "cloudcrew-tfstate-proj-001"
+        assert backend.key == "terraform.tfstate"
+        assert backend.region == "us-west-2"
+        assert backend.dynamodb_table == "cloudcrew-tflocks-proj-001"
+
+    def test_provisioned_at_default(self) -> None:
+        backend = TerraformBackend(bucket="b", key="k", region="r", dynamodb_table="t")
+        assert backend.provisioned_at == ""
+
+    def test_provisioned_at_set(self) -> None:
+        backend = TerraformBackend(
+            bucket="b",
+            key="k",
+            region="r",
+            dynamodb_table="t",
+            provisioned_at="2026-01-01T00:00:00Z",
+        )
+        assert backend.provisioned_at == "2026-01-01T00:00:00Z"
+
+    def test_missing_required_field_raises(self) -> None:
+        with pytest.raises(ValidationError):
+            TerraformBackend(bucket="b")  # type: ignore[call-arg]
+
+    def test_ledger_with_backend(self) -> None:
+        backend = TerraformBackend(bucket="b", key="k", region="r", dynamodb_table="t")
+        ledger = TaskLedger(project_id="proj-001", terraform_backend=backend)
+        assert ledger.terraform_backend is not None
+        assert ledger.terraform_backend.bucket == "b"
+
+    def test_ledger_serialization_roundtrip(self) -> None:
+        backend = TerraformBackend(
+            bucket="my-bucket",
+            key="terraform.tfstate",
+            region="us-west-2",
+            dynamodb_table="my-locks",
+            provisioned_at="2026-01-01T00:00:00Z",
+        )
+        ledger = TaskLedger(project_id="proj-001", terraform_backend=backend)
+        dumped = ledger.model_dump()
+        restored = TaskLedger.model_validate(dumped)
+        assert restored.terraform_backend is not None
+        assert restored.terraform_backend.bucket == "my-bucket"
+        assert restored.terraform_backend.region == "us-west-2"

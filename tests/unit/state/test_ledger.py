@@ -3,6 +3,7 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
+from botocore.exceptions import ClientError
 from src.state.models import (
     Blocker,
     Decision,
@@ -55,6 +56,37 @@ class TestReadLedger:
         assert len(ledger.facts) == 1
         assert ledger.facts[0].description == "AWS account ready"
 
+    @patch("src.state.ledger.boto3")
+    def test_returns_empty_ledger_on_corrupt_data(self, mock_boto3: MagicMock) -> None:
+        """Return empty TaskLedger when stored data fails validation."""
+        from src.state.ledger import read_ledger
+
+        mock_table = MagicMock()
+        mock_table.get_item.return_value = {
+            "Item": {"data": {"project_id": "proj-001", "current_phase": "INVALID_PHASE"}},
+        }
+        mock_boto3.resource.return_value.Table.return_value = mock_table
+
+        ledger = read_ledger("test-table", "proj-001")
+
+        assert ledger.project_id == "proj-001"
+        assert ledger.facts == []
+
+    @patch("src.state.ledger.boto3")
+    def test_propagates_dynamo_error(self, mock_boto3: MagicMock) -> None:
+        """ClientError from DynamoDB get_item propagates to caller."""
+        from src.state.ledger import read_ledger
+
+        mock_table = MagicMock()
+        mock_table.get_item.side_effect = ClientError(
+            {"Error": {"Code": "InternalServerError"}},
+            "GetItem",
+        )
+        mock_boto3.resource.return_value.Table.return_value = mock_table
+
+        with pytest.raises(ClientError):
+            read_ledger("test-table", "proj-001")
+
 
 @pytest.mark.unit
 class TestWriteLedger:
@@ -75,6 +107,22 @@ class TestWriteLedger:
         assert item["PK"] == "PROJECT#proj-001"
         assert item["SK"] == "LEDGER"
         assert item["data"]["project_id"] == "proj-001"
+
+    @patch("src.state.ledger.boto3")
+    def test_propagates_dynamo_error(self, mock_boto3: MagicMock) -> None:
+        """ClientError from DynamoDB put_item propagates to caller."""
+        from src.state.ledger import write_ledger
+
+        mock_table = MagicMock()
+        mock_boto3.resource.return_value.Table.return_value = mock_table
+        mock_table.put_item.side_effect = ClientError(
+            {"Error": {"Code": "ProvisionedThroughputExceededException"}},
+            "PutItem",
+        )
+
+        ledger = TaskLedger(project_id="proj-001")
+        with pytest.raises(ClientError):
+            write_ledger("test-table", "proj-001", ledger)
 
 
 @pytest.mark.unit
