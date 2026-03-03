@@ -293,13 +293,13 @@ class TestAgentFactories:
 
             if spec.expected_hook_types:
                 actual_hooks = call_kwargs.get("hooks", [])
-                assert len(actual_hooks) == len(
-                    spec.expected_hook_types
-                ), f"{spec.name}: expected {len(spec.expected_hook_types)} hook(s), got {len(actual_hooks)}"
+                assert len(actual_hooks) == len(spec.expected_hook_types), (
+                    f"{spec.name}: expected {len(spec.expected_hook_types)} hook(s), got {len(actual_hooks)}"
+                )
                 for hook, expected_type in zip(actual_hooks, spec.expected_hook_types, strict=True):
-                    assert isinstance(
-                        hook, expected_type
-                    ), f"{spec.name}: expected hook {expected_type.__name__}, got {type(hook).__name__}"
+                    assert isinstance(hook, expected_type), (
+                        f"{spec.name}: expected hook {expected_type.__name__}, got {type(hook).__name__}"
+                    )
             else:
                 hooks = call_kwargs.get("hooks")
                 assert hooks is None or hooks == [], f"{spec.name}: expected no hooks but got {hooks}"
