@@ -68,6 +68,11 @@ def git_write_phase_summary(
     Only the PM agent should use this tool. Files must be under docs/phase-summaries/.
     Generate this at the end of each phase, before the phase enters AWAITING_APPROVAL status.
 
+    The canonical filename is ``docs/phase-summaries/{phase}.md`` (e.g.
+    ``docs/phase-summaries/architecture.md``).  If you provide a different
+    filename, it will be normalized to the canonical form so the dashboard
+    can reliably locate the summary.
+
     Args:
         file_path: Relative path within the repo (must start with docs/phase-summaries/).
         content: Phase summary content (markdown recommended).
@@ -79,6 +84,21 @@ def git_write_phase_summary(
     """
     if not file_path.startswith("docs/phase-summaries/"):
         return "Error: PM agent can only write to docs/phase-summaries/"
+
+    # Enforce canonical filename: docs/phase-summaries/{phase}.md
+    # The agent may pass variations (e.g. "architecture-phase.md") but the
+    # dashboard expects a predictable name derived from the phase.
+    phase = tool_context.invocation_state.get("phase", "")
+    if phase:
+        canonical_path = f"docs/phase-summaries/{phase}.md"
+        if file_path != canonical_path:
+            logger.info(
+                "git_write_phase_summary: normalizing %s -> %s",
+                file_path,
+                canonical_path,
+            )
+            file_path = canonical_path
+
     repo = _get_repo(tool_context.invocation_state)
     resolved = _resolve_path(repo, file_path)
     resolved.parent.mkdir(parents=True, exist_ok=True)
