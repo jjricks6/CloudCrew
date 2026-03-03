@@ -15,6 +15,7 @@ import json
 import logging
 from datetime import UTC, datetime
 from typing import Any
+from urllib.error import URLError
 from urllib.request import urlopen
 
 import boto3
@@ -56,8 +57,12 @@ def _get_jwks() -> dict[str, Any]:
 
     issuer = f"https://cognito-idp.{AWS_REGION}.amazonaws.com/{COGNITO_USER_POOL_ID}"
     jwks_url = f"{issuer}/.well-known/jwks.json"
-    with urlopen(jwks_url) as response:  # noqa: S310 — trusted AWS endpoint
-        _jwks_cache = json.loads(response.read())
+    try:
+        with urlopen(jwks_url) as response:  # noqa: S310 — trusted AWS endpoint
+            _jwks_cache = json.loads(response.read())
+    except json.JSONDecodeError as e:
+        logger.error("Failed to parse JWKS response: %s", e)
+        raise ValueError("Failed to parse JWKS") from e
     return _jwks_cache
 
 
@@ -82,8 +87,14 @@ def _validate_token(token: str) -> bool:
             audience=COGNITO_CLIENT_ID,
             issuer=issuer,
         )
-    except (JWTError, Exception):  # catch network/parse errors too
-        logger.warning("JWT validation failed", exc_info=True)
+    except JWTError as e:
+        logger.warning("JWT validation failed (auth error): %s", str(e))
+        return False
+    except (URLError, TimeoutError) as e:
+        logger.warning("Failed to fetch/reach JWKS (transient error): %s", type(e).__name__)
+        return False
+    except Exception as e:
+        logger.exception("Unexpected error validating JWT: %s", type(e).__name__)
         return False
     else:
         return True
@@ -144,7 +155,7 @@ def disconnect_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
     """Handle WebSocket $disconnect route.
 
     Removes the connection record from DynamoDB. Since we don't know
-    the project_id at disconnect time, we scan for the connection_id.
+    the project_id at disconnect time, we query the ConnectionIdIndex GSI.
 
     Args:
         event: API Gateway WebSocket event.
@@ -158,11 +169,10 @@ def disconnect_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
     if not CONNECTIONS_TABLE:
         return {"statusCode": 200, "body": "OK"}
 
-    # At small scale (<100 connections) a scan is fine.
-    # At larger scale, add a GSI on connectionId.
     table = _get_table(CONNECTIONS_TABLE)
-    response = table.scan(
-        FilterExpression="SK = :conn_id",
+    response = table.query(
+        IndexName="ConnectionIdIndex",
+        KeyConditionExpression="SK = :conn_id",
         ExpressionAttributeValues={":conn_id": connection_id},
     )
     for item in response.get("Items", []):

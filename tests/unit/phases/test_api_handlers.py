@@ -127,6 +127,107 @@ class TestProjectStatusHandler:
         assert body["current_phase"] == "ARCHITECTURE"
         assert body["phase_status"] == "IN_PROGRESS"
 
+    @patch("src.phases.api_handlers.read_ledger")
+    @patch("src.phases.auth_utils.read_ledger")
+    def test_includes_review_messages_when_awaiting_approval(
+        self, mock_auth_read: MagicMock, mock_read: MagicMock
+    ) -> None:
+        """Verify persisted review messages are included in status when AWAITING_APPROVAL."""
+        from src.phases.api_handlers import project_status_handler
+
+        ledger = TaskLedger(
+            project_id="proj-1",
+            project_name="Test",
+            owner_id=TEST_USER_ID,
+            current_phase=Phase.ARCHITECTURE,
+            phase_status=PhaseStatus.AWAITING_APPROVAL,
+            review_opening_message="Welcome to the Architecture review!",
+            review_closing_message="",
+        )
+        mock_auth_read.return_value = ledger
+        mock_read.return_value = ledger
+
+        event = _create_event_with_auth({"id": "proj-1"})
+        result = project_status_handler(event)
+
+        assert result["statusCode"] == 200
+        body = json.loads(result["body"])
+        assert body["phase_status"] == "AWAITING_APPROVAL"
+        assert body["review_opening_message"] == "Welcome to the Architecture review!"
+        # Closing message is empty, so should not be in response
+        assert "review_closing_message" not in body
+
+    @patch("src.phases.api_handlers.read_ledger")
+    @patch("src.phases.auth_utils.read_ledger")
+    def test_excludes_review_messages_when_in_progress(self, mock_auth_read: MagicMock, mock_read: MagicMock) -> None:
+        """Review messages should NOT appear when phase is IN_PROGRESS."""
+        from src.phases.api_handlers import project_status_handler
+
+        ledger = TaskLedger(
+            project_id="proj-1",
+            project_name="Test",
+            owner_id=TEST_USER_ID,
+            current_phase=Phase.ARCHITECTURE,
+            phase_status=PhaseStatus.IN_PROGRESS,
+        )
+        mock_auth_read.return_value = ledger
+        mock_read.return_value = ledger
+
+        event = _create_event_with_auth({"id": "proj-1"})
+        result = project_status_handler(event)
+
+        assert result["statusCode"] == 200
+        body = json.loads(result["body"])
+        assert "review_opening_message" not in body
+        assert "review_closing_message" not in body
+
+    @patch("src.phases.api_handlers.read_ledger")
+    @patch("src.phases.auth_utils.read_ledger")
+    def test_includes_git_repo_url_when_set(self, mock_auth_read: MagicMock, mock_read: MagicMock) -> None:
+        """Verify git_repo_url appears in response when ledger has a repo URL."""
+        from src.phases.api_handlers import project_status_handler
+
+        ledger = TaskLedger(
+            project_id="proj-1",
+            project_name="Test",
+            owner_id=TEST_USER_ID,
+            current_phase=Phase.POC,
+            phase_status=PhaseStatus.AWAITING_APPROVAL,
+            git_repo_url_customer="https://github.com/org/repo",
+        )
+        mock_auth_read.return_value = ledger
+        mock_read.return_value = ledger
+
+        event = _create_event_with_auth({"id": "proj-1"})
+        result = project_status_handler(event)
+
+        assert result["statusCode"] == 200
+        body = json.loads(result["body"])
+        assert body["git_repo_url"] == "https://github.com/org/repo"
+
+    @patch("src.phases.api_handlers.read_ledger")
+    @patch("src.phases.auth_utils.read_ledger")
+    def test_excludes_git_repo_url_when_empty(self, mock_auth_read: MagicMock, mock_read: MagicMock) -> None:
+        """Verify git_repo_url is absent from response when ledger has no repo URL."""
+        from src.phases.api_handlers import project_status_handler
+
+        ledger = TaskLedger(
+            project_id="proj-1",
+            project_name="Test",
+            owner_id=TEST_USER_ID,
+            current_phase=Phase.POC,
+            phase_status=PhaseStatus.IN_PROGRESS,
+        )
+        mock_auth_read.return_value = ledger
+        mock_read.return_value = ledger
+
+        event = _create_event_with_auth({"id": "proj-1"})
+        result = project_status_handler(event)
+
+        assert result["statusCode"] == 200
+        body = json.loads(result["body"])
+        assert "git_repo_url" not in body
+
     def test_rejects_missing_id(self) -> None:
         from src.phases.api_handlers import project_status_handler
 
@@ -182,6 +283,7 @@ class TestProjectDeliverablesHandler:
 class TestApproveHandler:
     """Verify approve_handler behavior."""
 
+    @patch("src.phases.api_handlers.PM_REVIEW_MESSAGE_FUNCTION", "")
     @patch("src.phases.api_handlers.delete_token")
     @patch("src.phases.api_handlers.boto3")
     @patch("src.phases.api_handlers.get_token")
@@ -219,6 +321,95 @@ class TestApproveHandler:
         assert body["decision"] == "APPROVED"
         mock_sfn.send_task_success.assert_called_once()
         mock_delete.assert_called_once()
+
+    @patch("src.phases.api_handlers.PM_REVIEW_MESSAGE_FUNCTION", "cloudcrew-pm-review-message")
+    @patch("src.phases.api_handlers.delete_token")
+    @patch("src.phases.api_handlers.boto3")
+    @patch("src.phases.api_handlers.get_token")
+    @patch("src.phases.api_handlers.read_ledger")
+    @patch("src.phases.auth_utils.read_ledger")
+    def test_triggers_closing_message(
+        self,
+        mock_auth_read: MagicMock,
+        mock_read: MagicMock,
+        mock_get_token: MagicMock,
+        mock_boto3: MagicMock,
+        _mock_delete: MagicMock,
+    ) -> None:
+        """Verify approve_handler invokes PM closing message Lambda."""
+        from src.phases.api_handlers import approve_handler
+
+        mock_auth_read.return_value = TaskLedger(
+            project_id="proj-1",
+            owner_id=TEST_USER_ID,
+            current_phase=Phase.ARCHITECTURE,
+        )
+        mock_read.return_value = TaskLedger(
+            project_id="proj-1",
+            owner_id=TEST_USER_ID,
+            current_phase=Phase.ARCHITECTURE,
+        )
+        mock_get_token.return_value = "token-abc"
+        mock_client = MagicMock()
+        mock_boto3.client.return_value = mock_client
+
+        event = _create_event_with_auth({"id": "proj-1"})
+        result = approve_handler(event)
+
+        assert result["statusCode"] == 200
+
+        # Verify Lambda was invoked for closing message
+        mock_client.invoke.assert_called_once()
+        invoke_kwargs = mock_client.invoke.call_args.kwargs
+        assert invoke_kwargs["FunctionName"] == "cloudcrew-pm-review-message"
+        assert invoke_kwargs["InvocationType"] == "Event"
+        payload = json.loads(invoke_kwargs["Payload"])
+        assert payload["message_type"] == "closing"
+        assert payload["phase"] == "ARCHITECTURE"
+
+    @patch("src.phases.api_handlers.PM_REVIEW_MESSAGE_FUNCTION", "cloudcrew-pm-review-message")
+    @patch("src.phases.api_handlers.delete_token")
+    @patch("src.phases.api_handlers.boto3")
+    @patch("src.phases.api_handlers.get_token")
+    @patch("src.phases.api_handlers.read_ledger")
+    @patch("src.phases.auth_utils.read_ledger")
+    def test_discovery_skips_closing_message(
+        self,
+        mock_auth_read: MagicMock,
+        mock_read: MagicMock,
+        mock_get_token: MagicMock,
+        mock_boto3: MagicMock,
+        _mock_delete: MagicMock,
+    ) -> None:
+        """Discovery approval skips PM closing message Lambda."""
+        from src.phases.api_handlers import approve_handler
+
+        mock_auth_read.return_value = TaskLedger(
+            project_id="proj-1",
+            owner_id=TEST_USER_ID,
+            current_phase=Phase.DISCOVERY,
+        )
+        mock_read.return_value = TaskLedger(
+            project_id="proj-1",
+            owner_id=TEST_USER_ID,
+            current_phase=Phase.DISCOVERY,
+        )
+        mock_get_token.return_value = "token-abc"
+        mock_client = MagicMock()
+        mock_boto3.client.return_value = mock_client
+
+        event = _create_event_with_auth({"id": "proj-1"})
+        result = approve_handler(event)
+
+        assert result["statusCode"] == 200
+        body = json.loads(result["body"])
+        assert body["decision"] == "APPROVED"
+
+        # SFN send_task_success should be called (for the approval gate)
+        mock_client.send_task_success.assert_called_once()
+
+        # PM closing message Lambda should NOT be invoked for Discovery
+        mock_client.invoke.assert_not_called()
 
     @patch("src.phases.api_handlers.get_token")
     @patch("src.phases.api_handlers.read_ledger")

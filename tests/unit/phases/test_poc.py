@@ -18,10 +18,12 @@ class TestPOCSwarm:
     @patch("src.phases.poc.create_security_agent")
     @patch("src.phases.poc.create_data_agent")
     @patch("src.phases.poc.create_infra_agent")
+    @patch("src.phases.poc.create_pm_agent")
     @patch("src.phases.poc.create_dev_agent")
     def test_create_poc_swarm(
         self,
         mock_create_dev: MagicMock,
+        mock_create_pm: MagicMock,
         mock_create_infra: MagicMock,
         mock_create_data: MagicMock,
         mock_create_security: MagicMock,
@@ -32,12 +34,14 @@ class TestPOCSwarm:
         from src.phases.poc import create_poc_swarm
 
         mock_dev = MagicMock(name="dev")
+        mock_pm = MagicMock(name="pm")
         mock_infra = MagicMock(name="infra")
         mock_data = MagicMock(name="data")
         mock_security = MagicMock(name="security")
         mock_sa = MagicMock(name="sa")
         mock_qa = MagicMock(name="qa")
         mock_create_dev.return_value = mock_dev
+        mock_create_pm.return_value = mock_pm
         mock_create_infra.return_value = mock_infra
         mock_create_data.return_value = mock_data
         mock_create_security.return_value = mock_security
@@ -49,8 +53,9 @@ class TestPOCSwarm:
         mock_swarm_cls.assert_called_once()
         call_kwargs = mock_swarm_cls.call_args
 
-        # Verify all 6 specialist agents are nodes
+        # Verify all 7 agents are nodes (PM + Dev + 5 specialists)
         assert call_kwargs.kwargs["nodes"] == [
+            mock_pm,
             mock_dev,
             mock_infra,
             mock_data,
@@ -59,8 +64,8 @@ class TestPOCSwarm:
             mock_qa,
         ]
 
-        # Verify entry point is Dev
-        assert call_kwargs.kwargs["entry_point"] is mock_dev
+        # Verify entry point is PM (orchestrates and delegates)
+        assert call_kwargs.kwargs["entry_point"] is mock_pm
 
         # Verify Swarm configuration
         assert call_kwargs.kwargs["max_handoffs"] == 25
@@ -87,10 +92,12 @@ class TestPOCSwarm:
     @patch("src.phases.poc.create_security_agent")
     @patch("src.phases.poc.create_data_agent")
     @patch("src.phases.poc.create_infra_agent")
+    @patch("src.phases.poc.create_pm_agent")
     @patch("src.phases.poc.create_dev_agent")
     def test_all_agent_factories_called(
         self,
         mock_create_dev: MagicMock,
+        mock_create_pm: MagicMock,
         mock_create_infra: MagicMock,
         mock_create_data: MagicMock,
         mock_create_security: MagicMock,
@@ -103,6 +110,7 @@ class TestPOCSwarm:
         create_poc_swarm()
 
         mock_create_dev.assert_called_once()
+        mock_create_pm.assert_called_once()
         mock_create_infra.assert_called_once()
         mock_create_data.assert_called_once()
         mock_create_security.assert_called_once()

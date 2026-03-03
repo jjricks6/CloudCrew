@@ -17,12 +17,14 @@ class TestArchitectureSwarm:
     @patch("src.phases.architecture.create_security_agent")
     @patch("src.phases.architecture.create_data_agent")
     @patch("src.phases.architecture.create_infra_agent")
+    @patch("src.phases.architecture.create_pm_agent")
     @patch("src.phases.architecture.create_dev_agent")
     @patch("src.phases.architecture.create_sa_agent")
     def test_create_architecture_swarm(
         self,
         mock_create_sa: MagicMock,
         mock_create_dev: MagicMock,
+        mock_create_pm: MagicMock,
         mock_create_infra: MagicMock,
         mock_create_data: MagicMock,
         mock_create_security: MagicMock,
@@ -32,12 +34,14 @@ class TestArchitectureSwarm:
         from src.phases.architecture import create_architecture_swarm
 
         mock_sa = MagicMock(name="sa")
+        mock_pm = MagicMock(name="pm")
         mock_dev = MagicMock(name="dev")
         mock_infra = MagicMock(name="infra")
         mock_data = MagicMock(name="data")
         mock_security = MagicMock(name="security")
         mock_qa = MagicMock(name="qa")
         mock_create_sa.return_value = mock_sa
+        mock_create_pm.return_value = mock_pm
         mock_create_dev.return_value = mock_dev
         mock_create_infra.return_value = mock_infra
         mock_create_data.return_value = mock_data
@@ -49,9 +53,10 @@ class TestArchitectureSwarm:
         mock_swarm_cls.assert_called_once()
         call_kwargs = mock_swarm_cls.call_args
 
-        # Verify all 6 specialist agents are nodes
+        # Verify all 7 agents are nodes (SA + PM + 5 specialists)
         assert call_kwargs.kwargs["nodes"] == [
             mock_sa,
+            mock_pm,
             mock_dev,
             mock_infra,
             mock_data,
@@ -86,12 +91,14 @@ class TestArchitectureSwarm:
     @patch("src.phases.architecture.create_security_agent")
     @patch("src.phases.architecture.create_data_agent")
     @patch("src.phases.architecture.create_infra_agent")
+    @patch("src.phases.architecture.create_pm_agent")
     @patch("src.phases.architecture.create_dev_agent")
     @patch("src.phases.architecture.create_sa_agent")
     def test_all_agent_factories_called(
         self,
         mock_create_sa: MagicMock,
         mock_create_dev: MagicMock,
+        mock_create_pm: MagicMock,
         mock_create_infra: MagicMock,
         mock_create_data: MagicMock,
         mock_create_security: MagicMock,
@@ -103,6 +110,7 @@ class TestArchitectureSwarm:
         create_architecture_swarm()
 
         mock_create_sa.assert_called_once()
+        mock_create_pm.assert_called_once()
         mock_create_dev.assert_called_once()
         mock_create_infra.assert_called_once()
         mock_create_data.assert_called_once()

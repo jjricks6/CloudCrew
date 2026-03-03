@@ -156,7 +156,7 @@ class TestDisconnectHandler:
     @patch("src.phases.ws_handlers._get_table")
     def test_deletes_connection(self, mock_get_table: MagicMock) -> None:
         mock_table = MagicMock()
-        mock_table.scan.return_value = {
+        mock_table.query.return_value = {
             "Items": [{"PK": "proj-1", "SK": "conn-123"}],
         }
         mock_get_table.return_value = mock_table
@@ -165,6 +165,11 @@ class TestDisconnectHandler:
         result = disconnect_handler(event, None)
 
         assert result["statusCode"] == 200
+        mock_table.query.assert_called_once_with(
+            IndexName="ConnectionIdIndex",
+            KeyConditionExpression="SK = :conn_id",
+            ExpressionAttributeValues={":conn_id": "conn-123"},
+        )
         mock_table.delete_item.assert_called_once_with(
             Key={"PK": "proj-1", "SK": "conn-123"},
         )

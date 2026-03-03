@@ -1,8 +1,9 @@
 """Production phase Swarm assembly.
 
 Wires together all specialist agents into a Swarm for the Production phase.
-Dev is the entry point; all agents are available for handoffs so the
-team can collaborate organically based on their system prompts.
+PM is the entry point — it reviews prior work, delegates production-hardening
+tasks to specialists, and coordinates the build→review→security cycle.
+All agents are available for handoffs.
 
 This module is in phases/ — the ONLY package allowed to import from agents/.
 """
@@ -15,6 +16,7 @@ from strands.multiagent.swarm import Swarm
 from src.agents.data import create_data_agent
 from src.agents.dev import create_dev_agent
 from src.agents.infra import create_infra_agent
+from src.agents.pm import create_pm_agent
 from src.agents.qa import create_qa_agent
 from src.agents.sa import create_sa_agent
 from src.agents.security import create_security_agent
@@ -32,9 +34,9 @@ def create_production_swarm(
 ) -> Swarm:
     """Create the Production phase Swarm.
 
-    All specialist agents are available so the team can collaborate
-    organically. Dev drives the build; QA enforces quality gates,
-    Security audits, and SA consults on architecture questions.
+    PM is the entry point — it reviews the task ledger and prior phase
+    deliverables, then delegates production-hardening work. Dev builds,
+    QA enforces quality gates, Security audits, and SA consults.
 
     Configuration:
         - max_handoffs=25: High enough for per-module build->review cycles
@@ -47,6 +49,7 @@ def create_production_swarm(
     Returns:
         Configured Swarm ready for invocation with invocation_state.
     """
+    pm = create_pm_agent()
     dev = create_dev_agent()
     infra = create_infra_agent()
     data = create_data_agent()
@@ -54,7 +57,7 @@ def create_production_swarm(
     sa = create_sa_agent()
     qa = create_qa_agent()
 
-    logger.info("Creating production swarm with agents: dev, infra, data, security, sa, qa")
+    logger.info("Creating production swarm with agents: pm, dev, infra, data, security, sa, qa")
 
     hooks: list[HookProvider] = [
         ResilienceHook(),
@@ -63,8 +66,8 @@ def create_production_swarm(
     ]
 
     return Swarm(
-        nodes=[dev, infra, data, security, sa, qa],
-        entry_point=dev,
+        nodes=[pm, dev, infra, data, security, sa, qa],
+        entry_point=pm,
         max_handoffs=25,
         max_iterations=25,
         execution_timeout=EXECUTION_TIMEOUT_PRODUCTION,

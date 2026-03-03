@@ -16,6 +16,7 @@ from strands.multiagent.swarm import Swarm
 from src.agents.data import create_data_agent
 from src.agents.dev import create_dev_agent
 from src.agents.infra import create_infra_agent
+from src.agents.pm import create_pm_agent
 from src.agents.qa import create_qa_agent
 from src.agents.sa import create_sa_agent
 from src.agents.security import create_security_agent
@@ -33,9 +34,10 @@ def create_architecture_swarm(
 ) -> Swarm:
     """Create the Architecture phase Swarm.
 
-    All specialist agents are available so SA can consult any expert as
-    needed. The Swarm auto-creates handoff tools (transfer_to_{name})
-    so agents can transfer work to each other organically.
+    All specialist agents plus PM are available so SA can consult any
+    expert and hand off to PM for customer questions or phase completion.
+    The Swarm auto-creates handoff tools (transfer_to_{name}) so agents
+    can transfer work to each other organically.
 
     Configuration:
         - max_handoffs=20: Room for SA to consult multiple specialists
@@ -49,13 +51,14 @@ def create_architecture_swarm(
         Configured Swarm ready for invocation with invocation_state.
     """
     sa = create_sa_agent()
+    pm = create_pm_agent()
     dev = create_dev_agent()
     infra = create_infra_agent()
     data = create_data_agent()
     security = create_security_agent()
     qa = create_qa_agent()
 
-    logger.info("Creating architecture swarm with agents: sa, dev, infra, data, security, qa")
+    logger.info("Creating architecture swarm with agents: sa, pm, dev, infra, data, security, qa")
 
     hooks: list[HookProvider] = [
         ResilienceHook(),
@@ -64,7 +67,7 @@ def create_architecture_swarm(
     ]
 
     return Swarm(
-        nodes=[sa, dev, infra, data, security, qa],
+        nodes=[sa, pm, dev, infra, data, security, qa],
         entry_point=sa,
         max_handoffs=20,
         max_iterations=20,

@@ -15,7 +15,6 @@ import logging
 import os
 import sys
 import time
-import uuid
 from collections.abc import Callable
 from typing import Any
 
@@ -23,14 +22,20 @@ import boto3
 
 from src.config import (
     AWS_REGION,
+    ECS_CUSTOMER_FEEDBACK,
+    ECS_PHASE,
+    ECS_PROJECT_ID,
+    ECS_TASK_TOKEN,
     INTERRUPT_POLL_INTERVAL,
     INTERRUPT_POLL_TIMEOUT,
     PHASE_MAX_RETRIES,
     PHASE_RETRY_DELAY,
+    PROJECT_REPO_PATH,
     TASK_LEDGER_TABLE,
 )
+from src.phases.git_ops import push_to_remote, setup_git_repo, sync_artifacts_to_s3
 from src.phases.runner import RECOVERY_PREFIX
-from src.state.interrupts import get_interrupt_response, store_interrupt
+from src.state.interrupts import SOW_REVIEW_PREFIX, get_interrupt_response, store_interrupt
 
 logger = logging.getLogger(__name__)
 
@@ -102,18 +107,7 @@ def _poll_for_interrupt_responses(
     project_id: str,
     interrupt_ids: list[str],
 ) -> dict[str, str]:
-    """Poll DynamoDB until all interrupt responses are received.
-
-    Args:
-        project_id: The project identifier.
-        interrupt_ids: List of interrupt IDs to poll.
-
-    Returns:
-        Mapping of interrupt_id -> response text.
-
-    Raises:
-        TimeoutError: If polling exceeds INTERRUPT_POLL_TIMEOUT.
-    """
+    """Poll DynamoDB until all interrupt responses are received."""
     responses: dict[str, str] = {}
     pending = set(interrupt_ids)
     start = time.monotonic()
@@ -137,33 +131,86 @@ def _poll_for_interrupt_responses(
     return responses
 
 
+def _discovery_sow_validated(project_id: str) -> bool:
+    """Return True if the task ledger has facts (SOW was parsed after approval)."""
+    from src.state.ledger import read_ledger
+
+    ledger = read_ledger(TASK_LEDGER_TABLE, project_id)
+    if ledger.facts:
+        logger.info(
+            "Discovery SOW validated: %d facts in ledger for project=%s",
+            len(ledger.facts),
+            project_id,
+        )
+        return True
+
+    logger.warning(
+        "Discovery SOW NOT validated: no facts in ledger for project=%s",
+        project_id,
+    )
+    return False
+
+
 def execute_phase(
     project_id: str,
     phase: str,
     task_token: str,
     customer_feedback: str = "",
 ) -> None:
-    """Execute a phase with interrupt handling and retry logic.
+    """Execute a phase: run Swarm, handle interrupts, report to Step Functions."""
+    # Set up the git repo — clone customer's repo if credentials exist,
+    # otherwise fall back to a temporary local repo.
+    if not PROJECT_REPO_PATH:
+        repo_dir = setup_git_repo(project_id)
+        os.environ["PROJECT_REPO_PATH"] = str(repo_dir)
 
-    This is the main execution function for the ECS entrypoint.
-
-    The flow:
-    1. Create Swarm via factory
-    2. Invoke Swarm
-    3. If INTERRUPTED -> store interrupts, poll for responses, resume Swarm
-    4. If COMPLETED -> report success to Step Functions
-    5. If FAILED -> retry with fresh Swarm (up to PHASE_MAX_RETRIES)
-
-    Args:
-        project_id: The project identifier.
-        phase: The phase to execute.
-        task_token: Step Functions task token for reporting results.
-        customer_feedback: Optional feedback from a prior revision request.
-    """
     factory = get_swarm_factory(phase)
     invocation_state = _build_invocation_state(project_id, phase)
 
+    # For Discovery phase, check if SOW needs to be generated
     task = f"Execute the {phase} phase for project {project_id}."
+    if phase == "DISCOVERY":
+        from src.state.ledger import read_ledger
+
+        ledger = read_ledger(TASK_LEDGER_TABLE, project_id)
+
+        if ledger.initial_requirements and not ledger.facts:
+            # SOW not generated yet - instruct PM to ask questions then generate
+            project_name = ledger.project_name or project_id
+            task = f"""Project Name: {project_name}
+
+The customer already provided the following initial requirements at project creation:
+
+{ledger.initial_requirements}
+
+IMPORTANT: The project name and initial requirements above are already known.
+Do NOT ask the customer to repeat their project name or restate what they
+already told you. Start by acknowledging what they've shared, then ask
+clarifying questions about details they did NOT already cover.
+
+Your task for Discovery phase:
+
+1. Ask the customer clarifying questions ONE AT A TIME to fill in gaps.
+   Do NOT ask multiple questions at once. Ask ONE question, receive the answer,
+   then decide if you need to ask another question or if you have enough information.
+
+2. Once you have sufficient information, generate a comprehensive Statement of Work (SOW).
+
+3. Save the SOW to docs/project-plan/sow.md using git_write_project_plan.
+
+4. Show the SOW to the customer and ask for approval. If they request changes,
+   incorporate their feedback and regenerate. Repeat until approved.
+
+5. After SOW is approved, parse it using parse_sow to extract structured requirements.
+
+6. Record all requirements, objectives, and constraints in the task ledger.
+
+7. Create initial board tasks for the project.
+
+IMPORTANT: Ask questions ONE AT A TIME. This creates a natural, conversational
+experience where the customer can thoughtfully answer each question before
+you ask the next one."""
+
     if customer_feedback:
         task += (
             f"\n\nThe customer provided feedback on the previous submission:\n"
@@ -184,42 +231,92 @@ def execute_phase(
             from strands.multiagent.base import Status
 
             while result.status == Status.INTERRUPTED:
-                interrupts = _extract_interrupts(result)
-                if not interrupts:
+                interrupt_objects = getattr(result, "interrupts", None) or []
+                if not interrupt_objects:
                     logger.warning("INTERRUPTED status but no interrupt data found")
                     break
 
-                # Store interrupts in DynamoDB
-                interrupt_ids = []
-                for q in interrupts:
-                    iid = str(uuid.uuid4())
-                    store_interrupt(TASK_LEDGER_TABLE, project_id, iid, q, phase=phase)
-                    interrupt_ids.append(iid)
+                # Store interrupts in DynamoDB using the SDK's interrupt IDs
+                for interrupt_obj in interrupt_objects:
+                    question = str(getattr(interrupt_obj, "reason", None) or interrupt_obj)
+
+                    # For SOW review interrupts, the SOW content is appended
+                    # to the reason string after the "sow_review:" prefix by
+                    # the interrupt hook.  Extract it so store_interrupt can
+                    # broadcast it to the dashboard via WebSocket.
+                    sow_content = ""
+                    if question.startswith(SOW_REVIEW_PREFIX):
+                        sow_content = question[len(SOW_REVIEW_PREFIX) :]
+                        if sow_content:
+                            logger.info("Extracted SOW content from interrupt reason (%d chars)", len(sow_content))
+                        else:
+                            logger.warning("SOW review interrupt has no content attached")
+
+                    store_interrupt(
+                        TASK_LEDGER_TABLE,
+                        project_id,
+                        interrupt_obj.id,
+                        question,
+                        phase=phase,
+                        sow_content=sow_content,
+                    )
 
                 # Poll for customer responses
+                interrupt_ids = [obj.id for obj in interrupt_objects]
                 responses = _poll_for_interrupt_responses(project_id, interrupt_ids)
 
-                # Resume the swarm with responses
-                combined_response = "\n\n".join(
-                    f"Q: {interrupts[i]}\nA: {responses[interrupt_ids[i]]}" for i in range(len(interrupts))
-                )
-                result = swarm(
-                    f"Customer responded to your questions:\n\n{combined_response}\n\nPlease continue.",
+                # Resume the swarm with interruptResponse blocks (SDK-native format)
+                interrupt_responses: list[dict[str, Any]] = [
+                    {
+                        "interruptResponse": {
+                            "interruptId": obj.id,
+                            "response": responses[obj.id],
+                        },
+                    }
+                    for obj in interrupt_objects
+                ]
+                result = swarm(interrupt_responses, invocation_state=invocation_state)
+
+            if result.status == Status.COMPLETED:
+                # Discovery gate: validate the SOW was presented for customer
+                # approval and parsed before allowing the phase to complete.
+                # The PM sometimes completes after writing the SOW to git
+                # without presenting it for approval — catch that here and
+                # re-invoke the Swarm with recovery instructions.
+                if phase == "DISCOVERY" and not _discovery_sow_validated(project_id):
+                    logger.warning(
+                        "Discovery completed without SOW approval/parsing. Re-invoking swarm to complete SOW flow."
+                    )
+                    recovery_task = (
+                        "IMPORTANT: Discovery completed prematurely. The SOW was "
+                        "saved to git but NOT presented for customer approval.\n\n"
+                        "1. Read the SOW from docs/project-plan/sow.md using git_read\n"
+                        "2. Present it using present_sow_for_approval (full SOW text)\n"
+                        "3. If changes requested, incorporate and regenerate\n"
+                        "4. After approval, parse with parse_sow\n"
+                        "5. Record requirements in task ledger via update_task_ledger\n"
+                        "6. Create initial board tasks\n\n"
+                        "Do NOT complete until ALL steps are done."
+                    )
+                    # Create a fresh swarm and run the recovery task
+                    swarm = factory(project_id=project_id, phase=phase)
+                    result = swarm(recovery_task, invocation_state=invocation_state)
+                    # Re-enter the interrupt handling loop for SOW approval
+                    continue
+
+                # Generate phase summary before reporting success (with retry)
+                logger.info("Phase completed. Generating phase summary...")
+                _generate_phase_summary_with_retry(
+                    project_id=project_id,
+                    phase=phase,
                     invocation_state=invocation_state,
                 )
 
-            if result.status == Status.COMPLETED:
-                # Generate phase summary before reporting success
-                logger.info("Phase completed. Generating phase summary...")
-                try:
-                    _invoke_pm_for_phase_summary(
-                        project_id=project_id,
-                        phase=phase,
-                        invocation_state=invocation_state,
-                    )
-                except Exception as exc:
-                    logger.exception("Failed to generate phase summary: %s", exc)
-                    # Continue regardless — summary generation is non-critical
+                # Sync repo artifacts to S3 so the API Lambda can serve them
+                repo_path = os.environ.get("PROJECT_REPO_PATH", "")
+                if repo_path:
+                    sync_artifacts_to_s3(project_id, repo_path, phase)
+                    push_to_remote(project_id, repo_path, phase)
 
                 _send_task_success(
                     task_token,
@@ -251,91 +348,79 @@ def execute_phase(
     _send_task_failure(task_token, "PhaseExecutionFailed", last_error)
 
 
-def _invoke_pm_for_phase_summary(
+def _generate_phase_summary_with_retry(
     project_id: str,
     phase: str,
     invocation_state: dict[str, Any],
+    max_retries: int = 3,
 ) -> None:
-    """Invoke PM agent to generate phase summary after phase completes.
-
-    This is a standalone invocation of the PM agent in a single-node Swarm.
-    The PM reads the task ledger and git artifacts to synthesize a summary,
-    then writes it to docs/phase-summaries/{phase-name}.md.
-
-    Args:
-        project_id: The project identifier.
-        phase: The phase name that just completed.
-        invocation_state: The invocation state with memory context.
-    """
+    """Generate phase summary via PM agent with retry. Non-blocking on failure."""
     from strands.multiagent.swarm import Swarm
 
     from src.agents.pm import create_pm_agent
+    from src.hooks.max_tokens_recovery_hook import MaxTokensRecoveryHook
+    from src.hooks.resilience_hook import ResilienceHook
     from src.phases.runner import run_phase
 
-    # Build task for PM
-    task = f"""Phase {phase} has completed. Review what was accomplished and generate a comprehensive Phase Summary.
+    task = (
+        f"Phase {phase} has completed. Generate a Phase Summary.\n\n"
+        f"1. Read the task ledger for decisions and deliverables\n"
+        f"2. Review git artifacts in docs/, security/, infra/, app/, data/\n"
+        f"3. Synthesize into an executive-friendly summary\n"
+        f"4. Save to docs/phase-summaries/{phase.lower()}.md via git_write_phase_summary\n\n"
+        f"Focus on value delivered, key decisions, deliverables, and risks."
+    )
 
-Instructions:
-1. Read the task ledger for this project to understand decisions and deliverables
-2. Review git artifacts in docs/, security/, infra/, app/, and data/ directories
-3. Synthesize into an executive-friendly Phase Summary document
-4. Save to docs/phase-summaries/{phase.lower()}.md using git_write_phase_summary
-
-The summary should:
-- Lead with value delivered to the customer
-- Highlight key technical decisions and trade-offs made
-- List all deliverables with their status
-- Note any risks or follow-up items
-- Be suitable for customer review (professional, non-technical language)
-
-Ensure the summary file is committed to git before completing."""
-
-    # Create factory that produces a single-node Swarm with just PM
     def create_pm_only_swarm() -> Swarm:
-        """Create a Swarm with only the PM agent."""
         pm_agent = create_pm_agent()
         return Swarm(
             nodes=[pm_agent],
             entry_point=pm_agent,
-            max_handoffs=0,  # PM doesn't need to handoff
-            max_iterations=1,
+            max_handoffs=0,
+            max_iterations=5,
+            hooks=[ResilienceHook(), MaxTokensRecoveryHook()],
             id="pm-phase-summary-swarm",
         )
 
-    try:
-        result = run_phase(
-            swarm_factory=create_pm_only_swarm,
-            task=task,
-            invocation_state=invocation_state,
-            max_retries=1,
-        )
-        logger.info(
-            "Phase summary generation completed with status: %s",
-            result.result.status if result.result else "None",
-        )
-    except Exception as exc:
-        logger.exception("Phase summary generation failed: %s", exc)
-        # Re-raise to be caught by caller's exception handler
-        raise
-
-
-def _extract_interrupts(result: Any) -> list[str]:
-    """Extract interrupt questions from a SwarmResult.
-
-    Args:
-        result: The SwarmResult with INTERRUPTED status.
-
-    Returns:
-        List of question strings from the interrupt data.
-    """
-    interrupts: list[str] = []
-    # Access interrupt data from the swarm result
-    interrupt_data = getattr(result, "interrupts", None)
-    if interrupt_data and isinstance(interrupt_data, list):
-        for item in interrupt_data:
-            question = getattr(item, "query", None) or str(item)
-            interrupts.append(question)
-    return interrupts
+    for attempt in range(1, max_retries + 1):
+        try:
+            result = run_phase(
+                swarm_factory=create_pm_only_swarm,
+                task=task,
+                invocation_state=invocation_state,
+                max_retries=1,
+            )
+            status = result.result.status if result.result else None
+            if status and status.value == "completed":
+                logger.info("Phase summary generated for phase %s", phase)
+                return
+            # Swarm returned but with non-completed status — treat as failure
+            logger.warning(
+                "Phase summary attempt %d/%d returned status=%s for project=%s, phase=%s",
+                attempt,
+                max_retries,
+                status,
+                project_id,
+                phase,
+            )
+        except Exception as exc:
+            logger.warning(
+                "Phase summary generation failed (attempt %d/%d) for project=%s, phase=%s: %s",
+                attempt,
+                max_retries,
+                project_id,
+                phase,
+                type(exc).__name__,
+            )
+        if attempt < max_retries:
+            time.sleep(2.0)
+        else:
+            logger.error(
+                "Phase summary generation failed after %d attempts for project=%s, phase=%s",
+                max_retries,
+                project_id,
+                phase,
+            )
 
 
 def main() -> None:
@@ -350,10 +435,10 @@ def main() -> None:
         format="%(asctime)s %(name)s %(levelname)s %(message)s",
     )
 
-    project_id = os.environ.get("PROJECT_ID", "")
-    phase = os.environ.get("PHASE", "")
-    task_token = os.environ.get("TASK_TOKEN", "")
-    customer_feedback = os.environ.get("CUSTOMER_FEEDBACK", "")
+    project_id = ECS_PROJECT_ID
+    phase = ECS_PHASE
+    task_token = ECS_TASK_TOKEN
+    customer_feedback = ECS_CUSTOMER_FEEDBACK
 
     if not project_id or not phase or not task_token:
         logger.error(
