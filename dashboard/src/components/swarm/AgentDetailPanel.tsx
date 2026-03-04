@@ -52,7 +52,7 @@ export function AgentDetailPanel({
         animate={{ x: 0 }}
         exit={{ x: "100%" }}
         transition={{ type: "spring", stiffness: 300, damping: 30 }}
-        className="fixed right-0 top-0 z-50 flex h-full w-80 flex-col border-l bg-card shadow-xl"
+        className="fixed right-0 top-0 z-50 flex h-full w-full max-w-xs flex-col border-l bg-card shadow-xl md:w-80 md:max-w-none"
       >
         {/* Header */}
         <div className="flex items-center gap-3 border-b p-4">

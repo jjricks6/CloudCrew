@@ -38,7 +38,7 @@ export function PhaseReviewMessageCard({
       {showLoading ? (
         <ThinkingIndicator />
       ) : (
-        <div className="prose prose-sm dark:prose-invert max-w-none text-base leading-relaxed">
+        <div className="prose prose-sm dark:prose-invert max-w-none text-sm leading-relaxed md:text-base">
           <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSanitize]}>
             {isStreaming ? `${content}|` : content}
           </ReactMarkdown>

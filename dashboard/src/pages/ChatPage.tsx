@@ -108,7 +108,7 @@ export function ChatPage() {
   }
 
   return (
-    <div className="flex h-[calc(100vh-120px)] flex-col">
+    <div className="flex h-[calc(100dvh-8rem)] flex-col md:h-[calc(100vh-120px)]">
       <ChatMessageList
         quickReplies={quickReplies}
         onReply={handleSend}

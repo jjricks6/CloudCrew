@@ -123,8 +123,11 @@ export function SwarmVisualization({
   }, [resolvedAgents]);
 
   const cx = dimensions.width / 2;
-  const cy = dimensions.height / 2;
-  const orbitRadius = Math.min(cx, cy) * 0.55;
+  const isMobileContainer = dimensions.width < 768;
+  // On mobile, nudge center down slightly so top agents clear the Phase Progress card
+  const cy = dimensions.height / 2 + (isMobileContainer ? Math.min(dimensions.height * 0.02, 8) : 0);
+  // Larger orbit on mobile to fill the small container; original 0.55 on desktop
+  const orbitRadius = Math.min(cx, cy) * (isMobileContainer ? 0.8 : 0.55);
 
   // Dynamic node sizes based on container dimensions
   const nodeSizes = useMemo(
@@ -219,7 +222,7 @@ export function SwarmVisualization({
                   >
                     Project Manager
                   </span>
-                  <span className="max-w-[260px] text-sm leading-relaxed text-muted-foreground">
+                  <span className="max-w-[180px] text-xs leading-snug text-muted-foreground md:max-w-[260px] md:text-sm md:leading-relaxed">
                     {notification.message}
                   </span>
                   <button
@@ -245,7 +248,7 @@ export function SwarmVisualization({
                   >
                     {activeConfig.label}
                   </span>
-                  <span className="text-sm leading-relaxed text-muted-foreground">
+                  <span className="max-w-[180px] text-xs leading-snug text-muted-foreground md:max-w-[260px] md:text-sm md:leading-relaxed">
                     {activeDetail.detail}
                   </span>
                 </motion.div>
