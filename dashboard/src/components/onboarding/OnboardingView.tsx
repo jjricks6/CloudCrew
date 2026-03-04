@@ -137,11 +137,11 @@ export function OnboardingView() {
       : thinkingMessage || "Thinking";
 
   return (
-    <div className="flex h-[calc(100vh-10rem)] items-center justify-center">
-      <div className="flex w-full max-w-4xl flex-col items-center gap-8 px-4 md:flex-row md:items-center md:gap-12">
-        {/* PM Polyhedron — hero sized */}
+    <div className="flex h-[calc(100dvh-10rem)] items-center justify-center md:h-[calc(100vh-10rem)]">
+      <div className="flex w-full max-w-4xl flex-col items-center gap-6 px-4 md:flex-row md:items-center md:gap-12">
+        {/* PM Polyhedron — hero sized, smaller on mobile */}
         <div className="flex shrink-0 flex-col items-center gap-3">
-          <div className="relative" style={{ width: 260, height: 260 }}>
+          <div className="relative h-[180px] w-[180px] md:h-[260px] md:w-[260px]">
             <AgentPolyhedron
               shape={PM_CONFIG.shape}
               color={PM_CONFIG.color}
@@ -149,7 +149,7 @@ export function OnboardingView() {
             />
             {/* PM label centered over polyhedron */}
             <span
-              className="pointer-events-none absolute inset-0 flex items-center justify-center text-2xl font-bold"
+              className="pointer-events-none absolute inset-0 flex items-center justify-center text-xl font-bold md:text-2xl"
               style={{ color: PM_CONFIG.color, opacity: 0.7 }}
             >
               PM
@@ -173,7 +173,7 @@ export function OnboardingView() {
                 transition={{ duration: 0.4, ease: "easeOut" }}
               >
                 <div className="flex flex-col gap-3">
-                  <div className="text-base leading-relaxed text-foreground">
+                  <div className="text-sm leading-relaxed text-foreground md:text-base">
                     {thinkingDisplay}
                     <span className="ml-1 inline-flex gap-0.5">
                       <span className="animate-bounce" style={{ animationDelay: "0ms" }}>.</span>

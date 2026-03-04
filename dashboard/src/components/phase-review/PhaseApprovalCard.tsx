@@ -44,13 +44,12 @@ export function PhaseApprovalCard({
       transition={{ duration: 0.4, ease: "easeOut" }}
       className="flex flex-col gap-4"
     >
-      <div className="rounded-md border border-green-200 bg-green-50 p-4 dark:border-green-900 dark:bg-green-950">
-        <h3 className="font-semibold text-green-900 dark:text-green-50">
+      <div className="rounded-md border border-green-200 bg-green-50 p-2 md:p-4 dark:border-green-900 dark:bg-green-950">
+        <h3 className="text-sm font-semibold text-green-900 dark:text-green-50 md:text-base">
           Ready to proceed?
         </h3>
-        <p className="mt-1 text-sm text-green-800 dark:text-green-200">
-          Review the {phaseName} phase summary and deliverables above. You can
-          approve to move to the next phase or request changes.
+        <p className="mt-0.5 text-xs text-green-800 dark:text-green-200 md:mt-1 md:text-sm">
+          Review {phaseName} deliverables, then approve or request changes.
         </p>
       </div>
 
@@ -76,11 +75,12 @@ export function PhaseApprovalCard({
         </motion.div>
       )}
 
-      <div className="flex gap-3">
+      <div className="flex gap-2 md:gap-3">
         <Button
           onClick={onApprove}
           disabled={isLoading}
-          className="bg-green-600 hover:bg-green-700"
+          size="sm"
+          className="bg-green-600 hover:bg-green-700 text-xs md:text-sm"
         >
           Approve & Continue
         </Button>
@@ -88,6 +88,8 @@ export function PhaseApprovalCard({
           onClick={handleRequestChanges}
           variant="outline"
           disabled={isLoading}
+          size="sm"
+          className="text-xs md:text-sm"
         >
           {showFeedback ? "Submit Feedback" : "Request Changes"}
         </Button>

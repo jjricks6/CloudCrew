@@ -66,6 +66,9 @@ export function AgentNode({
   // Drag tracking — prevent onClick from firing after a drag release.
   const dragging = useRef(false);
 
+  // Disable drag on touch devices so it doesn't interfere with scrolling
+  const isTouchDevice = typeof window !== "undefined" && window.matchMedia("(pointer: coarse)").matches;
+
   // Staggered float timing so agents bob independently.
   const floatDuration = useMemo(() => 3 + (nameHash(name) % 20) / 10, [name]);
   const floatDelay = useMemo(() => (nameHash(name) % 10) / 10, [name]);
@@ -82,11 +85,11 @@ export function AgentNode({
         height: activeSize,
         marginLeft: -activeSize / 2,
         marginTop: -activeSize / 2,
-        cursor: "grab",
+        cursor: isTouchDevice ? "pointer" : "grab",
       }}
-      drag
+      drag={!isTouchDevice}
       dragMomentum={false}
-      whileDrag={{ scale: 1.12, cursor: "grabbing", zIndex: 50 }}
+      whileDrag={isTouchDevice ? undefined : { scale: 1.12, cursor: "grabbing", zIndex: 50 }}
       onDragStart={() => {
         dragging.current = true;
       }}

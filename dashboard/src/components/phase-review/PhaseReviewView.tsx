@@ -199,11 +199,11 @@ export function PhaseReviewView() {
 
 
   return (
-    <div className="flex h-[calc(100vh-10rem)] items-center justify-center overflow-hidden">
-      <div className="flex w-full max-w-6xl flex-col items-center gap-8 px-4 md:flex-row md:items-center md:gap-12 h-full min-h-0">
-        {/* PM Polyhedron — hero sized, sticky */}
-        <div className="flex shrink-0 flex-col items-center gap-3 md:sticky md:top-1/2 md:-translate-y-1/2 md:self-center">
-          <div className="relative" style={{ width: 260, height: 260 }}>
+    <div className="flex h-[calc(100dvh-10rem)] items-center justify-center overflow-x-hidden overflow-y-auto md:h-[calc(100vh-10rem)]">
+      <div className="flex w-full max-w-6xl flex-col items-center gap-4 px-3 md:px-4 md:flex-row md:items-center md:gap-12 h-full min-h-0">
+        {/* PM Polyhedron — hidden on mobile during artifact review to save space */}
+        <div className={`flex shrink-0 flex-col items-center gap-3 md:sticky md:top-1/2 md:-translate-y-1/2 md:self-center ${status === "artifact_review" ? "hidden md:flex" : ""}`}>
+          <div className="relative h-[180px] w-[180px] md:h-[260px] md:w-[260px]">
             <AgentPolyhedron
               shape={PM_CONFIG.shape}
               color={PM_CONFIG.color}
@@ -211,7 +211,7 @@ export function PhaseReviewView() {
             />
             {/* PM label centered over polyhedron */}
             <span
-              className="pointer-events-none absolute inset-0 flex items-center justify-center text-2xl font-bold"
+              className="pointer-events-none absolute inset-0 flex items-center justify-center text-xl font-bold md:text-2xl"
               style={{ color: PM_CONFIG.color, opacity: 0.7 }}
             >
               PM
@@ -223,7 +223,7 @@ export function PhaseReviewView() {
         </div>
 
         {/* Review content cards */}
-        <div className="min-w-0 flex-1 h-full flex flex-col min-h-0">
+        <div className="min-w-0 w-full flex-1 h-full flex flex-col min-h-0 overflow-hidden">
           <AnimatePresence mode="wait">
             {status === "opening_message" && (
               <motion.div key="opening" className="flex flex-col min-h-0 flex-1">

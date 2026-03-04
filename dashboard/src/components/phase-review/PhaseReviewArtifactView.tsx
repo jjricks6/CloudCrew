@@ -200,19 +200,19 @@ export function PhaseReviewArtifactView({
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="flex flex-col min-h-0 flex-1 gap-4"
+      className="flex flex-col min-h-0 min-w-0 w-full flex-1 gap-2 md:gap-4 overflow-hidden"
     >
-      <div className="flex items-center justify-between gap-3">
-        <h3 className="text-lg font-semibold">{phaseName} review</h3>
+      <div className="flex items-center justify-between gap-2">
+        <h3 className="text-base font-semibold md:text-lg">{phaseName} review</h3>
         {gitRepoUrl && (
           <a
             href={gitRepoUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-950 transition-colors"
+            className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-950 transition-colors md:gap-1.5 md:px-3 md:py-1.5 md:text-sm"
           >
-            <ExternalLink className="w-4 h-4" />
-            View Code on GitHub
+            <ExternalLink className="w-3.5 h-3.5 md:w-4 md:h-4" />
+            <span className="hidden sm:inline">View Code on</span> GitHub
           </a>
         )}
       </div>
@@ -225,22 +225,22 @@ export function PhaseReviewArtifactView({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="flex flex-col min-h-0 flex-1 gap-4"
+            className="flex flex-col min-h-0 min-w-0 w-full flex-1 gap-2 md:gap-4"
           >
             {/* Top: Artifacts + Preview (flex-1 grows to fill, input/buttons stay at bottom) */}
-            <div className="flex-1 min-h-0 flex flex-col md:flex-row gap-4">
-              {/* Artifact buttons */}
-              <div className="flex md:flex-col gap-2 overflow-x-auto md:overflow-y-auto md:w-48 flex-shrink-0 pb-2 md:pb-0">
+            <div className="flex-1 min-h-0 flex flex-col md:flex-row gap-2 md:gap-4">
+              {/* Artifact buttons — compact horizontal tabs on mobile */}
+              <div className="flex md:flex-col gap-1.5 md:gap-2 overflow-x-auto md:overflow-y-auto md:w-48 flex-shrink-0 pb-1 md:pb-0">
                 {isLoadingList ? (
-                  <p className="text-xs text-muted-foreground px-3 py-2">Loading artifacts...</p>
+                  <p className="text-xs text-muted-foreground px-2 py-1">Loading...</p>
                 ) : documents.length === 0 ? (
-                  <p className="text-xs text-muted-foreground px-3 py-2">No artifacts found</p>
+                  <p className="text-xs text-muted-foreground px-2 py-1">No artifacts found</p>
                 ) : (
                   documents.map((doc) => (
                     <button
                       key={doc.id}
                       onClick={() => setSelectedDocId(doc.id)}
-                      className={`px-3 py-2 rounded text-sm font-medium whitespace-nowrap transition-colors ${
+                      className={`px-2 py-1 md:px-3 md:py-2 rounded text-xs md:text-sm font-medium whitespace-nowrap transition-colors ${
                         doc.id === selectedDocId
                           ? "bg-blue-600 text-white dark:bg-blue-700"
                           : "bg-muted text-muted-foreground hover:bg-muted/80 dark:hover:bg-muted/60"
@@ -256,23 +256,23 @@ export function PhaseReviewArtifactView({
               <div className="flex-1 min-h-0 flex flex-col rounded-md border bg-muted/30 overflow-hidden">
                 {selectedDoc ? (
                   <>
-                    <div className="border-b p-3 flex items-center justify-between bg-muted/50 gap-3 flex-shrink-0">
-                      <h4 className="font-semibold text-sm">{selectedDoc.name}</h4>
+                    <div className="border-b px-2 py-1.5 md:p-3 flex items-center justify-between bg-muted/50 gap-2 flex-shrink-0">
+                      <h4 className="font-semibold text-xs md:text-sm truncate">{selectedDoc.name}</h4>
                       <Button
                         variant="ghost"
                         size="sm"
                         onClick={() => handleDownload(selectedDoc)}
-                        className="flex-shrink-0"
+                        className="flex-shrink-0 h-7 px-2 text-xs md:h-8 md:px-3 md:text-sm"
                       >
-                        <Download className="w-4 h-4 mr-1.5" />
-                        Download
+                        <Download className="w-3.5 h-3.5 md:w-4 md:h-4 mr-1" />
+                        <span className="hidden sm:inline">Download</span>
                       </Button>
                     </div>
-                    <div className="flex-1 overflow-y-auto p-4 min-h-0">
+                    <div className="flex-1 overflow-y-auto p-2 md:p-4 min-h-0">
                       {isLoadingDoc ? (
-                        <p className="text-sm text-muted-foreground">Loading...</p>
+                        <p className="text-xs text-muted-foreground">Loading...</p>
                       ) : (
-                        <div className="prose prose-sm dark:prose-invert max-w-none">
+                        <div className="prose prose-sm dark:prose-invert max-w-none text-xs md:text-sm overflow-x-auto break-words">
                           <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSanitize]}>
                             {docContent}
                           </ReactMarkdown>
@@ -281,8 +281,8 @@ export function PhaseReviewArtifactView({
                     </div>
                   </>
                 ) : (
-                  <div className="flex-1 flex items-center justify-center p-4">
-                    <p className="text-sm text-muted-foreground">
+                  <div className="flex-1 flex items-center justify-center p-3">
+                    <p className="text-xs text-muted-foreground">
                       {isLoadingList ? "Loading artifacts..." : "No artifacts available"}
                     </p>
                   </div>
@@ -291,17 +291,17 @@ export function PhaseReviewArtifactView({
             </div>
 
             {/* Bottom: Chat Input + Approval (flex-shrink-0 stays at bottom) */}
-            <div className="flex-shrink-0 flex flex-col gap-2 rounded-md border bg-muted/30 p-4">
+            <div className="flex-shrink-0 flex flex-col gap-2 rounded-md border bg-muted/30 p-2 md:p-4">
               {/* Chat input */}
               <div className="flex gap-2 flex-shrink-0">
                 <Textarea
                   value={chatInput}
                   onChange={(e) => setChatInput(e.target.value)}
                   onKeyDown={handleKeyPress}
-                  placeholder="Ask a question or request a change..."
+                  placeholder="Ask a question..."
                   disabled={isChatStreaming || isLoading}
-                  rows={2}
-                  className="flex-1 text-sm resize-none"
+                  rows={1}
+                  className="flex-1 text-xs md:text-sm resize-none"
                 />
                 <Button
                   onClick={handleSendChat}
@@ -331,7 +331,7 @@ export function PhaseReviewArtifactView({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="flex flex-col min-h-0 flex-1 gap-2"
+            className="flex flex-col min-h-0 min-w-0 w-full flex-1 gap-2"
           >
             <div className="flex-1 min-h-0 flex flex-col rounded-md border bg-muted/30 overflow-hidden">
               {/* Chat header */}

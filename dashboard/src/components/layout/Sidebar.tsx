@@ -1,4 +1,5 @@
-import { NavLink } from "react-router-dom";
+import { useEffect } from "react";
+import { NavLink, useLocation } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { useAgentStore } from "@/state/stores/agentStore";
@@ -26,6 +27,10 @@ interface SidebarProps {
   currentPhase?: Phase;
   phaseStatus?: PhaseStatus;
   isOnboarding?: boolean;
+  /** Whether the mobile drawer is open (ignored on md+ where sidebar is always visible). */
+  mobileOpen?: boolean;
+  /** Close the mobile drawer. */
+  onClose?: () => void;
 }
 
 function getDotColor(
@@ -87,13 +92,21 @@ export function Sidebar({
   currentPhase,
   phaseStatus,
   isOnboarding,
+  mobileOpen = false,
+  onClose,
 }: SidebarProps) {
   const hasNotification = useAgentStore(
     (s) => s.pendingInterrupt !== null || s.pendingApproval !== null,
   );
+  const { pathname } = useLocation();
 
-  return (
-    <aside className="flex h-screen w-64 flex-col border-r bg-sidebar text-sidebar-foreground">
+  // Close the mobile drawer whenever the route changes.
+  useEffect(() => {
+    onClose?.();
+  }, [pathname]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const sidebarContent = (
+    <>
       {/* Brand header */}
       <div className="border-b p-4">
         <h2 className="text-lg font-bold tracking-tight">CloudCrew</h2>
@@ -165,6 +178,29 @@ export function Sidebar({
       <div className="border-t p-4 text-xs text-muted-foreground">
         CloudCrew
       </div>
-    </aside>
+    </>
+  );
+
+  return (
+    <>
+      {/* Desktop sidebar — always visible at md+ */}
+      <aside className="hidden md:flex h-screen w-64 flex-col border-r bg-sidebar text-sidebar-foreground">
+        {sidebarContent}
+      </aside>
+
+      {/* Mobile drawer — overlay when open */}
+      {mobileOpen && (
+        <>
+          <div
+            className="fixed inset-0 z-40 bg-black/30 md:hidden"
+            onClick={onClose}
+            aria-hidden
+          />
+          <aside className="fixed inset-y-0 left-0 z-50 flex w-64 flex-col bg-sidebar text-sidebar-foreground shadow-lg md:hidden">
+            {sidebarContent}
+          </aside>
+        </>
+      )}
+    </>
   );
 }

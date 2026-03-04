@@ -74,7 +74,7 @@ export function OnboardingQuestionCard({
       className="flex flex-col gap-4"
     >
       {/* PM question text with blinking cursor */}
-      <div className="min-h-[80px] text-base leading-relaxed text-foreground">
+      <div className="min-h-[60px] text-sm leading-relaxed text-foreground md:min-h-[80px] md:text-base">
         {questionText}
         {isStreaming && (
           <span className="ml-0.5 inline-block w-[2px] animate-pulse bg-primary">

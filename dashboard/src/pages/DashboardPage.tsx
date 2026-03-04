@@ -167,9 +167,9 @@ export function DashboardPage() {
       className="space-y-4"
     >
       {/* Header row */}
-      <div className="flex items-center gap-3">
-        <h2 className="text-2xl font-bold">
-          {project?.project_name ?? "Project"} Dashboard
+      <div className="flex items-center gap-2 md:gap-3">
+        <h2 className="text-lg font-bold md:text-2xl">
+          {project?.project_name ?? "Project"}
         </h2>
         <Badge variant={wsStatus === "connected" ? "default" : "outline"}>
           {wsStatus === "connected" ? "Live" : "Offline"}
@@ -177,11 +177,11 @@ export function DashboardPage() {
       </div>
 
       {/* Phase Progress */}
-      <Card>
-        <CardHeader>
+      <Card className="py-3 gap-2 md:py-6 md:gap-6">
+        <CardHeader className="px-3 md:px-6">
           <CardTitle className="text-sm font-medium">Phase Progress</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-3 md:px-6">
           {projectLoading ? (
             <Skeleton className="h-12 w-full" />
           ) : (
@@ -193,10 +193,10 @@ export function DashboardPage() {
         </CardContent>
       </Card>
 
-      {/* Swarm (center) + Activity (right) — no boxes */}
-      <div className="flex h-[calc(100vh-21rem)] min-h-[300px] gap-6">
+      {/* Swarm (center) + Activity (right on desktop, below on mobile) */}
+      <div className="flex flex-col gap-4 md:h-[calc(100vh-21rem)] md:min-h-[300px] md:flex-row md:gap-6">
         {/* Swarm visualization */}
-        <div className="relative h-full flex-1">
+        <div className="relative h-[420px] flex-1 overflow-visible md:h-full">
           <SwarmVisualization
             agents={agents}
             phase={project?.current_phase}
@@ -207,7 +207,7 @@ export function DashboardPage() {
         </div>
 
         {/* Activity feed */}
-        <div className="flex w-72 shrink-0 flex-col overflow-hidden">
+        <div className="flex w-full flex-col md:max-h-none md:w-72 md:shrink-0 md:overflow-hidden">
           <h3 className="mb-2 text-sm font-medium text-muted-foreground">
             Activity
           </h3>

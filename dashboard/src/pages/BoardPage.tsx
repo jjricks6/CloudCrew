@@ -15,7 +15,7 @@ export function BoardPage() {
     return (
       <div className="space-y-6">
         <h2 className="text-2xl font-bold">Task Board</h2>
-        <div className="grid gap-4 md:grid-cols-4">
+        <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 md:grid-cols-4">
           {KANBAN_COLUMNS.map((col) => (
             <Skeleton key={col} className="h-[400px] rounded-lg" />
           ))}
@@ -47,7 +47,7 @@ export function BoardPage() {
     <div className="space-y-6">
       <h2 className="text-2xl font-bold">Task Board</h2>
 
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 md:grid-cols-4">
         {KANBAN_COLUMNS.map((col) => (
           <KanbanColumn
             key={col}

@@ -87,8 +87,11 @@ export function getAgentPositions(
 ): AgentPosition[] {
   const centerX = width / 2;
   const centerY = height / 2;
-  // Use 55% of the smaller dimension so thought bubbles have room
-  const radius = Math.min(centerX, centerY) * 0.55;
+  const isMobileContainer = width < 768;
+  // On mobile, nudge center down slightly; no offset on desktop
+  const centerYOffset = centerY + (isMobileContainer ? Math.min(height * 0.02, 8) : 0);
+  // Larger orbit on mobile; original 0.55 on desktop
+  const radius = Math.min(centerX, centerYOffset) * (isMobileContainer ? 0.8 : 0.55);
   const count = agents.length;
   const startAngle = -Math.PI / 2; // top of circle
 
@@ -97,7 +100,7 @@ export function getAgentPositions(
     return {
       name,
       x: centerX + radius * Math.cos(angle),
-      y: centerY + radius * Math.sin(angle),
+      y: centerYOffset + radius * Math.sin(angle),
     };
   });
 }
@@ -123,9 +126,9 @@ export interface NodeSizes {
 /** Compute node sizes that scale with the container. */
 export function getNodeSizes(width: number, height: number): NodeSizes {
   const minDim = Math.min(width, height);
-  const active = Math.round(clamp(88, minDim * 0.18, 160));
+  const active = Math.round(clamp(56, minDim * 0.18, 160));
   const idle = Math.round(active * 0.8);
-  const fontSize = Math.round(clamp(14, active * 0.16, 22));
-  const labelSize = Math.round(clamp(10, active * 0.1, 14));
+  const fontSize = Math.round(clamp(10, active * 0.16, 22));
+  const labelSize = Math.round(clamp(8, active * 0.1, 14));
   return { active, idle, fontSize, labelSize };
 }

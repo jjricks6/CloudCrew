@@ -88,7 +88,7 @@ export function ArtifactsPage() {
                     {item.version}
                   </span>
                   {item.created_at && (
-                    <span className="text-xs text-muted-foreground">
+                    <span className="hidden text-xs text-muted-foreground sm:inline">
                       {new Date(item.created_at).toLocaleString()}
                     </span>
                   )}
