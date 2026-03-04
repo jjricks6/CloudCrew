@@ -15,13 +15,11 @@
 </tr>
 </table>
 
----
 
 ## What CloudCrew Does
 
 CloudCrew works with you to identify your project's unique requirements, then autonomously executes the entire delivery—from architecture and design through production deployment and handoff—with your approval at every milestone.
 
-![CloudCrew Demo](docs/assets/demo.gif)
 
 Here's how it works:
 
@@ -35,10 +33,13 @@ Here's how it works:
 
 5. **Handoff Phase** — Team prepares you for independence. Deliverables: operations runbooks, API documentation, troubleshooting guides, and knowledge transfer sessions.
 
-**At every phase gate, you review deliverables and decide: approve to continue, or request changes.** If changes are needed, the team re-runs the phase with your feedback. No waiting on human coordination — the Swarm self-organizes internally.
+**At every phase gate, you review deliverables and decide: approve to continue, or request changes.** If changes are needed, the team re-runs the phase with your feedback. No waiting on human coordination — the Swarm self-organizes automatically.
 
-> [!TIP]
-> **[Try the Interactive Demo →](https://jjricks6.github.io/CloudCrew/project/demo)** Walk through a complete engagement in your browser — real-time agent collaboration, phase reviews, artifact preview, and chat. No setup required.
+### Demo
+Ready to see CloudCrew in action? Click the button below to go through an interactive demo!
+
+[![Try the Interactive Demo](https://img.shields.io/badge/▶_Try_the_Interactive_Demo-4285F4?style=for-the-badge)](https://jjricks6.github.io/CloudCrew/project/demo)
+
 
 Ready to deploy your own instance? See [Deployment](#deployment).
 
@@ -209,6 +210,9 @@ The `cloudcrew-projects` table is the central shared state — read and written 
 ---
 
 ## Deployment
+
+> [!WARNING]
+> CloudCrew has been tested end-to-end in a dev environment, but is **not yet ready for production use**.
 
 All deployment is manual. CI validates code quality but never applies infrastructure.
 
